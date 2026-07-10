@@ -1,0 +1,59 @@
+.argus-status-indicator {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  position: relative;
+}
+
+.argus-status-indicator::after {
+  content: '';
+  position: absolute;
+  top: -2px;
+  left: -2px;
+  right: -2px;
+  bottom: -2px;
+  border-radius: 50%;
+  animation: argus-pulse 2s infinite;
+  opacity: 0.5;
+}
+
+.argus-status--online {
+  background-color: var(--accent-cyan, #0ff);
+  box-shadow: 0 0 8px var(--accent-cyan, #0ff);
+}
+.argus-status--online::after {
+  background-color: var(--accent-cyan, #0ff);
+}
+
+.argus-status--offline {
+  background-color: #ff3366;
+  box-shadow: 0 0 8px #ff3366;
+  animation: none;
+}
+.argus-status--offline::after {
+  display: none;
+}
+
+.argus-status--busy {
+  background-color: #ffcc00;
+  box-shadow: 0 0 8px #ffcc00;
+}
+.argus-status--busy::after {
+  background-color: #ffcc00;
+}
+
+.argus-status--idle {
+  background-color: #aaaaaa;
+  box-shadow: 0 0 4px #aaaaaa;
+  animation: none;
+}
+.argus-status--idle::after {
+  display: none;
+}
+
+@keyframes argus-pulse {
+  0% { transform: scale(1); opacity: 0.8; }
+  70% { transform: scale(2.5); opacity: 0; }
+  100% { transform: scale(2.5); opacity: 0; }
+}

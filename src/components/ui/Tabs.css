@@ -1,0 +1,33 @@
+.argus-tabs-list {
+  display: flex;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  margin-bottom: 1rem;
+}
+
+.argus-tabs-trigger {
+  background: transparent;
+  padding: 0.5rem 1rem;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: #a0a0b0;
+  font-size: 1rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  outline: none;
+}
+
+.argus-tabs-trigger:hover {
+  color: #fff;
+}
+
+.argus-tabs-trigger[data-state="active"] {
+  color: var(--accent-cyan, #0ff);
+  border-bottom-color: var(--accent-cyan, #0ff);
+  text-shadow: 0 0 8px rgba(0, 255, 255, 0.5);
+}
+
+.argus-tabs-content {
+  outline: none;
+  color: #e0e0e0;
+}

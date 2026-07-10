@@ -1,0 +1,73 @@
+.argus-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  cursor: pointer;
+  border: none;
+  outline: none;
+  font-family: inherit;
+}
+
+.argus-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Sizes */
+.argus-btn--sm {
+  padding: 0.25rem 0.75rem;
+  font-size: 0.875rem;
+}
+.argus-btn--md {
+  padding: 0.5rem 1rem;
+  font-size: 1rem;
+}
+.argus-btn--lg {
+  padding: 0.75rem 1.5rem;
+  font-size: 1.125rem;
+}
+
+/* Variants */
+.argus-btn--primary {
+  background: var(--bg-surface, #1a1a2e);
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.5);
+}
+.argus-btn--primary:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.argus-btn--secondary {
+  background: transparent;
+  color: #a0a0b0;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+.argus-btn--secondary:hover:not(:disabled) {
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.4);
+}
+
+.argus-btn--ghost {
+  background: transparent;
+  color: #a0a0b0;
+}
+.argus-btn--ghost:hover:not(:disabled) {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.argus-btn--neon {
+  background: transparent;
+  color: var(--accent-cyan, #0ff);
+  border: 1px solid var(--accent-cyan, #0ff);
+  box-shadow: 0 0 8px rgba(0, 255, 255, 0.2), inset 0 0 8px rgba(0, 255, 255, 0.2);
+  text-shadow: 0 0 4px rgba(0, 255, 255, 0.5);
+}
+.argus-btn--neon:hover:not(:disabled) {
+  box-shadow: 0 0 15px rgba(0, 255, 255, 0.5), inset 0 0 15px rgba(0, 255, 255, 0.5);
+  background: rgba(0, 255, 255, 0.1);
+}

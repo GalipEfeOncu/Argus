@@ -1,0 +1,71 @@
+.argus-modal-overlay {
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(4px);
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  animation: argus-overlay-show 150ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.argus-modal-content {
+  background: rgba(20, 20, 35, 0.9);
+  border: 1px solid var(--accent-cyan, #0ff);
+  border-radius: 12px;
+  box-shadow: 0 0 20px rgba(0, 255, 255, 0.1), inset 0 0 20px rgba(0, 255, 255, 0.05);
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 90vw;
+  max-width: 500px;
+  max-height: 85vh;
+  padding: 1.5rem;
+  z-index: 101;
+  animation: argus-content-show 150ms cubic-bezier(0.16, 1, 0.3, 1);
+  color: #fff;
+}
+
+.argus-modal-header {
+  margin-bottom: 1rem;
+}
+
+.argus-modal-title {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--accent-cyan, #0ff);
+  text-shadow: 0 0 8px rgba(0, 255, 255, 0.3);
+}
+
+.argus-modal-close {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 1.5rem;
+  line-height: 1;
+  cursor: pointer;
+  transition: color 0.2s;
+}
+
+.argus-modal-close:hover {
+  color: var(--accent-cyan, #0ff);
+}
+
+@keyframes argus-overlay-show {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes argus-content-show {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -48%) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+}

@@ -1,0 +1,45 @@
+.argus-scroll-area {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+.argus-scroll-viewport {
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+}
+
+.argus-scroll-scrollbar {
+  display: flex;
+  user-select: none;
+  touch-action: none;
+  padding: 2px;
+  background: rgba(255, 255, 255, 0.05);
+  transition: background 0.2s;
+}
+
+.argus-scroll-scrollbar[data-orientation="vertical"] {
+  width: 8px;
+}
+
+.argus-scroll-scrollbar[data-orientation="horizontal"] {
+  flex-direction: column;
+  height: 8px;
+}
+
+.argus-scroll-thumb {
+  flex: 1;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+  position: relative;
+}
+
+.argus-scroll-thumb:hover {
+  background: var(--accent-cyan, #0ff);
+  box-shadow: 0 0 5px rgba(0, 255, 255, 0.5);
+}
+
+.argus-scroll-corner {
+  background: transparent;
+}

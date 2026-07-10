@@ -1,0 +1,29 @@
+.argus-badge {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 9999px;
+  padding: 0.125rem 0.625rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  transition: all 0.2s ease;
+}
+
+.argus-badge--default {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
+
+.argus-badge--neon {
+  background: rgba(0, 255, 255, 0.1);
+  color: var(--accent-cyan, #0ff);
+  box-shadow: 0 0 5px rgba(0, 255, 255, 0.3);
+  border: 1px solid rgba(0, 255, 255, 0.5);
+}
+
+.argus-badge--outline {
+  background: transparent;
+  color: #a0a0b0;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}

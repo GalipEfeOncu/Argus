@@ -1,0 +1,27 @@
+.argus-input {
+  display: flex;
+  width: 100%;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 0.5rem 0.75rem;
+  font-size: 1rem;
+  color: #fff;
+  backdrop-filter: blur(10px);
+  transition: border-color 0.2s, box-shadow 0.2s;
+  outline: none;
+}
+
+.argus-input::placeholder {
+  color: rgba(255, 255, 255, 0.3);
+}
+
+.argus-input:focus {
+  border-color: var(--accent-cyan, #0ff);
+  box-shadow: 0 0 8px rgba(0, 255, 255, 0.2);
+}
+
+.argus-input:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
