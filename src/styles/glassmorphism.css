@@ -1,0 +1,88 @@
+/* ============================================================
+   ARGUS — Glassmorphism Utilities
+   ============================================================ */
+
+/* ── Base Glass ──────────────────────────────────────────── */
+.glass {
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid var(--glass-border);
+}
+
+.glass-heavy {
+  background: var(--glass-bg-heavy);
+  backdrop-filter: blur(var(--glass-blur-heavy));
+  -webkit-backdrop-filter: blur(var(--glass-blur-heavy));
+  border: 1px solid var(--border-medium);
+}
+
+/* ── Glass Panel (full panel, no radius) ─────────────────── */
+.glass-panel {
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  border-right: 1px solid var(--glass-border);
+}
+
+/* ── Glass Card (rounded container) ─────────────────────── */
+.glass-card {
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-lg);
+}
+
+.glass-card:hover {
+  border-color: var(--border-medium);
+  background: rgba(26, 26, 46, 0.7);
+}
+
+/* ── Glass Surface (input, select backgrounds) ───────────── */
+.glass-surface {
+  background: rgba(8, 8, 16, 0.5);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid var(--border-subtle);
+}
+
+/* ── Glass Modal (dark overlay modal) ───────────────────── */
+.glass-modal {
+  background: rgba(14, 14, 26, 0.92);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid var(--border-medium);
+  border-radius: var(--radius-xl);
+}
+
+/* ── Agent Glow Borders ──────────────────────────────────── */
+.glow-border-planner {
+  border-color: rgba(0, 229, 255, 0.3) !important;
+  box-shadow: 0 0 0 1px rgba(0, 229, 255, 0.1) inset,
+              0 0 16px rgba(0, 229, 255, 0.08);
+}
+
+.glow-border-builder {
+  border-color: rgba(255, 107, 53, 0.3) !important;
+  box-shadow: 0 0 0 1px rgba(255, 107, 53, 0.1) inset,
+              0 0 16px rgba(255, 107, 53, 0.08);
+}
+
+.glow-border-reviewer {
+  border-color: rgba(168, 85, 247, 0.3) !important;
+  box-shadow: 0 0 0 1px rgba(168, 85, 247, 0.1) inset,
+              0 0 16px rgba(168, 85, 247, 0.08);
+}
+
+.glow-border-tester {
+  border-color: rgba(0, 255, 136, 0.3) !important;
+  box-shadow: 0 0 0 1px rgba(0, 255, 136, 0.1) inset,
+              0 0 16px rgba(0, 255, 136, 0.08);
+}
+
+.glow-border-ui-agent {
+  border-color: rgba(255, 51, 102, 0.3) !important;
+  box-shadow: 0 0 0 1px rgba(255, 51, 102, 0.1) inset,
+              0 0 16px rgba(255, 51, 102, 0.08);
+}

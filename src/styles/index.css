@@ -1,0 +1,37 @@
+/* ============================================================
+   ARGUS — CSS Entry Hub
+   ============================================================ */
+@import './reset.css';
+@import './tokens.css';
+@import './animations.css';
+@import './glassmorphism.css';
+@import './utilities.css';
+
+/* ── Global Base Styles ──────────────────────────────────── */
+html,
+body {
+  font-family: var(--font-sans);
+  font-size: var(--text-base);
+  font-weight: var(--weight-normal);
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  line-height: 1.6;
+}
+
+/* ── Focus Styles ────────────────────────────────────────── */
+:focus-visible {
+  outline: 2px solid var(--accent-cyan);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+/* ── Selection ───────────────────────────────────────────── */
+::selection {
+  background-color: rgba(0, 229, 255, 0.2);
+  color: var(--text-primary);
+}
+
+/* ── Radix UI Overrides ──────────────────────────────────── */
+[data-radix-popper-content-wrapper] {
+  z-index: 9999 !important;
+}
