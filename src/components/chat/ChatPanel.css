@@ -1,0 +1,7 @@
+.chat-panel {
+  box-shadow: -1px 0 0 var(--border-medium);
+}
+
+.chat-header {
+  z-index: 10;
+}

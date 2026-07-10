@@ -1,0 +1,7 @@
+.app-header {
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+}
+
+.header-btn {
+  backdrop-filter: blur(4px);
+}

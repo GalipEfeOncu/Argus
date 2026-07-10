@@ -1,0 +1,44 @@
+.workflow-node {
+  width: 80px;
+  height: 80px;
+  border: 1px solid var(--border-medium);
+  position: relative;
+  z-index: 2;
+}
+
+.node-idle {
+  opacity: 0.5;
+  filter: grayscale(100%);
+}
+
+.node-active {
+  border-color: var(--node-color);
+  background: rgba(0, 0, 0, 0.4);
+  box-shadow: 0 0 15px var(--node-glow) inset, 0 0 10px var(--node-glow);
+  transform: scale(1.05);
+}
+
+.node-active::after {
+  content: '';
+  position: absolute;
+  top: -2px; left: -2px; right: -2px; bottom: -2px;
+  border-radius: inherit;
+  border: 2px solid var(--node-color);
+  animation: pulse-border 2s linear infinite;
+  opacity: 0.5;
+}
+
+.node-done {
+  border-color: rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.node-next {
+  opacity: 0.8;
+  border-style: dashed;
+}
+
+@keyframes pulse-border {
+  0% { transform: scale(1); opacity: 0.8; }
+  100% { transform: scale(1.15); opacity: 0; }
+}

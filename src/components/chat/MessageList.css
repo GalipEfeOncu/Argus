@@ -1,0 +1,9 @@
+.message-list {
+  flex: 1;
+  padding: var(--space-4) 0;
+  scroll-behavior: smooth;
+}
+
+.empty-state {
+  user-select: none;
+}

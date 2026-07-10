@@ -1,0 +1,46 @@
+.agent-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-full);
+  background: var(--bg-surface);
+  border: 1px solid var(--border-medium);
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+  color: var(--text-primary);
+  flex-shrink: 0;
+  transition: all var(--transition-fast);
+  position: relative;
+}
+
+.agent-avatar-sm {
+  width: 24px;
+  height: 24px;
+  font-size: 12px;
+}
+
+.agent-avatar-md {
+  width: 36px;
+  height: 36px;
+  font-size: 18px;
+}
+
+.agent-avatar-lg {
+  width: 48px;
+  height: 48px;
+  font-size: 24px;
+}
+
+/* Pulsing effect when thinking/active */
+.agent-avatar-pulsing {
+  border-color: var(--avatar-color);
+  animation: avatar-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes avatar-pulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 var(--avatar-glow);
+  }
+  50% {
+    box-shadow: 0 0 16px 2px var(--avatar-glow);
+  }
+}

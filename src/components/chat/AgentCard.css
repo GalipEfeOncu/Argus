@@ -1,0 +1,51 @@
+.agent-card {
+  cursor: pointer;
+  transition: all var(--transition-base);
+  border: 1px solid var(--border-medium);
+}
+
+.agent-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+.agent-card-active {
+  border-color: var(--agent-color);
+  background: linear-gradient(180deg, rgba(20, 20, 34, 0.9) 0%, rgba(14, 14, 26, 0.95) 100%);
+  box-shadow: 0 0 0 1px var(--agent-glow) inset, 0 4px 16px rgba(0, 0, 0, 0.4);
+}
+
+.agent-role-name {
+  letter-spacing: 0.02em;
+}
+
+.agent-status-text {
+  text-transform: capitalize;
+}
+
+.status-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  margin-left: 4px;
+  background-color: var(--text-muted);
+}
+
+.status-dot.idle, .status-dot.done {
+  background-color: var(--text-muted);
+}
+
+.status-dot.thinking, .status-dot.streaming, .status-dot.using_tool {
+  background-color: var(--agent-color);
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+.status-dot.waiting_approval {
+  background-color: var(--accent-yellow);
+}
+
+.status-dot.error {
+  background-color: var(--accent-red);
+}
