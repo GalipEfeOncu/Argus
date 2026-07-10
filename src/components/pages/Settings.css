@@ -1,0 +1,5 @@
+/* Settings page specific styles */
+select option {
+  background-color: var(--bg-surface);
+  color: var(--text-primary);
+}

@@ -1,0 +1,11 @@
+.toggle-label {
+  overflow: hidden;
+}
+
+.toggle-dot {
+  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+
+.peer:checked ~ .toggle-label {
+  background-color: rgba(255, 255, 255, 0.05);
+}
