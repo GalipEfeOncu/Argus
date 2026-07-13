@@ -1,28 +1,30 @@
+/* ============================================================
+   Card — Styles
+   ============================================================ */
+
 .argus-card {
-  background: rgba(15, 15, 30, 0.6);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 12px;
-  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  color: #fff;
+  background-color: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
   overflow: hidden;
+  box-sizing: border-box;
 }
 
 .argus-card-header {
   display: flex;
   flex-direction: column;
-  padding: 1.25rem 1.5rem;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border-subtle);
 }
 
 .argus-card-title {
-  font-size: 1.25rem;
-  font-weight: 600;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-primary);
   margin: 0;
-  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+  letter-spacing: -0.01em;
 }
 
 .argus-card-content {
-  padding: 1.5rem;
+  padding: 20px;
 }

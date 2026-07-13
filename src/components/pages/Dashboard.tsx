@@ -14,78 +14,94 @@ export const Dashboard: React.FC = () => {
   };
 
   return (
-    <div className="dashboard h-full w-full bg-[var(--bg-main)] p-8 overflow-y-auto">
-      <div className="max-w-5xl mx-auto">
-        <div className="flex justify-between items-start mb-8">
+    <div className="dashboard">
+      <div className="dashboard-inner">
+
+        {/* ── Header ──────────────────────────────────────── */}
+        <div className="dashboard-header">
           <div>
-            <h1 className="text-2xl font-bold text-primary mb-1">
-              Dashboard
-            </h1>
-            <p className="text-secondary text-sm">Multi-agent orchestration</p>
+            <h1 className="dashboard-title">Dashboard</h1>
+            <p className="dashboard-subtitle">Multi-agent orchestration</p>
           </div>
-          <button 
-            className="bg-accent-primary hover:bg-accent-hover text-primary px-4 py-2 rounded-md font-medium transition-colors text-sm"
+          <button
+            className="dashboard-new-btn"
             onClick={() => setActivePage('session-setup')}
           >
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+              <line x1="12" y1="5" x2="12" y2="19" />
+              <line x1="5" y1="12" x2="19" y2="12" />
+            </svg>
             New Session
           </button>
         </div>
 
-        <div className="recent-sessions">
-          {sessions.length === 0 ? (
-            <div className="rounded-md p-12 text-center text-muted border border-border-subtle bg-[var(--bg-card)]">
-              <p className="mb-4">No recent sessions found.</p>
-              <button 
-                className="text-primary underline hover:text-secondary text-sm"
-                onClick={() => setActivePage('session-setup')}
+        {/* ── Sessions ─────────────────────────────────────── */}
+        <div className="dashboard-section-label">RECENT SESSIONS</div>
+
+        {sessions.length === 0 ? (
+          /* ── Empty State ─────────────────────────────────── */
+          <div className="dashboard-empty">
+            <div className="dashboard-empty-icon">
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+              </svg>
+            </div>
+            <p className="dashboard-empty-title">No sessions yet</p>
+            <p className="dashboard-empty-sub">Start a new orchestration to put your agents to work.</p>
+            <button
+              className="dashboard-empty-cta"
+              onClick={() => setActivePage('session-setup')}
+            >
+              Start your first session
+            </button>
+          </div>
+        ) : (
+          /* ── Session Grid ─────────────────────────────────── */
+          <div className="dashboard-grid">
+            {sessions.map((session) => (
+              <div
+                key={session.id}
+                className="session-card group"
+                onClick={() => handleOpenSession(session.id)}
               >
-                Start a new orchestration session
-              </button>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {sessions.map((session) => (
-                <div 
-                  key={session.id} 
-                  className="session-card bg-[var(--bg-card)] border border-border-subtle p-5 rounded-md hover:border-border-focus hover:bg-[var(--bg-card-hover)] transition-all cursor-pointer group flex flex-col"
-                  onClick={() => handleOpenSession(session.id)}
-                >
-                  <div className="flex justify-between items-start mb-4">
-                    <h3 className="font-medium text-primary truncate pr-2 text-base">{session.name}</h3>
-                    <div className="flex items-center gap-2">
-                      <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-sm bg-[#111111] border border-border-subtle text-xs text-secondary">
-                        <span className={`w-1.5 h-1.5 rounded-full ${
-                          session.status === 'completed' ? 'bg-[var(--status-idle)]' : 
-                          session.status === 'error' ? 'bg-[var(--status-error)]' : 
-                          'bg-[var(--status-active)]'
-                        }`} />
-                        {session.status === 'completed' ? 'ended' : 'active'}
-                      </span>
-                    </div>
-                  </div>
-                  
-                  <div className="text-xs text-secondary mb-4 flex-1">
-                    <div className="mb-1">{formatRelativeTime(session.startedAt)}</div>
-                    <div>Model</div>
-                    <div className="text-muted truncate">Models 3, Claude 3.5 Sonnet</div>
-                  </div>
-                  
-                  <div className="flex justify-between items-center mt-auto">
-                     <button 
-                      className="opacity-0 group-hover:opacity-100 text-muted hover:text-[var(--status-error)] transition-opacity text-xs"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        deleteSession(session.id);
-                      }}
-                    >
-                      Delete
-                    </button>
-                  </div>
+                {/* Status indicator row */}
+                <div className="session-card-top">
+                  <span className={`session-status-dot ${
+                    session.status === 'completed' ? 'session-status-dot--idle' :
+                    session.status === 'error'     ? 'session-status-dot--error' :
+                    'session-status-dot--active'
+                  }`} />
+                  <span className="session-status-label">
+                    {session.status === 'completed' ? 'Ended' : session.status === 'error' ? 'Error' : 'Active'}
+                  </span>
+                  <button
+                    className="session-delete-btn"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      deleteSession(session.id);
+                    }}
+                    title="Delete session"
+                  >
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="3 6 5 6 21 6" />
+                      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+                    </svg>
+                  </button>
                 </div>
-              ))}
-            </div>
-          )}
-        </div>
+
+                <h3 className="session-name">{session.name}</h3>
+
+                <div className="session-meta">
+                  <span>{formatRelativeTime(session.startedAt)}</span>
+                </div>
+
+                <div className="session-open-hint">
+                  Open session →
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

@@ -1,27 +1,50 @@
-.argus-input {
+/* ============================================================
+   Input — Styles
+   ============================================================ */
+
+.argus-input,
+.argus-select {
   display: flex;
   width: 100%;
-  border-radius: 6px;
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  padding: 0.5rem 0.75rem;
-  font-size: 1rem;
-  color: #fff;
-  backdrop-filter: blur(10px);
-  transition: border-color 0.2s, box-shadow 0.2s;
+  border-radius: var(--radius-sm);
+  background-color: var(--bg-element);
+  border: 1px solid var(--border-medium);
+  padding: 7px 10px;
+  font-size: 13px;
+  color: var(--text-primary);
+  font-family: var(--font-sans);
   outline: none;
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+  box-sizing: border-box;
+  -webkit-appearance: none;
+  appearance: none;
 }
 
 .argus-input::placeholder {
-  color: rgba(255, 255, 255, 0.3);
+  color: var(--text-muted);
 }
 
-.argus-input:focus {
-  border-color: var(--accent-cyan, #0ff);
-  box-shadow: 0 0 8px rgba(0, 255, 255, 0.2);
+.argus-input:focus,
+.argus-select:focus {
+  border-color: var(--border-focus);
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.04);
 }
 
-.argus-input:disabled {
-  opacity: 0.5;
+.argus-input:disabled,
+.argus-select:disabled {
+  opacity: 0.45;
   cursor: not-allowed;
+}
+
+.argus-select {
+  cursor: pointer;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23666666' stroke-width='2.5' stroke-linecap='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  padding-right: 30px;
+}
+
+.argus-select option {
+  background-color: var(--bg-card);
+  color: var(--text-primary);
 }

@@ -1,35 +1,132 @@
+/* ============================================================
+   ToolCallBlock — Styles
+   ============================================================ */
+
 .tool-call-block {
   border-radius: var(--radius-md);
+  border: 1px solid var(--border-subtle);
+  background-color: var(--bg-element);
   overflow: hidden;
-  transition: all var(--transition-fast);
+  transition: border-color var(--transition-fast);
 }
 
 .tool-call-header {
-  padding: var(--space-2) var(--space-3);
-  background: rgba(255, 255, 255, 0.02);
+  padding: 8px 12px;
+  background: transparent;
   user-select: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
 }
 
 .tool-call-header:hover {
-  background: rgba(255, 255, 255, 0.05);
+  background: rgba(255, 255, 255, 0.03);
 }
 
-.tool-icon.spin {
-  display: inline-block;
-  animation: spin 2s linear infinite;
+.tool-status-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
 }
 
-.tool-running {
-  border-color: rgba(0, 229, 255, 0.3);
-  box-shadow: 0 0 10px rgba(0, 229, 255, 0.1);
+.tool-status-icon--running {
+  color: var(--accent-primary);
+  animation: toolSpin 1.2s linear infinite;
 }
 
-.tool-error {
-  border-color: rgba(255, 51, 102, 0.4);
+.tool-status-icon--success {
+  color: var(--status-success);
+}
+
+.tool-status-icon--error {
+  color: var(--status-error);
+}
+
+@keyframes toolSpin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+.tool-name {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.tool-args-preview {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 200px;
+  flex: 1;
+}
+
+.tool-duration {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.tool-expand-chevron {
+  color: var(--text-muted);
+  transition: transform var(--transition-fast);
+  flex-shrink: 0;
+}
+
+.tool-expand-chevron--open {
+  transform: rotate(180deg);
 }
 
 .tool-call-details {
-  padding: var(--space-3);
   border-top: 1px solid var(--border-subtle);
-  background: rgba(0, 0, 0, 0.2);
+  background: rgba(0, 0, 0, 0.15);
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.tool-detail-label {
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: 5px;
+}
+
+.tool-detail-pre {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  background-color: var(--bg-code);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  padding: 8px 10px;
+  color: var(--text-secondary);
+  overflow: auto;
+  max-height: 260px;
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+/* Status variants */
+.tool-running {
+  border-color: rgba(165, 14, 28, 0.3);
+  box-shadow: 0 0 8px rgba(165, 14, 28, 0.08);
+}
+
+.tool-error {
+  border-color: rgba(220, 38, 38, 0.4);
+}
+
+.tool-success {
+  border-color: rgba(22, 163, 74, 0.25);
 }

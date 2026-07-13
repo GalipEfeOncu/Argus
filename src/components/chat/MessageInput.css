@@ -1,0 +1,176 @@
+/* ============================================================
+   MessageInput — Styles
+   ============================================================ */
+
+.input-section {
+  padding: 12px 20px 16px;
+  background-color: var(--bg-main);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.input-box-container {
+  display: flex;
+  flex-direction: column;
+  background-color: var(--bg-card);
+  border: 1px solid var(--border-medium);
+  border-radius: var(--radius-lg);
+  padding: 10px 12px;
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.input-box-container:focus-within {
+  border-color: var(--border-focus);
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.03);
+}
+
+.input-textarea {
+  width: 100%;
+  background: transparent;
+  color: var(--text-primary);
+  border: none;
+  outline: none;
+  resize: none;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  line-height: 1.6;
+  padding: 2px 0;
+  min-height: 56px;
+  max-height: 140px;
+}
+
+.input-textarea::placeholder {
+  color: var(--text-muted);
+}
+
+.input-textarea:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+/* ── Inner bottom bar ─────────────────────────────────────────── */
+
+.input-bottom-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-top: 1px solid var(--border-subtle);
+  padding-top: 8px;
+  margin-top: 6px;
+}
+
+.input-left-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.input-action-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  color: var(--text-muted);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: color var(--transition-fast), background-color var(--transition-fast);
+  outline: none;
+}
+
+.input-action-btn:hover {
+  color: var(--text-secondary);
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+.mode-selector-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border-radius: 99px;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  background-color: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-muted);
+  user-select: none;
+  cursor: default;
+}
+
+.btn-execute {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 7px 14px;
+  background-color: var(--accent-primary);
+  color: #ffffff;
+  border: none;
+  border-radius: var(--radius-md);
+  font-size: 12px;
+  font-weight: 600;
+  font-family: var(--font-sans);
+  cursor: pointer;
+  transition: background-color var(--transition-fast), box-shadow var(--transition-fast);
+  outline: none;
+}
+
+.btn-execute:hover:not(:disabled) {
+  background-color: var(--accent-hover);
+  box-shadow: 0 0 14px var(--accent-glow-md);
+}
+
+.btn-execute:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.btn-execute:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+/* ── Sub pills ────────────────────────────────────────────────── */
+
+.input-sub-pills {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 2px;
+}
+
+.sub-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.02);
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: color var(--transition-fast), border-color var(--transition-fast);
+  box-sizing: border-box;
+  user-select: none;
+}
+
+.sub-pill:hover {
+  color: var(--text-secondary);
+  border-color: var(--border-medium);
+}
+
+.sub-pill-kbd {
+  font-family: var(--font-mono);
+  font-size: 8px;
+  background: rgba(255, 255, 255, 0.05);
+  padding: 1px 4px;
+  border-radius: 3px;
+  border: 1px solid var(--border-subtle);
+  color: var(--text-muted);
+}

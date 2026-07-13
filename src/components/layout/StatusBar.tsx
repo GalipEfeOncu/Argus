@@ -2,16 +2,17 @@ import React from 'react';
 import { useAgentStore } from '@/stores/agentStore';
 import { formatTokens } from '@/utils/formatters';
 import type { BackendStatus } from '@/hooks/useTauri';
+import './StatusBar.css';
 
 interface StatusBarProps {
   backendStatus: BackendStatus;
 }
 
-const statusConfig: Record<BackendStatus, { label: string; color: string; pulse: boolean }> = {
-  starting: { label: 'Starting…',  color: 'bg-[var(--status-warning)]', pulse: true  },
-  running:  { label: 'Connected',  color: 'bg-[var(--status-active)]',  pulse: false },
-  stopped:  { label: 'Offline',    color: 'bg-[var(--status-idle)]',    pulse: false },
-  error:    { label: 'Error',      color: 'bg-[var(--status-error)]',   pulse: true  },
+const statusConfig: Record<BackendStatus, { label: string; dotClass: string; pulse: boolean }> = {
+  starting: { label: 'Starting…',  dotClass: 'statusbar-dot--warning', pulse: true  },
+  running:  { label: 'Connected',  dotClass: 'statusbar-dot--active',  pulse: false },
+  stopped:  { label: 'Offline',    dotClass: 'statusbar-dot--idle',    pulse: false },
+  error:    { label: 'Error',      dotClass: 'statusbar-dot--error',   pulse: true  },
 };
 
 export const StatusBar: React.FC<StatusBarProps> = ({ backendStatus }) => {
@@ -21,25 +22,26 @@ export const StatusBar: React.FC<StatusBarProps> = ({ backendStatus }) => {
     0
   );
 
-  const { label, color, pulse } = statusConfig[backendStatus];
+  const { label, dotClass, pulse } = statusConfig[backendStatus];
 
   return (
-    <footer className="h-[var(--statusbar-height)] bg-[var(--bg-status)] flex items-center justify-between px-4 text-xs text-muted relative z-40">
-      <div className="flex items-center gap-1.5 w-1/3">
-        <span
-          className={`w-1.5 h-1.5 rounded-full ${color} ${pulse ? 'animate-pulse' : ''}`}
-        />
-        Backend: {label}
+    <footer className="statusbar">
+      {/* Left: backend status */}
+      <div className="statusbar-section statusbar-section--left">
+        <span className={`statusbar-dot ${dotClass} ${pulse ? 'statusbar-dot--pulse' : ''}`} />
+        <span>Backend: {label}</span>
       </div>
 
-      <div className="flex items-center justify-center w-1/3">
+      {/* Center: token count */}
+      <div className="statusbar-section statusbar-section--center">
         {totalTokens > 0 && (
-          <span>Session token count: {formatTokens(totalTokens)}</span>
+          <span>Session tokens: {formatTokens(totalTokens)}</span>
         )}
       </div>
 
-      <div className="flex items-center justify-end w-1/3">
-        <span>ws://127.0.0.1:8000</span>
+      {/* Right: WS endpoint */}
+      <div className="statusbar-section statusbar-section--right">
+        <span className="statusbar-ws">ws://127.0.0.1:8000</span>
       </div>
     </footer>
   );

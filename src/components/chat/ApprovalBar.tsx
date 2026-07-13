@@ -1,6 +1,7 @@
 import React from 'react';
 import { useWebSocket } from '@/hooks/useWebSocket';
 import { useAgentStore } from '@/stores/agentStore';
+import './ApprovalBar.css';
 
 interface ApprovalBarProps {
   sessionId: string;
@@ -10,11 +11,9 @@ export const ApprovalBar: React.FC<ApprovalBarProps> = ({ sessionId }) => {
   const { isInterrupted, interruptReason, setInterrupted } = useAgentStore();
   const { sendApproval } = useWebSocket(sessionId);
 
-  // Mocking interrupt for UI overhaul preview if not interrupted yet
-  // In real app, only show if isInterrupted is true.
-  // For now, we always render it to match the mockup, but wrapped in a check.
-  const showMock = true; // Set to false in Phase 1.2
-  
+  // Mock for UI preview — set to false in production phase
+  const showMock = true;
+
   if (!isInterrupted && !showMock) return null;
 
   const handleApprove = () => {
@@ -28,23 +27,23 @@ export const ApprovalBar: React.FC<ApprovalBarProps> = ({ sessionId }) => {
   };
 
   return (
-    <div className="flex items-center justify-between p-4 bg-[var(--bg-card)] border border-border-subtle rounded-md mx-6 mb-4">
-      <div className="text-sm text-primary">
-        {interruptReason || 'Builder wants to execute: npm install'}
+    <div className="approval-bar">
+      <div className="approval-left">
+        <div className="pulse-warning-dot" />
+        <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+          <span className="approval-label">Attention Required</span>
+          <span className="approval-reason">
+            {interruptReason || 'Builder wants to execute: npm run test'}
+          </span>
+        </div>
       </div>
-      
-      <div className="flex gap-2">
-        <button 
-          className="text-xs px-3 py-1.5 rounded bg-accent-primary text-primary hover:bg-accent-hover transition-colors font-medium"
-          onClick={handleApprove}
-        >
-          [Approve]
+
+      <div className="approval-actions">
+        <button className="btn-approve" onClick={handleApprove}>
+          Approve
         </button>
-        <button 
-          className="text-xs px-3 py-1.5 rounded border border-accent-primary text-accent-primary hover:bg-accent-transparent transition-colors font-medium"
-          onClick={handleReject}
-        >
-          [Reject]
+        <button className="btn-reject" onClick={handleReject}>
+          Reject
         </button>
       </div>
     </div>

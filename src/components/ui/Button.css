@@ -1,73 +1,98 @@
+/* ============================================================
+   Button — Styles
+   ============================================================ */
+
 .argus-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border-radius: 4px;
-  font-weight: 500;
-  transition: all 0.2s ease;
+  gap: 6px;
+  border-radius: var(--radius-md);
+  font-weight: 600;
+  font-family: var(--font-sans);
   cursor: pointer;
   border: none;
   outline: none;
-  font-family: inherit;
+  transition: all var(--transition-base);
+  white-space: nowrap;
+  box-sizing: border-box;
 }
 
 .argus-btn:disabled {
-  opacity: 0.5;
+  opacity: 0.45;
   cursor: not-allowed;
+  pointer-events: none;
 }
 
-/* Sizes */
+/* ── Sizes ───────────────────────────────────────────────────── */
+
 .argus-btn--sm {
-  padding: 0.25rem 0.75rem;
-  font-size: 0.875rem;
+  padding: 5px 10px;
+  font-size: 11px;
 }
+
 .argus-btn--md {
-  padding: 0.5rem 1rem;
-  font-size: 1rem;
+  padding: 7px 14px;
+  font-size: 13px;
 }
+
 .argus-btn--lg {
-  padding: 0.75rem 1.5rem;
-  font-size: 1.125rem;
+  padding: 10px 20px;
+  font-size: 14px;
 }
 
-/* Variants */
+/* ── Variants ─────────────────────────────────────────────────── */
+
+/* Primary — ruby fill */
 .argus-btn--primary {
-  background: var(--bg-surface, #1a1a2e);
-  color: #fff;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.5);
-}
-.argus-btn--primary:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.05);
+  background-color: var(--accent-primary);
+  color: #ffffff;
+  border: none;
 }
 
+.argus-btn--primary:hover:not(:disabled) {
+  background-color: var(--accent-hover);
+  box-shadow: 0 0 14px var(--accent-glow-md), 0 2px 8px var(--accent-glow-sm);
+}
+
+.argus-btn--primary:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+/* Secondary — outlined subtle */
 .argus-btn--secondary {
   background: transparent;
-  color: #a0a0b0;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-}
-.argus-btn--secondary:hover:not(:disabled) {
-  color: #fff;
-  border-color: rgba(255, 255, 255, 0.4);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-medium);
 }
 
+.argus-btn--secondary:hover:not(:disabled) {
+  color: var(--text-primary);
+  border-color: var(--border-focus);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+/* Ghost — no border */
 .argus-btn--ghost {
   background: transparent;
-  color: #a0a0b0;
+  color: var(--text-muted);
+  border: none;
 }
+
 .argus-btn--ghost:hover:not(:disabled) {
-  color: #fff;
+  color: var(--text-primary);
   background: rgba(255, 255, 255, 0.05);
 }
 
+/* Neon → repurposed as Danger outline */
 .argus-btn--neon {
   background: transparent;
-  color: var(--accent-cyan, #0ff);
-  border: 1px solid var(--accent-cyan, #0ff);
-  box-shadow: 0 0 8px rgba(0, 255, 255, 0.2), inset 0 0 8px rgba(0, 255, 255, 0.2);
-  text-shadow: 0 0 4px rgba(0, 255, 255, 0.5);
+  color: var(--accent-primary);
+  border: 1px solid rgba(165, 14, 28, 0.45);
 }
+
 .argus-btn--neon:hover:not(:disabled) {
-  box-shadow: 0 0 15px rgba(0, 255, 255, 0.5), inset 0 0 15px rgba(0, 255, 255, 0.5);
-  background: rgba(0, 255, 255, 0.1);
+  background-color: var(--accent-transparent);
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 10px var(--accent-glow-sm);
 }

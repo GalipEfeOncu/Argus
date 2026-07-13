@@ -18,7 +18,7 @@ interface UIState {
 export const useUIStore = create<UIState>()((set) => ({
   activePage: 'dashboard',
   sidebarCollapsed: false,
-  agentPanelVisible: true,
+  agentPanelVisible: false,
   workflowVisible: true,
 
   setActivePage: (page) => set({ activePage: page }),

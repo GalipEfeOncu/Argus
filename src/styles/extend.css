@@ -122,3 +122,23 @@
 .inline-block { display: inline-block; }
 .whitespace-pre-wrap { white-space: pre-wrap; }
 .leading-relaxed { line-height: 1.625; }
+
+/* ── Logo red ────────────────────────────────────────────── */
+.bg-logo-red { background-color: var(--logo-red); }
+
+/* ── Accent transparent hover ────────────────────────────── */
+.bg-accent-transparent { background-color: var(--accent-transparent); }
+.hover\:bg-accent-transparent-hover:hover { background-color: var(--accent-transparent-hover); }
+
+/* ── px/py extras ────────────────────────────────────────── */
+.px-1 { padding-left: 0.25rem; padding-right: 0.25rem; }
+.py-1 { padding-top: 0.25rem; padding-bottom: 0.25rem; }
+.px-5 { padding-left: 1.25rem; padding-right: 1.25rem; }
+.py-5 { padding-top: 1.25rem; padding-bottom: 1.25rem; }
+.px-4 { padding-left: 1rem; padding-right: 1rem; }
+.py-4 { padding-top: 1rem; padding-bottom: 1rem; }
+
+/* ── border-b/t with border-subtle ──────────────────────── */
+.border-t.border-border-subtle { border-top: 1px solid var(--border-subtle); }
+.border-b.border-border-subtle { border-bottom: 1px solid var(--border-subtle); }
+
