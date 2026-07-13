@@ -14,22 +14,60 @@ const PageRenderer: React.FC = () => {
   const { activePage } = useUIStore();
   
   switch (activePage) {
-    case 'dashboard': return <Dashboard />;
+    case 'dashboard':     return <Dashboard />;
     case 'session-setup': return <SessionSetup />;
-    case 'session': return <SessionView />;
-    case 'settings': return <Settings />;
-    case 'history': return <div className="p-8 w-full flex items-center justify-center text-muted">History coming soon...</div>;
-    default: return <Dashboard />;
+    case 'session':       return <SessionView />;
+    case 'settings':      return <Settings />;
+    case 'history':       return <div className="p-8 w-full flex items-center justify-center text-muted">History coming soon...</div>;
+    default:              return <Dashboard />;
   }
 };
 
 const App: React.FC = () => {
-  const { isRunning, startBackend } = useTauri();
+  const { status, errorMsg, startBackend } = useTauri();
 
   useEffect(() => {
-    // Attempt to start python backend when app launches
+    // Kick off the backend — lib.rs already auto-starts it, but calling
+    // invoke here lets the hook track the result and update status state.
     startBackend();
   }, [startBackend]);
+
+  // ── Backend status banner ──────────────────────────────────────────────
+  const banner = (() => {
+    switch (status) {
+      case 'starting':
+        return (
+          <div className="absolute top-2 right-1/2 translate-x-1/2 z-50 flex items-center gap-2 bg-accent-yellow/20 text-accent-yellow px-3 py-1 rounded-full text-xs border border-accent-yellow/50 backdrop-blur-md animate-pulse">
+            <span className="w-1.5 h-1.5 rounded-full bg-accent-yellow inline-block" />
+            Starting backend service…
+          </div>
+        );
+      case 'error':
+        return (
+          <div
+            className="absolute top-2 right-1/2 translate-x-1/2 z-50 flex items-center gap-2 bg-red-500/20 text-red-400 px-3 py-1 rounded-full text-xs border border-red-500/50 backdrop-blur-md cursor-pointer hover:bg-red-500/30 transition-colors"
+            title={errorMsg ?? undefined}
+            onClick={() => startBackend()}
+          >
+            <span className="w-1.5 h-1.5 rounded-full bg-red-400 inline-block" />
+            Backend error — click to retry
+          </div>
+        );
+      case 'stopped':
+        return (
+          <div
+            className="absolute top-2 right-1/2 translate-x-1/2 z-50 flex items-center gap-2 bg-gray-500/20 text-gray-400 px-3 py-1 rounded-full text-xs border border-gray-500/40 backdrop-blur-md cursor-pointer hover:bg-gray-500/30 transition-colors"
+            onClick={() => startBackend()}
+          >
+            <span className="w-1.5 h-1.5 rounded-full bg-gray-400 inline-block" />
+            Backend stopped — click to start
+          </div>
+        );
+      case 'running':
+      default:
+        return null; // No banner when everything is fine
+    }
+  })();
 
   return (
     <div className="app-container w-screen h-screen flex flex-col overflow-hidden bg-bg-base text-text-primary">
@@ -48,13 +86,9 @@ const App: React.FC = () => {
         </main>
       </div>
 
-      <StatusBar />
-      
-      {!isRunning && (
-        <div className="absolute top-2 right-1/2 translate-x-1/2 z-50 bg-accent-yellow/20 text-accent-yellow px-3 py-1 rounded-full text-xs border border-accent-yellow/50 backdrop-blur-md">
-          Starting Backend Service...
-        </div>
-      )}
+      <StatusBar backendStatus={status} />
+
+      {banner}
     </div>
   );
 };
