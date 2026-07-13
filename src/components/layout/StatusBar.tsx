@@ -8,10 +8,10 @@ interface StatusBarProps {
 }
 
 const statusConfig: Record<BackendStatus, { label: string; color: string; pulse: boolean }> = {
-  starting: { label: 'Starting…',  color: 'bg-accent-yellow', pulse: true  },
-  running:  { label: 'Connected',  color: 'bg-accent-cyan',   pulse: false },
-  stopped:  { label: 'Offline',    color: 'bg-gray-500',      pulse: false },
-  error:    { label: 'Error',      color: 'bg-red-500',       pulse: true  },
+  starting: { label: 'Starting…',  color: 'bg-[var(--status-warning)]', pulse: true  },
+  running:  { label: 'Connected',  color: 'bg-[var(--status-active)]',  pulse: false },
+  stopped:  { label: 'Offline',    color: 'bg-[var(--status-idle)]',    pulse: false },
+  error:    { label: 'Error',      color: 'bg-[var(--status-error)]',   pulse: true  },
 };
 
 export const StatusBar: React.FC<StatusBarProps> = ({ backendStatus }) => {
@@ -24,25 +24,21 @@ export const StatusBar: React.FC<StatusBarProps> = ({ backendStatus }) => {
   const { label, color, pulse } = statusConfig[backendStatus];
 
   return (
-    <footer className="h-8 glass-heavy border-t border-border-strong flex items-center justify-between px-4 text-xs text-muted relative z-40">
-      <div className="flex items-center gap-4">
-        <span>Argus Engine</span>
+    <footer className="h-[var(--statusbar-height)] bg-[var(--bg-status)] flex items-center justify-between px-4 text-xs text-muted relative z-40">
+      <div className="flex items-center gap-1.5 w-1/3">
+        <span
+          className={`w-1.5 h-1.5 rounded-full ${color} ${pulse ? 'animate-pulse' : ''}`}
+        />
+        Backend: {label}
+      </div>
+
+      <div className="flex items-center justify-center w-1/3">
         {totalTokens > 0 && (
-          <span className="flex items-center gap-1">
-            <span className="w-2 h-2 rounded-full bg-accent-cyan animate-pulse" />
-            {formatTokens(totalTokens)} tokens this session
-          </span>
+          <span>Session token count: {formatTokens(totalTokens)}</span>
         )}
       </div>
 
-      <div className="flex items-center gap-4">
-        {/* Backend connection indicator */}
-        <span className="flex items-center gap-1.5">
-          <span
-            className={`w-2 h-2 rounded-full ${color} ${pulse ? 'animate-pulse' : ''}`}
-          />
-          Backend: {label}
-        </span>
+      <div className="flex items-center justify-end w-1/3">
         <span>ws://127.0.0.1:8000</span>
       </div>
     </footer>

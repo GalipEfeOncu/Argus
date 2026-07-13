@@ -1,11 +1,19 @@
 .sidebar {
+  background-color: var(--bg-sidebar);
   z-index: 40;
 }
 
 .nav-item {
   outline: none;
+  border-left: 2px solid transparent;
+}
+
+.nav-item.active {
+  border-left: 2px solid var(--accent-primary);
+  background-color: rgba(255, 255, 255, 0.02); /* Extremely subtle active bg */
 }
 
 .nav-item:focus-visible {
-  box-shadow: 0 0 0 2px var(--accent-cyan);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 0 0 2px var(--border-focus);
 }

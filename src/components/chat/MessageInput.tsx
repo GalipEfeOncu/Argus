@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { useWebSocket } from '@/hooks/useWebSocket';
 import { useSessionStore } from '@/stores/sessionStore';
 import { useAgentStore } from '@/stores/agentStore';
-import './MessageInput.css';
 
 interface MessageInputProps {
   sessionId: string;
@@ -28,20 +27,20 @@ export const MessageInput: React.FC<MessageInputProps> = ({ sessionId }) => {
   };
 
   return (
-    <div className="message-input-container p-4 glass-heavy border-t border-border-medium relative z-10">
-      <div className="input-wrapper relative flex items-center">
+    <div className="px-6 pb-6 pt-2 bg-[var(--bg-main)]">
+      <div className="relative flex items-center">
         <textarea
-          className="chat-textarea w-full bg-transparent border border-border-strong rounded-lg p-3 pr-12 text-primary resize-none glass-surface focus:outline-none focus:border-accent-cyan"
+          className="w-full bg-[var(--bg-card)] border border-border-subtle rounded-md py-3 pl-4 pr-12 text-primary resize-none focus:outline-none focus:border-border-focus transition-colors"
           rows={1}
-          placeholder={isInterrupted ? "Waiting for approval..." : "Send a message or instruction..."}
+          placeholder={isInterrupted ? "Waiting for approval..." : "Message input"}
           value={content}
           onChange={(e) => setContent(e.target.value)}
           onKeyDown={handleKeyDown}
           disabled={!activeSessionId || isInterrupted}
-          style={{ minHeight: '44px', maxHeight: '120px' }}
+          style={{ minHeight: '48px', maxHeight: '120px' }}
         />
         <button 
-          className="send-button absolute right-2 bottom-2 w-8 h-8 rounded-md flex items-center justify-center text-primary disabled:opacity-50 disabled:cursor-not-allowed hover:bg-white/10 transition-colors"
+          className="absolute right-3 bottom-3 w-6 h-6 flex items-center justify-center text-muted hover:text-primary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           onClick={handleSend}
           disabled={!content.trim() || isInterrupted}
         >

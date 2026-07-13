@@ -1,7 +1,6 @@
 import React from 'react';
 import { useWebSocket } from '@/hooks/useWebSocket';
 import { useAgentStore } from '@/stores/agentStore';
-import './ApprovalBar.css';
 
 interface ApprovalBarProps {
   sessionId: string;
@@ -10,54 +9,43 @@ interface ApprovalBarProps {
 export const ApprovalBar: React.FC<ApprovalBarProps> = ({ sessionId }) => {
   const { isInterrupted, interruptReason, setInterrupted } = useAgentStore();
   const { sendApproval } = useWebSocket(sessionId);
-  const [feedback, setFeedback] = React.useState('');
 
-  if (!isInterrupted) return null;
+  // Mocking interrupt for UI overhaul preview if not interrupted yet
+  // In real app, only show if isInterrupted is true.
+  // For now, we always render it to match the mockup, but wrapped in a check.
+  const showMock = true; // Set to false in Phase 1.2
+  
+  if (!isInterrupted && !showMock) return null;
 
   const handleApprove = () => {
-    sendApproval(true, feedback);
+    sendApproval(true, '');
     setInterrupted(false);
-    setFeedback('');
   };
 
   const handleReject = () => {
-    sendApproval(false, feedback);
+    sendApproval(false, '');
     setInterrupted(false);
-    setFeedback('');
   };
 
   return (
-    <div className="approval-bar glass-heavy p-4 border-t border-border-medium shadow-xl">
-      <div className="flex items-center gap-3 mb-3">
-        <div className="warning-icon text-xl">⚠️</div>
-        <div>
-          <h4 className="text-primary font-semibold text-sm">Human Approval Required</h4>
-          <p className="text-secondary text-xs">{interruptReason || 'The workflow requires your review.'}</p>
-        </div>
+    <div className="flex items-center justify-between p-4 bg-[var(--bg-card)] border border-border-subtle rounded-md mx-6 mb-4">
+      <div className="text-sm text-primary">
+        {interruptReason || 'Builder wants to execute: npm install'}
       </div>
       
-      <div className="flex flex-col gap-3">
-        <input 
-          type="text"
-          className="feedback-input glass-surface p-2 text-sm rounded border border-border-subtle w-full"
-          placeholder="Optional feedback or instructions..."
-          value={feedback}
-          onChange={(e) => setFeedback(e.target.value)}
-        />
-        <div className="flex gap-2 justify-end">
-          <button 
-            className="btn btn-ghost text-sm px-4 py-2 rounded text-red-400 hover:bg-red-950/30"
-            onClick={handleReject}
-          >
-            Reject & Revise
-          </button>
-          <button 
-            className="btn btn-primary text-sm px-4 py-2 rounded bg-green-500/20 text-green-400 hover:bg-green-500/30 border border-green-500/30"
-            onClick={handleApprove}
-          >
-            Approve & Continue
-          </button>
-        </div>
+      <div className="flex gap-2">
+        <button 
+          className="text-xs px-3 py-1.5 rounded bg-accent-primary text-primary hover:bg-accent-hover transition-colors font-medium"
+          onClick={handleApprove}
+        >
+          [Approve]
+        </button>
+        <button 
+          className="text-xs px-3 py-1.5 rounded border border-accent-primary text-accent-primary hover:bg-accent-transparent transition-colors font-medium"
+          onClick={handleReject}
+        >
+          [Reject]
+        </button>
       </div>
     </div>
   );

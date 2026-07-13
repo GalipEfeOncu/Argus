@@ -15,10 +15,23 @@
 .flex-1 { flex: 1; }
 .flex-none { flex: none; }
 .flex-wrap { flex-wrap: wrap; }
-.gap-1 { gap: var(--space-1); }
-.gap-2 { gap: var(--space-2); }
-.gap-3 { gap: var(--space-3); }
-.gap-4 { gap: var(--space-4); }
+.gap-1 { gap: var(--spacing-xs); }
+.gap-2 { gap: var(--spacing-sm); }
+.gap-3 { gap: var(--spacing-md); }
+.gap-4 { gap: var(--spacing-lg); }
+.gap-6 { gap: var(--spacing-xl); }
+
+/* ── Padding & Margin ────────────────────────────────────── */
+.p-0 { padding: 0; }
+.p-1 { padding: var(--spacing-xs); }
+.p-2 { padding: var(--spacing-sm); }
+.p-3 { padding: var(--spacing-md); }
+.p-4 { padding: var(--spacing-lg); }
+
+.px-2 { padding-left: var(--spacing-sm); padding-right: var(--spacing-sm); }
+.py-2 { padding-top: var(--spacing-sm); padding-bottom: var(--spacing-sm); }
+.px-4 { padding-left: var(--spacing-lg); padding-right: var(--spacing-lg); }
+.py-4 { padding-top: var(--spacing-lg); padding-bottom: var(--spacing-lg); }
 
 /* ── Overflow ────────────────────────────────────────────── */
 .overflow-hidden { overflow: hidden; }
@@ -35,14 +48,19 @@
 .text-primary { color: var(--text-primary); }
 .text-secondary { color: var(--text-secondary); }
 .text-muted { color: var(--text-muted); }
-.text-xs { font-size: var(--text-xs); }
-.text-sm { font-size: var(--text-sm); }
-.text-base { font-size: var(--text-base); }
-.text-md { font-size: var(--text-md); }
-.text-lg { font-size: var(--text-lg); }
+.text-xs { font-size: 11px; }
+.text-sm { font-size: 13px; }
+.text-base { font-size: 14px; }
+.text-lg { font-size: 16px; }
+.text-xl { font-size: 20px; }
+.text-2xl { font-size: 24px; }
+
 .font-mono { font-family: var(--font-mono); }
-.font-medium { font-weight: var(--weight-medium); }
-.font-semibold { font-weight: var(--weight-semibold); }
+.font-medium { font-weight: 500; }
+.font-semibold { font-weight: 600; }
+.font-bold { font-weight: 700; }
+.tracking-wider { letter-spacing: 0.05em; }
+.text-center { text-align: center; }
 
 /* ── Sizing ──────────────────────────────────────────────── */
 .w-full { width: 100%; }
@@ -55,25 +73,16 @@
 .select-none { user-select: none; }
 .relative { position: relative; }
 .absolute { position: absolute; }
+.rounded-sm { border-radius: var(--radius-sm); }
+.rounded-md { border-radius: var(--radius-md); }
+.rounded-lg { border-radius: var(--radius-lg); }
 
-/* ── Agent Color Text ────────────────────────────────────── */
-.text-planner   { color: var(--agent-planner); }
-.text-builder   { color: var(--agent-builder); }
-.text-reviewer  { color: var(--agent-reviewer); }
-.text-tester    { color: var(--agent-tester); }
-.text-ui-agent  { color: var(--agent-ui); }
-
-/* ── Shimmer Loading ─────────────────────────────────────── */
-.shimmer {
-  background: linear-gradient(
-    90deg,
-    var(--bg-surface) 0%,
-    var(--bg-elevated) 50%,
-    var(--bg-surface) 100%
-  );
-  background-size: 200% auto;
-  animation: shimmer 1.5s linear infinite;
-}
+/* ── Agent Color Text (Fallback) ─────────────────────────── */
+.text-planner   { color: var(--text-secondary); }
+.text-builder   { color: var(--text-secondary); }
+.text-reviewer  { color: var(--text-secondary); }
+.text-tester    { color: var(--text-secondary); }
+.text-ui-agent  { color: var(--text-secondary); }
 
 /* ── Visually Hidden (accessibility) ────────────────────── */
 .sr-only {

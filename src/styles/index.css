@@ -4,30 +4,31 @@
 @import './reset.css';
 @import './tokens.css';
 @import './animations.css';
-@import './glassmorphism.css';
 @import './utilities.css';
+@import './extend.css';
 
 /* ── Global Base Styles ──────────────────────────────────── */
 html,
 body {
   font-family: var(--font-sans);
-  font-size: var(--text-base);
-  font-weight: var(--weight-normal);
-  background-color: var(--bg-primary);
+  background-color: var(--bg-desktop);
   color: var(--text-primary);
   line-height: 1.6;
+  margin: 0;
+  padding: 0;
+  overflow: hidden; /* Desktop app layout */
 }
 
 /* ── Focus Styles ────────────────────────────────────────── */
 :focus-visible {
-  outline: 2px solid var(--accent-cyan);
+  outline: 2px solid var(--border-focus);
   outline-offset: 2px;
   border-radius: var(--radius-sm);
 }
 
 /* ── Selection ───────────────────────────────────────────── */
 ::selection {
-  background-color: rgba(0, 229, 255, 0.2);
+  background-color: var(--accent-transparent);
   color: var(--text-primary);
 }
 

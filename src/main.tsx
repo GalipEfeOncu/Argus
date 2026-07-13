@@ -5,7 +5,6 @@ import './styles/reset.css';
 import './styles/tokens.css';
 import './styles/utilities.css';
 import './styles/animations.css';
-import './styles/glassmorphism.css';
 import './styles/index.css';
 
 const el = document.getElementById('root');
