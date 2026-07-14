@@ -1,213 +1,79 @@
-# Argus — Mimari Referans
+# Argus Architecture
 
-Bu belge, Argus'un teknik mimarisini anlamak isteyen geliştiriciler ve AI agent'lar için kapsamlı bir referans sunar.
+## Purpose
 
-## Genel Bakış
+Argus is a local-first desktop workspace for transparent multi-agent software development. It combines a Tauri desktop client, a React interface, and a local FastAPI runtime that coordinates model providers and project tools.
 
-Argus iki ana katmandan oluşur:
+The product is not modeled as a fixed agent chain. A session is a shared, ordered collaboration room with a deterministic control plane and model-driven participants.
 
-1. **Frontend** — Tauri v2 içinde çalışan React + Vite uygulaması
-2. **Backend** — Tauri sidecar olarak başlatılan FastAPI + LangGraph süreci
+## System overview
 
-İkisi arasındaki iletişim **WebSocket** üzerinden gerçekleşir. Frontend olayları dinler, backend LangGraph graph'ını çalıştırır ve token/araç olaylarını stream'ler.
-
----
-
-## Frontend Katmanı
-
-### Teknolojiler
-- **Framework:** React 18 + TypeScript 5
-- **Build:** Vite 6
-- **State:** Zustand (persist middleware ile localStorage'a kayıt)
-- **UI Primitives:** Radix UI (Dialog, Select, Tabs, ScrollArea, Tooltip)
-- **Stil:** Vanilla CSS — design token'lar (`src/styles/tokens.css`), glassmorphism yardımcıları
-- **Tauri Bridge:** `@tauri-apps/api/core` (invoke), `@tauri-apps/plugin-dialog` (dosya seç)
-
-### State Mimarisi (Zustand)
-
-```
-useSettingsStore   — API provider'lar, rol→model eşlemeleri (localStorage'a persist)
-useSessionStore    — Session meta verileri (localStorage'a persist)
-useAgentStore      — Aktif session'daki mesajlar, agent durumları (persist değil)
-useUIStore         — Aktif sayfa, sidebar açık/kapalı (persist değil)
+```text
+Tauri Desktop App
+├── React client
+│   ├── Project/session navigation
+│   ├── Shared timeline and composer
+│   ├── Agent roster, assignments, usage, diffs, approvals
+│   └── Typed REST/WebSocket clients
+├── Tauri bridge
+│   ├── Native dialogs and credential-store access
+│   └── Local backend lifecycle
+└── FastAPI local runtime
+    ├── Deterministic control plane
+    ├── Event store and session projections
+    ├── Coordinator and agent execution workers
+    ├── Provider adapters and skill registry
+    ├── Workspace, worktree, tool, and approval services
+    └── SQLite persistence
 ```
 
-### WebSocket Event Akışı
+## Control plane and collaboration plane
 
-```
-Backend → Frontend olayları:
-  agent_start      → AgentStore: yeni mesaj balonu aç, durumu "thinking"
-  token            → AgentStore: stream token'ı ekle
-  agent_done       → AgentStore: mesajı finalize et
-  tool_call_start  → AgentStore: ToolCallBlock aç
-  tool_call_end    → AgentStore: ToolCallBlock'u sonuçla kapat
-  interrupt        → AgentStore: isInterrupted=true, ApprovalBar göster
-  error            → Hata mesajı
+The control plane owns facts that must be deterministic: event sequencing, policy checks, approvals, project locks, writer leases, cancellation, retries, timeouts, persistence, and recovery.
 
-Frontend → Backend olayları:
-  user_message     → Kullanıcı chat girdisi
-  human_response   → Onay/ret (interrupt sonrası)
-  interrupt        → Acil durdurma
-```
+The collaboration plane contains the visible Coordinator and agents. They receive a bounded projection of the shared timeline, can create messages, request tools, assign work, hand off tasks, and produce artifacts. Model output never bypasses the control plane.
 
-### Sayfa Akışı
+LangGraph may be used for an individual agent's tool loop and checkpointing. It is not the source of truth for session topology; the current static `Planner → Builder → Reviewer → Tester` graph will be replaced by the event-driven session runtime.
 
-```
-Dashboard (/)
-  → "New Session" butonu
-SessionSetup (/setup)
-  → Proje klasörü seç
-  → Görev yaz
-  → Agent roller aktif/pasif
-  → "Initialize Agents" → backend'e POST /sessions
-SessionView (/session)
-  → ChatPanel (canlı mesajlar)
-  → WorkflowMini (agent akış grafiği)
-  → AgentPanel (sağda her agent'ın durumu)
-  → ApprovalBar (interrupt geldiğinde)
-Settings (/settings)
-  → Provider yönetimi (API key ekle/sil)
-  → Rol→Model eşleme
+## Session lifecycle
+
+```text
+created → preparing → running ⇄ paused
+                          ├→ waiting_approval ⇄ running
+                          ├→ completed
+                          ├→ cancelled
+                          └→ failed
 ```
 
----
+Each session has an append-only event log. The client receives a snapshot then events in increasing `sequence` order. On reconnect it requests events after its last confirmed sequence. Commands carry idempotency keys.
 
-## Backend Katmanı
+Different projects may run sessions concurrently. Only one mutating session can hold a project writer lock in the MVP. Within a session, read-only work may overlap while only one participant holds the writer lease.
 
-### Teknolojiler
-- **Framework:** FastAPI 0.115+
-- **Orchestration:** LangGraph 1.2+ (StateGraph)
-- **LLM Desteği:** langchain-openai, langchain-anthropic, langchain-google-genai
-- **Checkpointing:** MemorySaver (MVP) → AsyncSqliteSaver (production)
-- **DB:** aiosqlite (session meta verileri)
-- **Server:** uvicorn[standard]
+## Participants, roles, and skills
 
-### LangGraph Graph Yapısı
+Participants are `human`, `system`, `coordinator`, or `agent`. Built-in agent definitions provide a prompt, default skills, tool permissions, and suggested model capabilities. A user can override those values or create a custom capability-based role.
 
-```
-START
-  │
-  ▼
-[planner]     ← Görevi analiz et, adımlara böl, plan yaz
-  │
-  ▼
-[builder]     ← Kodu yaz/düzenle (file_tools + shell_tools kullanır)
-  │
-  ▼
-[reviewer]    ← Kodu incele → APPROVE veya REVISE
-  │
-  ├─ REVISE → [builder] (geri döngü)
-  │
-  ▼
-[tester]      ← Test çalıştır, sonuçları raporla
-  │
-  ▼
-END
-```
+A skill package contains a manifest, instructions, optional reference material, required tools, and requested permissions. Imported skills are validated and require explicit enabling before use.
 
-`ui_agent` — İsteğe bağlı; builder yerine ya da builder sonrası UI odaklı görevler için.
+## Provider layer
 
-### Agent Node Anatomisi
+Provider adapters normalize streaming, tool calls, usage, model metadata, and provider errors for:
 
-Her agent node şu yapıyı izler:
-```python
-async def create_X_node(provider_type, model_id, api_key, base_url, tools):
-    llm = create_llm(provider_type, model_id, api_key, base_url)
-    llm_with_tools = llm.bind_tools(tools) if tools else llm
-    
-    async def node(state: AgentState) -> AgentState:
-        messages = state["messages"]
-        response = await llm_with_tools.ainvoke(messages)
-        return {"messages": [response], "current_agent": "X"}
-    
-    return node
-```
+- OpenAI
+- Anthropic
+- Google
+- OpenAI-compatible endpoints, including OpenRouter and local model servers
 
-### LLM Factory
+Provider keys are stored through the native credential service. The runtime only sees a short-lived resolved credential and never emits it in events, logs, exports, or SQLite records.
 
-`app/core/llm_factory.py` → `create_llm(provider_type, model_id, api_key, base_url)` fonksiyonu:
+## Workspace and tools
 
-| `provider_type` | Kullanılan Kütüphane | Notlar |
-|---|---|---|
-| `openai_compat` | `ChatOpenAI` | `base_url` ile OpenRouter, LM Studio vb. |
-| `anthropic` | `ChatAnthropic` | Claude modelleri |
-| `google` | `ChatGoogleGenerativeAI` | Gemini modelleri |
+The default workspace is a session-specific git worktree and branch. Filesystem, search, shell, and git tools run through a policy-aware service scoped to that workspace. A tool execution records its request, approval state, result summary, duration, and related artifacts in the timeline.
 
-### Araçlar (Tools)
+Non-git projects use a managed snapshot workspace. Direct modification of the original directory is an explicit policy choice.
 
-```
-app/tools/
-  file_tools.py    — read_file, write_file, edit_file, list_directory
-  shell_tools.py   — run_shell_command (güvenlik sınırlı)
-  search_tools.py  — ripgrep_search, find_files
-  git_tools.py     — git_status, git_diff, git_commit, git_log
-```
+## Data ownership
 
-### API Endpoint'leri
+SQLite persists project metadata, sessions, immutable events, participant snapshots, approvals, assignments, artifacts, diffs, usage, and workspace metadata. The selected project remains the source of code; Argus stores orchestration metadata and isolated worktree state.
 
-```
-GET  /health                     — Backend sağlık kontrolü
-POST /sessions                   — Yeni session oluştur
-GET  /sessions                   — Session listesi
-GET  /sessions/{id}              — Session detayı
-POST /sessions/{id}/start        — Agent graph'ını başlat
-POST /providers                  — Provider ekle (API key kaydet)
-GET  /providers                  — Provider listesi
-DELETE /providers/{id}           — Provider sil
-GET  /models/{provider_id}       — Provider'ın model listesi
-WS   /ws/session/{id}            — Canlı event stream
-```
-
----
-
-## Tauri / Rust Katmanı
-
-### Dosyalar
-
-```
-src-tauri/src/
-  main.rs        — Binary entry point (argus_lib::run() çağırır)
-  lib.rs         — Plugin'leri kaydeder (dialog, shell, opener, fs)
-  commands.rs    — #[tauri::command] fonksiyonları (IPC)
-  sidecar.rs     — Python backend process lifecycle (MVP: ayrı başlatılır)
-```
-
-### IPC Komutları (commands.rs)
-
-Frontend → Rust arası:
-- `greet` — Test komutu
-- İleride: `start_backend`, `stop_backend`, `get_app_config`
-
-### İzin Modeli (capabilities/default.json)
-
-```json
-{
-  "permissions": [
-    "core:default",
-    "shell:allow-execute",
-    "dialog:allow-open",
-    "fs:allow-read-all",
-    "fs:allow-write-all",
-    "opener:allow-open-url"
-  ]
-}
-```
-
----
-
-## Veri Akışı — Tam Senaryo
-
-```
-1. Kullanıcı SessionSetup'ta "Initialize Agents" tıklar
-2. Frontend → POST /sessions (role_configs + task + project_path)
-3. Backend session kaydeder → session_id döner
-4. Frontend → WS /ws/session/{id} bağlanır
-5. Backend WS handler → compile_graph() çağırır
-6. LangGraph graph.astream() başlar
-7. Her LangGraph event → JSON WebSocket frame olarak frontend'e
-8. Frontend AgentStore'u günceller → UI reaktif render
-9. Reviewer INTERRUPT gönderirse → Frontend ApprovalBar gösterir
-10. Kullanıcı onaylarsa → Frontend WS'e human_response gönderir
-11. Backend interrupt'tan devam eder
-12. Tüm agent'lar bitince → agent_done + session completed
-```
+See [API.md](API.md) for protocol contracts, [SECURITY.md](SECURITY.md) for enforcement, and [UX_SPEC.md](UX_SPEC.md) for the visible product behavior.

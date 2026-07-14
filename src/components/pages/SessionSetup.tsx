@@ -5,9 +5,11 @@ import { useUIStore } from '@/stores/uiStore';
 import { useTauri } from '@/hooks/useTauri';
 import { AGENT_ROLE_META } from '@/types/agent';
 import type { AgentRole } from '@/types/agent';
+import { eventSimulator } from '@/services/eventSimulator';
 import './SessionSetup.css';
 
 const roleIconColors: Record<AgentRole, string> = {
+  coordinator: '#f472b6',
   planner:  '#60a5fa',
   builder:  '#a78bfa',
   reviewer: '#a50e1c',
@@ -24,6 +26,7 @@ export const SessionSetup: React.FC = () => {
   const [projectPath, setProjectPath] = useState('');
   const [task, setTask] = useState('');
   const [enabledRoles, setEnabledRoles] = useState<Record<AgentRole, boolean>>({
+    coordinator: true,
     planner:  true,
     builder:  true,
     reviewer: true,
@@ -47,7 +50,8 @@ export const SessionSetup: React.FC = () => {
       const def = defaultRoleModels[role] || { providerId: 'default', modelId: 'gpt-4o-mini', displayName: 'Default Model' };
       return { role, enabled, provider_id: def.providerId, model_id: def.modelId, modelRef: def };
     });
-    createSession({ projectPath, task, roleConfigs });
+    const sessionId = createSession({ projectPath, task, roleConfigs });
+    eventSimulator.start(sessionId);
     setActivePage('session');
   };
 

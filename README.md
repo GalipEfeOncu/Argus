@@ -1,120 +1,84 @@
-# Argus 🔭
+# Argus
 
-> **Transparent Multi-Agent Orchestration Platform**
->
-> Cursor, Codex ve Antigravity gibi araçlar arka planda agent kullanır — ama bu tamamen kapalı bir kutu.  
-> Argus bunun tersini yapar: hangi agent hangi rolü üstlendi, hangi modeli kullandı, aralarında nasıl konuştu — hepsini **canlı olarak** görebilir ve kontrol edebilirsiniz.
+> A transparent, local-first multi-agent workspace for software projects.
 
-<p align="center">
-  <img src="docs/assets/banner.png" alt="Argus Banner" width="800" />
-</p>
+Argus lets you run the models you choose against a local project while keeping the collaboration visible. Agents, a Coordinator, and the user work in one shared timeline: you can see assignments, messages, tool activity, diffs, approvals, costs, and handoffs as they happen.
 
-## Özellikler
+Argus is not a black-box coding assistant. It is a controllable orchestration workspace.
 
-| Özellik | Açıklama |
-|---------|----------|
-| 🎭 **5 Özelleştirilebilir Agent Rolü** | Planner · Builder · Reviewer · Tester · UI Agent |
-| 🔑 **Kendi API Key'ini Getir** | OpenAI, Anthropic, Google Gemini, OpenRouter — ya da herhangi bir OpenAI-uyumlu API |
-| 🔴 **Canlı İzleme** | Agent'ların birbirine mesaj paslayışını, araç kullanımını ve kodu gerçek zamanlı görün |
-| 🛑 **Human-in-the-Loop** | İstediğiniz an müdahale edin, onaylayın ya da yönlendirin |
-| 🛠️ **Tam Dosya Sistemi Erişimi** | Okuma, yazma, düzenleme, ripgrep arama, shell, git — Claude Code gibi |
-| 🖥️ **Native Desktop Uygulama** | Tauri v2 ile paketlenmiş — macOS, Linux, Windows |
+## Status
 
-## Mimari
+Argus is in active pre-alpha development. The repository currently contains the Tauri, React, FastAPI, and LangGraph foundations plus an initial UI. The shared-room orchestration runtime described below is the active implementation target; see the [roadmap](docs/ROADMAP.md) for milestone criteria.
 
-```
-┌─────────────────────────────────────────────┐
-│              Tauri Desktop App              │
-│  ┌─────────────────────────────────────┐   │
-│  │         React + Vite Frontend       │   │
-│  │  Dashboard · SessionView · Settings  │   │
-│  │         Zustand State Stores        │   │
-│  └────────────────┬────────────────────┘   │
-│                   │ WebSocket              │
-│  ┌────────────────▼────────────────────┐   │
-│  │        FastAPI Python Backend       │   │
-│  │   LangGraph StateGraph Orchestrator  │   │
-│  │  Planner→Builder→Reviewer→Tester   │   │
-│  │     File/Shell/Git/Search Tools     │   │
-│  └─────────────────────────────────────┘   │
-└─────────────────────────────────────────────┘
-```
+## Product principles
 
-## Hızlı Başlangıç
+- **Transparent by default.** Show messages, concise decision summaries, tool activity, diffs, approvals, usage, and failures. Do not present private model reasoning as a product feature.
+- **Local-first.** Sessions operate on projects selected by the user. Provider credentials belong in the operating-system credential store, never in source control or browser storage.
+- **User-controlled.** Pause, redirect, mention, approve, reject, or stop participants at any time.
+- **Safe defaults, configurable freedom.** Work in an isolated worktree by default; let experienced users choose stricter or more autonomous policies explicitly.
+- **Extensible teams.** Start with built-in roles and skill bundles, then customize or add roles for a project.
 
-### Gereksinimler
+## Target workflow
 
-- [Node.js](https://nodejs.org/) ≥ 18
-- [Rust](https://rustup.rs/) (stable)
-- [uv](https://docs.astral.sh/uv/) (Python paket yöneticisi)
-- Python ≥ 3.12
+1. Choose a local project and configure a session policy.
+2. Select a model for each built-in or custom agent.
+3. Start a shared room where the visible Coordinator assigns and hands off work.
+4. Follow the live timeline, intervene with messages or mentions, and review requested tool permissions.
+5. Inspect generated diffs and accept the isolated worktree changes when ready.
 
-### Kurulum
+## Planned MVP
+
+| Area | MVP capability |
+| --- | --- |
+| Participants | Coordinator, Planner, Builder, Reviewer, Tester, UI Agent, and custom capability-based roles |
+| Providers | Native OpenAI, Anthropic, Google, plus an OpenAI-compatible adapter for OpenRouter and local servers |
+| Collaboration | Ordered shared timeline, mentions, assignments, handoffs, pause/resume/cancel, and reconnect/replay |
+| Safety | Worktree isolation, policy profiles, scoped approvals, diffs, and project-level writer locks |
+| Skills | Built-in bundles plus validated local skill-package import |
+| Desktop | Tauri v2 application for Linux, macOS, and Windows |
+
+## Development
+
+### Prerequisites
+
+- Node.js 18+
+- Rust stable
+- Python 3.12+
+- [uv](https://docs.astral.sh/uv/)
+
+### Setup
 
 ```bash
-# 1. Repo'yu klonla
-git clone https://github.com/GalipEfeOncu/Argus.git
-cd Argus
-
-# 2. Frontend bağımlılıklarını kur
 npm install
-
-# 3. Backend bağımlılıklarını kur
-cd backend && uv sync && cd ..
-
-# 4. Geliştirme modunda başlat
-npm run tauri dev
+(cd backend && uv sync)
+npm run tauri:dev
 ```
 
-### Backend'i ayrıca çalıştır (opsiyonel)
+Run the backend separately during backend development:
 
 ```bash
 cd backend
 uv run uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
 ```
 
-## Proje Yapısı
+### Verification
 
-```
-Argus/
-├── src/                        # React + TypeScript Frontend
-│   ├── components/
-│   │   ├── ui/                 # Atomic UI (Button, Card, Modal…)
-│   │   ├── chat/               # Agent mesaj arayüzü
-│   │   ├── layout/             # Sidebar, Header, StatusBar
-│   │   ├── workflow/           # WorkflowMini agent akış görseli
-│   │   └── pages/              # Dashboard, SessionSetup, SessionView, Settings
-│   ├── stores/                 # Zustand state yönetimi
-│   ├── services/               # WebSocket & API katmanı
-│   ├── hooks/                  # Custom React hook'ları
-│   ├── types/                  # TypeScript tip tanımları
-│   └── styles/                 # Design token'ları ve global CSS
-│
-├── backend/                    # FastAPI + LangGraph Backend
-│   └── app/
-│       ├── agents/             # LangGraph düğümleri (planner, builder…)
-│       ├── api/                # REST + WebSocket endpoint'leri
-│       ├── tools/              # Dosya, shell, git, arama araçları
-│       ├── schemas/            # Pydantic modeller
-│       └── db/                 # SQLite veritabanı
-│
-├── src-tauri/                  # Rust / Tauri Native Layer
-│   └── src/
-│       ├── main.rs             # Binary giriş noktası
-│       ├── lib.rs              # Plugin kurulumu
-│       ├── commands.rs         # IPC komutları
-│       └── sidecar.rs          # Python sidecar yönetimi
-│
-└── docs/                       # Proje dokümantasyonu
+```bash
+npm run type-check
+(cd backend && .venv/bin/python3 -c "import app.main; print('backend import OK')")
+(cd src-tauri && cargo check)
 ```
 
-## Dokümantasyon
+## Documentation
 
-- [📐 Mimari](docs/ARCHITECTURE.md)
-- [🗺️ Geliştirme Fazları](docs/PHASES.md)
-- [🔌 API Referansı](docs/API.md)
-- [🤝 Katkı Rehberi](CONTRIBUTING.md)
+- [Product definition](docs/PRODUCT.md)
+- [Architecture](docs/ARCHITECTURE.md)
+- [UX specification](docs/UX_SPEC.md)
+- [API and event protocol](docs/API.md)
+- [Security model](docs/SECURITY.md)
+- [Roadmap](docs/ROADMAP.md)
+- [Contributing](CONTRIBUTING.md)
 
-## Lisans
+## License
 
 MIT © Galip Efe Oncu

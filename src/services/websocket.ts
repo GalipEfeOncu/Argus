@@ -2,6 +2,7 @@ import type { WSEvent } from '@/types/session';
 import type { ToolCallEvent, DiffBlock } from '@/types/agent';
 import { useAgentStore } from '@/stores/agentStore';
 import { useSessionStore } from '@/stores/sessionStore';
+import { eventSimulator } from '@/services/eventSimulator';
 
 const WS_BASE = 'ws://127.0.0.1:8000';
 
@@ -13,6 +14,7 @@ class WebSocketManager {
 
   connect(sessionId: string): void {
     this.sessionId = sessionId;
+    if (eventSimulator.isActive(sessionId)) return;
     this.cleanup();
     
     const url = `${WS_BASE}/ws/session/${sessionId}`;
@@ -53,10 +55,18 @@ class WebSocketManager {
   }
 
   sendMessage(content: string): void {
+    if (this.sessionId && eventSimulator.isActive(this.sessionId)) {
+      eventSimulator.sendHumanMessage(this.sessionId, content);
+      return;
+    }
     this.send({ type: 'user_message', content });
   }
 
   sendApproval(approved: boolean, feedback?: string): void {
+    if (this.sessionId && eventSimulator.isActive(this.sessionId)) {
+      eventSimulator.resolveApproval(this.sessionId, approved);
+      return;
+    }
     this.send({ type: 'human_response', approved, feedback });
   }
 

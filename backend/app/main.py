@@ -5,7 +5,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
-from app.api import sessions, providers, models_router, websocket as ws_router
+from app.api import contracts, models_router, providers, sessions, websocket as ws_router
 from app.db.database import init_db
 
 
@@ -40,6 +40,7 @@ app.add_middleware(
 app.include_router(sessions.router, prefix="/sessions", tags=["sessions"])
 app.include_router(providers.router, prefix="/providers", tags=["providers"])
 app.include_router(models_router.router, prefix="/models", tags=["models"])
+app.include_router(contracts.router, prefix="/contracts", tags=["contracts"])
 app.include_router(ws_router.router, tags=["websocket"])
 
 

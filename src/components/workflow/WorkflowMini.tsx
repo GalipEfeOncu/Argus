@@ -17,7 +17,7 @@ export const WorkflowMini: React.FC = () => {
     .filter(rc => rc.enabled)
     .map(rc => rc.role as AgentRole)
     .sort((a, b) => {
-      const order = { planner: 1, ui_agent: 2, builder: 3, reviewer: 4, tester: 5 };
+      const order: Record<AgentRole, number> = { coordinator: 1, planner: 2, ui_agent: 3, builder: 4, reviewer: 5, tester: 6 };
       return (order[a] || 99) - (order[b] || 99);
     });
 

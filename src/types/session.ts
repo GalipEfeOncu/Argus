@@ -7,10 +7,12 @@ import type { RoleConfig } from './agent';
 
 export type SessionStatus =
   | 'setup'
+  | 'preparing'
   | 'running'
   | 'paused'
   | 'waiting_approval'
   | 'completed'
+  | 'cancelled'
   | 'error';
 
 export interface Session {

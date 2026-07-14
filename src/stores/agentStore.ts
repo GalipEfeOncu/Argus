@@ -9,7 +9,7 @@ interface AgentStoreState {
 
   initAgents: (infos: AgentInfo[]) => void;
   updateAgentStatus: (role: AgentRole, status: AgentStatus, action?: string) => void;
-  addMessage: (msg: Omit<Message, 'id'>) => string;
+  addMessage: (msg: Message | Omit<Message, 'id'>) => string;
   appendStreamToken: (msgId: string, token: string) => void;
   finalizeMessage: (msgId: string) => void;
   addToolCallToMessage: (msgId: string, toolCall: ToolCallEvent) => void;
@@ -41,10 +41,9 @@ export const useAgentStore = create<AgentStoreState>()((set) => ({
   },
 
   addMessage: (msg) => {
-    const id = crypto.randomUUID();
-    const fullMsg: Message = { ...msg, id };
+    const fullMsg: Message = 'id' in msg ? msg : { ...msg, id: crypto.randomUUID() };
     set((s) => ({ messages: [...s.messages, fullMsg] }));
-    return id;
+    return fullMsg.id;
   },
 
   appendStreamToken: (msgId, token) => {

@@ -11,10 +11,7 @@ export const ApprovalBar: React.FC<ApprovalBarProps> = ({ sessionId }) => {
   const { isInterrupted, interruptReason, setInterrupted } = useAgentStore();
   const { sendApproval } = useWebSocket(sessionId);
 
-  // Mock for UI preview — set to false in production phase
-  const showMock = true;
-
-  if (!isInterrupted && !showMock) return null;
+  if (!isInterrupted) return null;
 
   const handleApprove = () => {
     sendApproval(true, '');

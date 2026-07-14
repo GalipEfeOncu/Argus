@@ -1,86 +1,69 @@
-# Argus — Katkı Rehberi
+# Contributing to Argus
 
-## Dallar (Branches)
+## Contribution model
 
-| Dal | Amaç |
-|-----|------|
-| `main` | Stabil, her zaman çalışan kod |
-| `dev` | Aktif geliştirme |
-| `feat/xxx` | Yeni özellik |
-| `fix/xxx` | Bug düzeltmesi |
-| `docs/xxx` | Yalnızca dokümantasyon |
+Argus is local-first, transparent, and safety-conscious. Contributions must preserve these product invariants:
 
-## Commit Formatı
+- The user can observe and control meaningful agent actions.
+- Runtime policy enforcement is deterministic; prompts are not a security boundary.
+- Secrets never enter source control, browser storage, event payloads, or logs.
+- Frontend and backend protocol changes ship together.
 
-[Conventional Commits](https://www.conventionalcommits.org/) standardını takip ediyoruz:
-
-```
-<type>(<scope>): <kısa açıklama>
-
-[isteğe bağlı detay]
-```
-
-### Tipler
-
-| Tip | Kullanım |
-|-----|----------|
-| `feat` | Yeni özellik |
-| `fix` | Bug düzeltmesi |
-| `chore` | Build, bağımlılık, config değişiklikleri |
-| `docs` | Yalnızca dokümantasyon |
-| `style` | Kod formatı (logic değişimi yok) |
-| `refactor` | Yeniden yapılandırma (özellik/fix yok) |
-| `test` | Test ekleme/düzeltme |
-| `perf` | Performans iyileştirmesi |
-
-### Scope'lar
-
-| Scope | Alan |
-|-------|------|
-| `frontend` | React bileşenleri, store'lar, servisler |
-| `backend` | FastAPI, LangGraph, araçlar |
-| `tauri` | Rust, sidecar, IPC komutları |
-| `styles` | CSS, design tokens |
-| `deps` | Bağımlılık güncellemeleri |
-| `docs` | Dokümantasyon dosyaları |
-
-### Örnekler
-
-```
-feat(backend): add WebSocket streaming for LangGraph events
-fix(frontend): correct agent avatar color for reviewer role
-chore(deps): add langgraph-checkpoint-sqlite for persistence
-docs(api): add WebSocket protocol reference
-refactor(tauri): extract sidecar lifecycle to separate module
-```
-
-## Geliştirme Akışı
+## Setup
 
 ```bash
-# 1. Feature dalı aç
-git checkout -b feat/ws-backend-streaming
-
-# 2. Değişiklikleri yap
-# ...
-
-# 3. Kontroller
-npx tsc --noEmit
-cd backend && .venv/bin/python3 -c "import app.main; print('OK')"
-source $HOME/.cargo/env && cd src-tauri && cargo check
-
-# 4. Commit
-git add -p  # değişiklikleri gözden geçirerek ekle
-git commit -m "feat(backend): stream LangGraph events via WebSocket"
-
-# 5. Push & PR
-git push origin feat/ws-backend-streaming
+npm install
+(cd backend && uv sync)
 ```
 
-## PR Kontrol Listesi
+## Branches and commits
 
-- [ ] TypeScript derleniyor (`tsc --noEmit`)
-- [ ] Backend import hatasız
-- [ ] Rust `cargo check` başarılı
-- [ ] Commit mesajları Conventional Commits formatında
-- [ ] İlgili `.md` dokümantasyonu güncellendi
-- [ ] Yeni API endpoint'leri `docs/API.md`'de belgelendi
+Use short-lived branches from `main`:
+
+- `feat/<area>` — feature work
+- `fix/<area>` — bug fixes
+- `docs/<area>` — documentation-only changes
+- `chore/<area>` — tooling and maintenance
+
+Use Conventional Commits:
+
+```text
+feat(runtime): add ordered session event replay
+fix(frontend): preserve pending approval state after reconnect
+docs(protocol): define command idempotency requirements
+```
+
+## Required workflow
+
+1. Read [AGENTS.md](AGENTS.md), the relevant product document, and nearby code before editing.
+2. Keep a change within one coherent vertical slice.
+3. Update the authoritative Pydantic contract before generated schema/types and frontend reducers.
+4. Add or update tests for the behavior and failure mode.
+5. Update the relevant documentation in the same pull request.
+6. Review the final diff for unrelated changes and secrets.
+
+## Verification
+
+Run the checks relevant to the changed layer, then run the full check before merging:
+
+```bash
+npm run type-check
+(cd backend && .venv/bin/python3 -c "import app.main; print('backend import OK')")
+(cd src-tauri && cargo check)
+```
+
+As test tooling is introduced, the repository verification script becomes the required entry point:
+
+```bash
+.agents/skills/argus-development/scripts/verify.sh all
+```
+
+## Pull request checklist
+
+- [ ] The change has a focused purpose and an understandable commit history.
+- [ ] TypeScript, backend, and Tauri checks pass where applicable.
+- [ ] Contracts, generated types, fixtures, and reducers are synchronized.
+- [ ] New failure and permission paths are tested.
+- [ ] API keys, tokens, paths, and user content are not leaked.
+- [ ] Documentation and roadmap status are accurate.
+- [ ] UI work covers loading, error, disconnected, and keyboard-accessible states.

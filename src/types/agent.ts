@@ -2,7 +2,7 @@
 // ARGUS — Agent & Role Type Definitions
 // ============================================================
 
-export type AgentRole = 'planner' | 'builder' | 'reviewer' | 'tester' | 'ui_agent';
+export type AgentRole = 'coordinator' | 'planner' | 'builder' | 'reviewer' | 'tester' | 'ui_agent';
 
 export type AgentStatus =
   | 'idle'
@@ -92,6 +92,12 @@ export const AGENT_ROLE_META: Record<AgentRole, {
   description: string;
   colorVar: string;
 }> = {
+  coordinator: {
+    label: 'Coordinator',
+    emoji: '✦',
+    description: 'Coordinates assignments, handoffs, and the shared session flow',
+    colorVar: '--accent-primary',
+  },
   planner: {
     label: 'Planner',
     emoji: '🧭',

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Argus Development"
+  short_description: "Build contract-first Argus changes"
+  default_prompt: "Use $argus-development to implement and verify an Argus feature slice."

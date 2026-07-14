@@ -1,6 +1,7 @@
 import React from 'react';
 import { useAgentStore } from '@/stores/agentStore';
 import { useUIStore } from '@/stores/uiStore';
+import type { AgentStatus, AgentRole } from '@/types/agent';
 import './AgentPanel.css';
 
 /* ── Role-specific SVG icons ──────────────────────────────── */
@@ -43,6 +44,7 @@ const UIAgentIcon: React.FC = () => (
 );
 
 const roleIconMap: Record<string, React.FC> = {
+  coordinator: PlannerIcon,
   planner: PlannerIcon,
   builder: BuilderIcon,
   reviewer: ReviewerIcon,
@@ -62,56 +64,28 @@ const CheckIcon: React.FC = () => (
   </svg>
 );
 
+interface AgentPanelItem {
+  role: AgentRole;
+  label: string;
+  subtitle: string;
+  status: AgentStatus;
+  action: string;
+  tokens: number;
+}
+
 export const AgentPanel: React.FC = () => {
   const { agents } = useAgentStore();
   const { agentPanelVisible } = useUIStore();
   const activeAgents = Object.values(agents);
 
-  const mockAgents = [
-    {
-      role: 'planner',
-      label: 'Planner',
-      subtitle: 'PLANNER',
-      status: 'done',
-      action: 'Strategy defined',
-      tokens: 245,
-    },
-    {
-      role: 'builder',
-      label: 'Builder',
-      subtitle: 'BUILDER',
-      status: 'thinking',
-      action: 'Implementing core logic...',
-      tokens: 1854,
-    },
-    {
-      role: 'reviewer',
-      label: 'Reviewer',
-      subtitle: 'REVIEWER',
-      status: 'active',
-      action: 'Security path analysis...',
-      tokens: 512,
-    },
-    {
-      role: 'tester',
-      label: 'Tester',
-      subtitle: 'TESTER',
-      status: 'idle',
-      action: 'Awaiting build',
-      tokens: 0,
-    },
-  ];
-
-  const displayAgents = activeAgents.length > 0
-    ? activeAgents.map(a => ({
-        role: a.role,
-        label: a.role.charAt(0).toUpperCase() + a.role.slice(1),
-        subtitle: a.role.toUpperCase(),
-        status: a.status,
-        action: a.currentAction || 'Idle',
-        tokens: a.tokenCount,
-      }))
-    : mockAgents;
+  const displayAgents: AgentPanelItem[] = activeAgents.map((agent) => ({
+    role: agent.role,
+    label: agent.role.charAt(0).toUpperCase() + agent.role.slice(1),
+    subtitle: agent.role.replace('_', ' ').toUpperCase(),
+    status: agent.status,
+    action: agent.currentAction || 'Idle',
+    tokens: agent.tokenCount,
+  }));
 
   if (!agentPanelVisible) return null;
 
@@ -131,11 +105,10 @@ export const AgentPanel: React.FC = () => {
 
       {/* ── Agent Cards ──────────────────────────────────── */}
       <div className="agents-list flex flex-col gap-2 overflow-y-auto agents-cards-scroll flex-1 min-h-0">
-        {displayAgents.map((agent: any) => {
+        {displayAgents.map((agent) => {
           const isThinking = agent.status === 'thinking' || agent.status === 'streaming' || agent.status === 'using_tool';
-          const isActive   = agent.status === 'active';
-          const isDone     = agent.status === 'done' || agent.status === 'completed';
-          const highlight  = isThinking || isActive;
+          const isDone = agent.status === 'done';
+          const highlight = isThinking || agent.status === 'waiting_approval';
 
           return (
             <div
@@ -180,15 +153,15 @@ export const AgentPanel: React.FC = () => {
 
       {/* ── Pipeline Flow Timeline ───────────────────────── */}
       <div className="pipeline-section">
-        <h3 className="pipeline-title">PIPELINE FLOW</h3>
+        <h3 className="pipeline-title">SESSION ACTIVITY</h3>
 
         <div className="pipeline-timeline">
           {/* Vertical line */}
           <div className="pipeline-line" />
 
-          {displayAgents.map((agent: any, idx: number) => {
-            const isDone    = agent.status === 'done' || agent.status === 'completed';
-            const isActive  = agent.status === 'active' || agent.status === 'thinking' || agent.status === 'streaming';
+          {displayAgents.map((agent) => {
+            const isDone = agent.status === 'done';
+            const isActive = agent.status === 'thinking' || agent.status === 'streaming' || agent.status === 'using_tool' || agent.status === 'waiting_approval';
 
             return (
               <div key={agent.role} className="pipeline-node">
@@ -221,23 +194,6 @@ export const AgentPanel: React.FC = () => {
                   {isDone ? 'Done' : isActive ? 'Active' : 'Pending'}
                 </span>
 
-                {/* Dashed back-loop from reviewer to builder */}
-                {idx === 2 && (
-                  <svg className="pipeline-loop-arrow" fill="none" overflow="visible">
-                    <path
-                      d="M 10,36 C -8,36 -8,2 8,2"
-                      stroke="var(--accent-primary)"
-                      strokeWidth="1.5"
-                      strokeDasharray="3,3"
-                      opacity="0.6"
-                    />
-                    <polygon
-                      points="6,0 10,2 6,4"
-                      fill="var(--accent-primary)"
-                      opacity="0.6"
-                    />
-                  </svg>
-                )}
               </div>
             );
           })}
