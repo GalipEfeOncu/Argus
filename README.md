@@ -76,6 +76,7 @@ npm run type-check
 - [UX specification](docs/UX_SPEC.md)
 - [API and event protocol](docs/API.md)
 - [Security model](docs/SECURITY.md)
+- [Implementation specification](docs/IMPLEMENTATION_SPEC.md)
 - [Roadmap](docs/ROADMAP.md)
 - [Contributing](CONTRIBUTING.md)
 

@@ -6,7 +6,7 @@
 - Add repository Codex guidance and the Argus development skill.
 - Define Pydantic-authoritative event models and generated frontend types.
 
-**Exit:** documentation reflects reality and the contract has one source of truth.
+**Exit:** documentation reflects reality and [IMPLEMENTATION_SPEC.md](IMPLEMENTATION_SPEC.md) contains no unresolved MVP design decisions.
 
 ## Phase 1 — Interactive contract prototype
 
