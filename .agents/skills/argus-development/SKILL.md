@@ -9,11 +9,14 @@ Implement a focused Argus feature slice while preserving the shared-room, local-
 
 ## Workflow
 
-1. Read `AGENTS.md` and the relevant documents in `docs/`.
+1. Read `AGENTS.md`, the closest directory-specific `AGENTS.md`, and use
+   `docs/README.md` to select the relevant source-of-truth documents.
 2. Inspect existing code and state the affected contract, persistence, UI, and permission boundaries.
 3. For protocol work, update the backend model first; then generated types, frontend reducer/simulator, tests, and `docs/API.md`.
 4. Keep changes small enough to validate end-to-end. Do not replace a working layer with an unverified broad rewrite.
-5. Run `scripts/verify.sh` with the narrowest appropriate scope, then use `all` before handoff when all toolchains are available.
+5. Run `scripts/verify.sh` with the narrowest appropriate scope (`docs`,
+   `frontend`, `backend`, or `tauri`), then use `all` before handoff when all
+   toolchains are available.
 6. Review `git diff` for secrets, generated-file drift, unrelated edits, and inaccurate documentation.
 
 ## Guardrails
@@ -28,3 +31,4 @@ Implement a focused Argus feature slice while preserving the shared-room, local-
 
 - Read `references/contract-checklist.md` for REST/WebSocket changes.
 - Read `docs/UX_SPEC.md` for UI work and `docs/SECURITY.md` for tools, credentials, or workspace changes.
+- Treat `docs/README.md` as the documentation ownership and reading map.

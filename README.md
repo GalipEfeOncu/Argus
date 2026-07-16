@@ -39,6 +39,21 @@ Argus is in active pre-alpha development. The repository currently contains the 
 
 ## Development
 
+The repository is organized by runtime boundary:
+
+```text
+Argus/
+├── src/          React client, typed state, and transport services
+├── backend/      FastAPI runtime, contracts, persistence, agents, and tools
+├── src-tauri/    Native bridge, capabilities, and sidecar lifecycle
+├── docs/         Product and engineering sources of truth
+├── .agents/      Reusable repository skills and verification workflows
+└── .codex/       Repository-local Codex defaults
+```
+
+Coding agents start with [AGENTS.md](AGENTS.md). Each implementation boundary
+contains a narrower `AGENTS.md` that extends the repository-wide rules.
+
 ### Prerequisites
 
 - Node.js 18+
@@ -64,13 +79,15 @@ uv run uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
 ### Verification
 
 ```bash
-npm run type-check
-(cd backend && .venv/bin/python3 -c "import app.main; print('backend import OK')")
-(cd src-tauri && cargo check)
+.agents/skills/argus-development/scripts/verify.sh all
 ```
+
+Use `docs`, `frontend`, `backend`, or `tauri` instead of `all` while iterating on
+one boundary.
 
 ## Documentation
 
+- [Documentation index and reading matrix](docs/README.md)
 - [Product definition](docs/PRODUCT.md)
 - [Architecture](docs/ARCHITECTURE.md)
 - [UX specification](docs/UX_SPEC.md)
