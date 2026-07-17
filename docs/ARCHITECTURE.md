@@ -203,4 +203,24 @@ counters, approvals, assignments, artifacts, diffs, usage, and workspace
 metadata. The selected project remains the source of code; Argus stores
 orchestration metadata and isolated worktree state.
 
+## Vocabulary
+
+Stable terms used across all Argus contracts. When prose elsewhere conflicts with
+these definitions, update the prose to match.
+
+| Term | Definition |
+| --- | --- |
+| **agent definition** | A versioned record that describes one participant: role name, system prompt, model binding, enabled skills, tool allowlist, permission profile, evidence contract, and output language. Definitions are snapshotted into a session at creation and are immutable for the life of that session. |
+| **session agent** | An immutable snapshot of an agent definition bound to a specific session. Session agents are the active participants; editing an agent definition after session creation has no effect on running sessions. |
+| **available pool** | The set of session agents the Coordinator is permitted to assign work to in a given session, expressed as `availableAgentIds` in the session configuration. The Coordinator may use any member when useful and may never select an excluded agent. |
+| **required-role rule** | A completion gate that specifies a role, an applicability condition (`always`, `when_changes`, or `when_capability_used`), a success-evidence kind, and a minimum completion count. The session cannot reach `completed` while any applicable required-role rule is unsatisfied. |
+| **assignment** | A persisted unit of work delegated to one session agent. It carries a parent cause, acceptance criteria, operation class (`read_only` or `mutating`), budget, attempt number, and a terminal result. Only the Coordinator creates root specialist assignments; the scheduler validates and persists every assignment proposal before dispatching it. |
+| **attempt** | One worker invocation for an assignment. An assignment may produce multiple attempts when retries are permitted and budget remains. Each attempt records its configuration version, checkpoint, usage, normalized outcome, and failure fingerprint. |
+| **gate evidence** | Structured proof produced by a completed assignment that satisfies a required-role rule. Evidence is tied to the workspace revision at which it was produced; a subsequent mutation invalidates Reviewer and Tester evidence. Evidence is validated by deterministic code, not by model prose. |
+| **grant** | A persisted, bounded authorization for a capability and workspace scope, created either at session start (`preauthorize_session`) or in response to an approval request. Grants carry an expiry, a scope, and the policy hash under which they were issued. A grant cannot widen its original scope or override non-bypassable denials. |
+| **soft threshold** | A configurable limit value at which the budget service emits a `limit.warning` event and gives the Coordinator an opportunity to adapt. Crossing the soft threshold does not stop work. |
+| **hard ceiling** | A configurable limit value at which the budget service prevents the next counted action, emits a `limit.reached` event, and triggers the configured limit-resolution mode (`ask_user`, `coordinator_decides`, or `stop`). A Coordinator decision at a hard ceiling may not reset counters or expand authority. |
+| **decision** | A structured choice recorded after a limit is reached or the session enters `waiting_decision`. For `coordinator_decides`, the Coordinator selects one of: `reassign`, `change_approach`, `deliver_partial`, or `stop`. For `ask_user`, the human makes the choice. The scheduler validates and persists the decision before acting on it. |
+| **workspace revision** | An immutable checkpoint of the session workspace, identified by a content checksum. A workspace revision is created after each accepted mutating operation. Required-role gate evidence is tied to the revision at which it was produced and is invalidated when a later mutation changes the checksum. |
+
 See [API.md](API.md) for protocol contracts, [SECURITY.md](SECURITY.md) for enforcement, and [UX_SPEC.md](UX_SPEC.md) for the visible product behavior.
