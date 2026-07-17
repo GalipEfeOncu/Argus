@@ -15,6 +15,7 @@ prompts or implementation notes.
 | What must the user see and control? | [UX_SPEC.md](UX_SPEC.md) | UX contract |
 | What is allowed and where is it enforced? | [SECURITY.md](SECURITY.md) | Security contract |
 | Which MVP decisions are already settled? | [IMPLEMENTATION_SPEC.md](IMPLEMENTATION_SPEC.md) | Implementation contract |
+| What performance and platform budgets must pass? | [IMPLEMENTATION_SPEC.md](IMPLEMENTATION_SPEC.md#12-performance-and-footprint-budgets) | Release contract |
 | What should be built next? | [ROADMAP.md](ROADMAP.md) | Phase plan and exit criteria |
 
 The [design reference](assets/argus-design-reference.png) is visual input, not an
