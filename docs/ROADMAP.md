@@ -72,7 +72,7 @@ human → Coordinator → structured proposal → deterministic scheduler
 
 ## Phase 0 — Contract and test foundation
 
-### 0.1 Freeze Coordinator-first contracts
+### 0.1 Freeze Coordinator-first contracts (✅ Completed)
 
 Deliverables:
 
