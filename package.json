@@ -14,7 +14,14 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "generate:contracts": "node scripts/generate-contracts.mjs",
-    "check:contracts": "node scripts/check-contracts.mjs"
+    "check:contracts": "node scripts/check-contracts.mjs",
+    "benchmark:fixtures": "node scripts/benchmarks/generate-fixtures.mjs",
+    "benchmark:validate": "node scripts/benchmarks/benchmark.mjs validate",
+    "benchmark:compare": "node scripts/benchmarks/benchmark.mjs compare",
+    "benchmark:report": "node scripts/benchmarks/benchmark.mjs report",
+    "benchmark:attribution": "node scripts/benchmarks/benchmark.mjs attribution",
+    "benchmark:release": "node scripts/benchmarks/benchmark.mjs release",
+    "test:benchmarks": "node --test scripts/benchmarks/test/*.test.mjs"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.1.14",
@@ -44,6 +51,7 @@
     "@types/react": "^19.1.8",
     "@types/react-dom": "^19.1.6",
     "@vitejs/plugin-react": "^4.5.2",
+    "ajv": "^8.17.1",
     "jsdom": "^26.1.0",
     "json-schema-to-typescript": "^15.0.4",
     "openapi-typescript": "^7.10.1",

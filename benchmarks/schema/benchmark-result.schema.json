@@ -1,0 +1,116 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://argus.local/schemas/benchmark-result.schema.json",
+  "title": "Argus release benchmark result",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "status", "metadata", "provenance", "measurements", "attribution"],
+  "x-argus-contract": {
+    "metrics": {
+      "firstNativeWindowMs": { "unit": "ms", "adapter": "nativeWindow" },
+      "firstPaintMs": { "unit": "ms", "adapter": "webview" },
+      "firstWindowInteractiveColdP50": { "unit": "ms", "adapter": "webview" },
+      "firstWindowInteractiveColdP95": { "unit": "ms", "adapter": "webview", "hardLimit": 3000 },
+      "firstWindowInteractiveWarmP50": { "unit": "ms", "adapter": "webview" },
+      "firstWindowInteractiveWarmP95": { "unit": "ms", "adapter": "webview", "hardLimit": 1500 },
+      "sidecarReadyColdP50": { "unit": "ms", "adapter": "sidecar" },
+      "sidecarReadyColdP95": { "unit": "ms", "adapter": "sidecar", "hardLimit": 5000 },
+      "sessionReadyMs": { "unit": "ms", "adapter": "session" },
+      "firstStreamedTokenMs": { "unit": "ms", "adapter": "session" },
+      "idleCpuP95": { "unit": "percent", "adapter": "processTree", "hardLimit": 1 },
+      "cpuWakeups": { "unit": "count", "adapter": "processTree" },
+      "shellRssP95": { "unit": "MiB", "adapter": "processTree", "hardLimit": 150 },
+      "webviewRssP95": { "unit": "MiB", "adapter": "processTree" },
+      "sidecarRssP95": { "unit": "MiB", "adapter": "processTree" },
+      "workerRssP95": { "unit": "MiB", "adapter": "processTree" },
+      "idleTotalRssP95": { "unit": "MiB", "adapter": "processTree", "hardLimit": 250 },
+      "activeTotalRssP95": { "unit": "MiB", "adapter": "processTree" },
+      "eventReplayThroughput": { "unit": "events/s", "adapter": "eventReplay" },
+      "databaseQueryCount": { "unit": "count", "adapter": "eventReplay" },
+      "timelineDomNodeCount": { "unit": "count", "adapter": "timelineDomNodeCount", "hardLimit": 9999 },
+      "droppedFrames": { "unit": "count", "adapter": "scrollAndInputResponsiveness" },
+      "timelineLongTaskP95": { "unit": "ms", "adapter": "mainThreadLongTasks", "hardLimit": 100 },
+      "timelineScrollInputFps": { "unit": "fps", "adapter": "scrollAndInputResponsiveness" },
+      "composerPendingFeedbackP95": { "unit": "ms", "adapter": "composer", "hardLimit": 100 },
+      "pauseCancelFeedbackP95": { "unit": "ms", "adapter": "composer", "hardLimit": 100 },
+      "windowsInstallerCompressed": { "unit": "bytes", "adapter": "packageComposition", "hardLimit": 188743680, "platforms": ["windows"] },
+      "macosInstallerCompressed": { "unit": "bytes", "adapter": "packageComposition", "hardLimit": 188743680, "platforms": ["macos"] },
+      "linuxAppImage": { "unit": "bytes", "adapter": "packageComposition", "hardLimit": 262144000, "platforms": ["linux"] }
+    },
+    "unsupportedOnlyMetricIds": ["nativeReleaseRunner"],
+    "requiredAttributionCategories": ["frontendChunk", "rustShell", "pythonRuntime", "pythonDependency", "providerAdapter", "platformResource"]
+  },
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "status": { "enum": ["complete", "unsupported"] },
+    "metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["os", "arch", "appVersion", "sidecarVersion", "dataset", "hardwareClass"],
+      "properties": {
+        "os": { "enum": ["linux", "windows", "macos"] },
+        "arch": { "type": "string", "minLength": 1 },
+        "appVersion": { "type": "string", "minLength": 1 },
+        "sidecarVersion": { "type": "string", "minLength": 1 },
+        "dataset": { "type": "string", "minLength": 1 },
+        "hardwareClass": { "type": "string", "minLength": 1 }
+      }
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["build", "artifactSha256", "telemetry"],
+      "properties": {
+        "build": { "enum": ["signed", "release-equivalent"] },
+        "artifactSha256": {
+          "oneOf": [
+            { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+            { "const": "unavailable" }
+          ]
+        },
+        "telemetry": { "const": "disabled" }
+      }
+    },
+    "measurements": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "status", "unit"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^[A-Za-z][A-Za-z0-9]*$" },
+          "status": { "enum": ["measured", "unavailable"] },
+          "value": { "type": "number", "minimum": 0 },
+          "unit": { "type": "string", "minLength": 1 },
+          "reason": { "type": "string", "minLength": 1 }
+        },
+        "allOf": [
+          { "if": { "properties": { "status": { "const": "measured" } } }, "then": { "required": ["value"] } },
+          { "if": { "properties": { "status": { "const": "unavailable" } } }, "then": { "required": ["reason"] } }
+        ]
+      }
+    },
+    "attribution": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "category", "status"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^[A-Za-z0-9._-]+$" },
+          "fileName": { "type": "string", "pattern": "^[A-Za-z0-9._-]+$" },
+          "category": { "enum": ["frontendChunk", "rustShell", "pythonRuntime", "pythonDependency", "providerAdapter", "platformResource"] },
+          "status": { "enum": ["measured", "unavailable"] },
+          "compressedBytes": { "type": "integer", "minimum": 0 },
+          "uncompressedBytes": { "type": "integer", "minimum": 0 },
+          "reason": { "type": "string", "minLength": 1 }
+        },
+        "allOf": [
+          { "if": { "properties": { "status": { "const": "measured" } } }, "then": { "required": ["fileName", "compressedBytes", "uncompressedBytes"] } },
+          { "if": { "properties": { "status": { "const": "unavailable" } } }, "then": { "required": ["reason"] } }
+        ]
+      }
+    }
+  },
+  "x-argus-contract-validator": true
+}

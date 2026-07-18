@@ -1,0 +1,59 @@
+{
+  "schemaVersion": 1,
+  "fixtures": [
+    {
+      "id": "empty-launch",
+      "kind": "scenario",
+      "description": "No active session; native shell launch and first-paint fixture.",
+      "onDemand": false
+    },
+    {
+      "id": "session-100",
+      "kind": "session-events",
+      "eventCount": 100,
+      "onDemand": false
+    },
+    {
+      "id": "session-10000",
+      "kind": "session-events",
+      "eventCount": 10000,
+      "onDemand": false
+    },
+    {
+      "id": "diff-5mb",
+      "kind": "diff",
+      "byteLength": 5242880,
+      "onDemand": false
+    },
+    {
+      "id": "diff-50mb-on-demand",
+      "kind": "diff",
+      "byteLength": 52428800,
+      "onDemand": true
+    },
+    {
+      "id": "parallel-readonly-agents",
+      "kind": "scenario",
+      "description": "Three parallel read-only participants with no writer lease.",
+      "onDemand": false
+    },
+    {
+      "id": "one-mutating-agent",
+      "kind": "scenario",
+      "description": "One mutating participant holding the writer lease.",
+      "onDemand": false
+    },
+    {
+      "id": "sidecar-idle-restart",
+      "kind": "scenario",
+      "description": "Idle sidecar shutdown followed by a requested restart.",
+      "onDemand": false
+    },
+    {
+      "id": "reconnect-replay",
+      "kind": "scenario",
+      "description": "Reconnect after ordered session-event replay.",
+      "onDemand": false
+    }
+  ]
+}

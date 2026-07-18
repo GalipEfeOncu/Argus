@@ -332,6 +332,23 @@ one mutating agent, sidecar idle shutdown/restart, and reconnect replay. Record:
 - compressed/uncompressed size by frontend chunk, Rust binary, Python runtime,
   Python package, provider adapter, and platform resource.
 
+### Benchmark evidence status
+
+The deterministic fixture manifest, release-result schema, comparison renderer,
+and artifact attribution tool live under `benchmarks/` and `scripts/benchmarks/`.
+It covers empty launch, 100/10,000-event replay, 5 MB and on-demand 50 MB
+diffs, parallel read-only and one mutating agent scenarios, idle/restart, and
+reconnect/replay. Complete results must provide every canonical metric for their
+target OS with its declared unit, including session ready/first token, separate
+shell/webview/sidecar/worker RSS, dropped frames, query count, CPU wakeups, and
+compressed/uncompressed component attribution. Linux AppImage, Windows installer,
+and macOS installer metrics are deliberately mutually platform-specific. The
+tools reject Vite/dev-server and debug provenance, incompatible baseline metadata,
+and unavailable runners as release evidence. They do not contain a measured
+baseline. Native packaged measurements on each supported target remain required
+for the Phase 0 exit gate; an unsupported runner must never be promoted to a
+baseline.
+
 ### Implementation constraints
 
 - Route-level and feature-level code splitting is required. Shiki, diff parsing,
