@@ -21,6 +21,7 @@ htmlcov/
 node_modules/
 dist/
 .cache/
+.argus-contract-check-*/
 
 # ─── Tauri / Rust ─────────────────────────────────────────────
 src-tauri/target/

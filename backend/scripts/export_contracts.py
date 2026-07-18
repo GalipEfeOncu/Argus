@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from argparse import ArgumentParser
 from pathlib import Path
 from typing import Any
 
@@ -33,13 +34,61 @@ def exported_schema(schema: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def parse_arguments() -> Path:
+    parser = ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--output-dir",
+        type=Path,
+        default=CONTRACTS_DIRECTORY,
+        help="Directory for generated JSON contracts (defaults to repository contracts/).",
+    )
+    output_dir = parser.parse_args().output_dir
+    try:
+        return workspace_output_directory(output_dir)
+    except ValueError as error:
+        parser.error(str(error))
+
+
+def workspace_output_directory(output_dir: Path) -> Path:
+    if ".." in output_dir.parts:
+        raise ValueError("generated contract output directory must not contain parent traversal")
+
+    repository_root = REPOSITORY_ROOT.resolve()
+    unresolved_output_dir = output_dir if output_dir.is_absolute() else Path.cwd() / output_dir
+    unresolved_output_dir = unresolved_output_dir.absolute()
+    try:
+        relative_output_dir = unresolved_output_dir.relative_to(repository_root)
+    except ValueError as error:
+        raise ValueError(
+            "generated contract output directory must stay within the repository workspace"
+        ) from error
+
+    inspected_path = repository_root
+    for path_component in relative_output_dir.parts:
+        inspected_path = inspected_path / path_component
+        if inspected_path.is_symlink():
+            raise ValueError("generated contract output directory must not traverse symbolic links")
+        if inspected_path.exists() and not inspected_path.is_dir():
+            raise ValueError("generated contract output path must be a directory")
+
+    resolved_output_dir = unresolved_output_dir.resolve(strict=False)
+    try:
+        resolved_output_dir.relative_to(repository_root)
+    except ValueError as error:
+        raise ValueError(
+            "generated contract output directory must stay within the repository workspace"
+        ) from error
+    return resolved_output_dir
+
+
 def main() -> None:
-    write_json(CONTRACTS_DIRECTORY / "session-events.schema.json", exported_schema(event_schema()))
-    write_json(CONTRACTS_DIRECTORY / "session-commands.schema.json", exported_schema(command_schema()))
+    contracts_directory = parse_arguments()
+    write_json(contracts_directory / "session-events.schema.json", exported_schema(event_schema()))
+    write_json(contracts_directory / "session-commands.schema.json", exported_schema(command_schema()))
 
     openapi = app.openapi()
     openapi["x-generated-by"] = GENERATED_BY
-    write_json(CONTRACTS_DIRECTORY / "openapi.json", openapi)
+    write_json(contracts_directory / "openapi.json", openapi)
 
 
 if __name__ == "__main__":

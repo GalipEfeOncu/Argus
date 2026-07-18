@@ -17,8 +17,7 @@ fn is_port_in_use(port: u16) -> bool {
 
 /// Poll the port at 250 ms intervals until it responds or timeout elapses.
 async fn wait_for_backend(port: u16, timeout_secs: u64) -> bool {
-    let deadline =
-        std::time::Instant::now() + std::time::Duration::from_secs(timeout_secs);
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(timeout_secs);
     while std::time::Instant::now() < deadline {
         if is_port_in_use(port) {
             return true;
@@ -77,7 +76,6 @@ pub async fn start(
     app: tauri::AppHandle,
     state: State<'_, SidecarState>,
 ) -> Result<String, String> {
-
     // ── 1. Early-exit checks (guard dropped at end of block) ─────────────────
     {
         let child_lock = state.child.lock().map_err(|e| e.to_string())?;
@@ -114,8 +112,7 @@ pub async fn start(
         }
 
         // Resolve uv — Tauri uses a minimal PATH that may not include ~/.local/bin
-        let uv_path = find_uv()
-            .ok_or("uv not found. Install uv: https://docs.astral.sh/uv/")?;
+        let uv_path = find_uv().ok_or("uv not found. Install uv: https://docs.astral.sh/uv/")?;
 
         println!("[argus] Using uv at: {}", uv_path.display());
 
@@ -188,7 +185,8 @@ pub async fn stop(state: State<'_, SidecarState>) -> Result<(), String> {
         lock.take()
     };
     if let Some(c) = child {
-        c.kill().map_err(|e| format!("Failed to kill backend: {e}"))?;
+        c.kill()
+            .map_err(|e| format!("Failed to kill backend: {e}"))?;
         println!("[backend] Process killed");
     }
     Ok(())
@@ -196,9 +194,5 @@ pub async fn stop(state: State<'_, SidecarState>) -> Result<(), String> {
 
 /// Non-blocking check: do we hold a child process handle?
 pub fn is_running(state: &SidecarState) -> bool {
-    state
-        .child
-        .lock()
-        .map(|g| g.is_some())
-        .unwrap_or(false)
+    state.child.lock().map(|g| g.is_some()).unwrap_or(false)
 }

@@ -22,7 +22,7 @@ pub fn run() {
                 let state = app_handle.state::<sidecar::SidecarState>();
                 match sidecar::start(app_handle.clone(), state).await {
                     Ok(msg) => println!("[argus] Backend auto-start: {msg}"),
-                    Err(e)  => eprintln!("[argus] Backend auto-start failed: {e}"),
+                    Err(e) => eprintln!("[argus] Backend auto-start failed: {e}"),
                 }
             });
 

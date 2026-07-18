@@ -1,5 +1,5 @@
-use tauri::State;
 use crate::sidecar::SidecarState;
+use tauri::State;
 
 /// Start the Python FastAPI backend as a sidecar process.
 ///
@@ -14,9 +14,7 @@ pub async fn start_backend(
 
 /// Stop the Python FastAPI backend sidecar.
 #[tauri::command]
-pub async fn stop_backend(
-    state: State<'_, SidecarState>,
-) -> Result<(), String> {
+pub async fn stop_backend(state: State<'_, SidecarState>) -> Result<(), String> {
     crate::sidecar::stop(state).await
 }
 
@@ -26,9 +24,7 @@ pub async fn stop_backend(
 /// whether the HTTP server is actually reachable.  Use the frontend
 /// health-poll for the latter.
 #[tauri::command]
-pub async fn get_backend_status(
-    state: State<'_, SidecarState>,
-) -> Result<bool, String> {
+pub async fn get_backend_status(state: State<'_, SidecarState>) -> Result<bool, String> {
     Ok(crate::sidecar::is_running(&state))
 }
 

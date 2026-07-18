@@ -228,7 +228,7 @@ The backend Pydantic discriminated union is the canonical event source. Wire JSO
 2. Generate `src/types/generated/session-events.ts` and `src/types/generated/session-commands.ts` with `json-schema-to-typescript`.
 3. Export FastAPI OpenAPI to `contracts/openapi.json` and derive `src/types/generated/rest.ts` with `openapi-typescript`.
 4. Run `npm run generate:contracts` to regenerate all of those files; commit the outputs and never edit them manually.
-5. Add a CI check that fails if regenerating changes tracked output.
+5. Run `npm run check:contracts` to generate into a workspace-scoped temporary directory and byte-compare all six tracked artifacts without modifying the tracked outputs. CI fails on a mismatch.
 
 The legacy WebSocket message names are transitional. The runtime migration emits only the event types documented in [API.md](API.md), then removes the legacy reducer after the frontend consumes the new envelope.
 

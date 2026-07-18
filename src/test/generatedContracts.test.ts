@@ -1,6 +1,24 @@
 import { expect, test } from 'vitest';
-import type { ArgusSessionCommand } from '@/types/generated/session-commands';
-import type { ArgusSessionEvent } from '@/types/generated/session-events';
+import type {
+  ArgusSessionCommand,
+  ArgusSessionEvent,
+} from '@/types/events';
+import type { ArgusSessionCommand as GeneratedArgusSessionCommand } from '@/types/generated/session-commands';
+import type { ArgusSessionEvent as GeneratedArgusSessionEvent } from '@/types/generated/session-events';
+
+type IsExactly<Left, Right> = (<Value>() => Value extends Left ? 1 : 2) extends
+  <Value>() => Value extends Right ? 1 : 2
+  ? (<Value>() => Value extends Right ? 1 : 2) extends <Value>() => Value extends Left ? 1 : 2
+    ? true
+    : false
+  : false;
+type Assert<Type extends true> = Type;
+
+const canonicalReexportsMatchGenerated: [
+  Assert<IsExactly<ArgusSessionEvent, GeneratedArgusSessionEvent>>,
+  Assert<IsExactly<ArgusSessionCommand, GeneratedArgusSessionCommand>>,
+] = [true, true];
+void canonicalReexportsMatchGenerated;
 
 test('generated canonical event and command unions are consumable by frontend tests', () => {
   const event: ArgusSessionEvent = {
