@@ -3,9 +3,9 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { FIXTURE_MANIFEST_PATH, loadJson } from './core.mjs';
 
 const repositoryRoot = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
+const fixtureManifestPath = 'benchmarks/fixtures/manifest.json';
 
 function argumentValue(name) {
   const index = process.argv.indexOf(name);
@@ -39,7 +39,7 @@ async function main() {
   const outputDirectory = argumentValue('--output-dir');
   if (!outputDirectory) throw new Error('Usage: generate-fixtures.mjs --output-dir <directory> [--include-on-demand]');
   const includeOnDemand = process.argv.includes('--include-on-demand');
-  const manifest = await loadJson(join(repositoryRoot, FIXTURE_MANIFEST_PATH));
+  const manifest = JSON.parse(await readFile(join(repositoryRoot, fixtureManifestPath), 'utf8'));
   await mkdir(outputDirectory, { recursive: true });
   for (const fixture of manifest.fixtures) {
     if (fixture.onDemand && !includeOnDemand) continue;
