@@ -248,6 +248,16 @@ The UI simulator and live transport use the same reducer. Before connecting a li
 
 ## 10. Test and CI policy
 
+Current local test runners are `npm run test` for the frontend and
+`(cd backend && .venv/bin/python3 -m pytest -q)` for the backend. The
+repository verification entry points run these checks together with their
+respective type-check/build or import checks:
+
+```bash
+.agents/skills/argus-development/scripts/verify.sh frontend
+.agents/skills/argus-development/scripts/verify.sh backend
+```
+
 Add the following before the corresponding roadmap phase is declared complete:
 
 - **Frontend:** Vitest and Testing Library for reducers, stores, simulator, and stateful UI components.

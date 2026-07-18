@@ -9,9 +9,12 @@ case "$scope" in
     ;;
   frontend)
     npm run type-check
+    npm run test
+    npm run build
     ;;
   backend)
     (cd backend && .venv/bin/python3 -c "import app.main; print('backend import OK')")
+    (cd backend && .venv/bin/python3 -m pytest -q)
     ;;
   tauri)
     (cd src-tauri && cargo check)
@@ -19,7 +22,10 @@ case "$scope" in
   all)
     python3 .agents/skills/argus-development/scripts/check_docs.py
     npm run type-check
+    npm run test
+    npm run build
     (cd backend && .venv/bin/python3 -c "import app.main; print('backend import OK')")
+    (cd backend && .venv/bin/python3 -m pytest -q)
     (cd src-tauri && cargo check)
     ;;
   *)

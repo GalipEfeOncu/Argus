@@ -11,10 +11,34 @@ const demoModel: ModelRef = {
 
 const demoRoles: AgentRole[] = ['coordinator', 'planner', 'builder', 'reviewer', 'tester', 'ui_agent'];
 
-class EventSimulator {
+type SimulatorTimer = ReturnType<typeof setTimeout>;
+
+export interface SimulatorClock {
+  now(): number;
+  setTimeout(callback: () => void, delayMs: number): SimulatorTimer;
+  clearTimeout(timer: SimulatorTimer): void;
+}
+
+export interface EventSimulatorDependencies {
+  clock: SimulatorClock;
+  createId(): string;
+}
+
+const browserSimulatorDependencies: EventSimulatorDependencies = {
+  clock: {
+    now: () => Date.now(),
+    setTimeout: (callback, delayMs) => setTimeout(callback, delayMs),
+    clearTimeout: (timer) => clearTimeout(timer),
+  },
+  createId: () => crypto.randomUUID(),
+};
+
+export class EventSimulator {
   private activeSessions = new Set<string>();
-  private timers = new Map<string, ReturnType<typeof setTimeout>[]>();
+  private timers = new Map<string, SimulatorTimer[]>();
   private sequences = new Map<string, number>();
+
+  constructor(private readonly dependencies: EventSimulatorDependencies = browserSimulatorDependencies) {}
 
   isActive(sessionId: string): boolean {
     return this.activeSessions.has(sessionId);
@@ -45,7 +69,7 @@ class EventSimulator {
   }
 
   stop(sessionId: string): void {
-    (this.timers.get(sessionId) ?? []).forEach(clearTimeout);
+    (this.timers.get(sessionId) ?? []).forEach((timer) => this.dependencies.clock.clearTimeout(timer));
     this.timers.delete(sessionId);
     this.sequences.delete(sessionId);
     this.activeSessions.delete(sessionId);
@@ -54,7 +78,7 @@ class EventSimulator {
   sendHumanMessage(sessionId: string, content: string): void {
     if (!this.isActive(sessionId)) return;
     this.emit(sessionId, 'message.created', 'human', {
-      messageId: crypto.randomUUID(),
+      messageId: this.dependencies.createId(),
       role: 'user',
       content,
     });
@@ -76,7 +100,7 @@ class EventSimulator {
   }
 
   private schedule(sessionId: string, delay: number, action: () => void): void {
-    const timer = setTimeout(action, delay);
+    const timer = this.dependencies.clock.setTimeout(action, delay);
     this.timers.get(sessionId)?.push(timer);
   }
 
@@ -90,10 +114,10 @@ class EventSimulator {
     this.sequences.set(sessionId, sequence);
     return {
       version: 1,
-      eventId: crypto.randomUUID(),
+      eventId: this.dependencies.createId(),
       sessionId,
       sequence,
-      timestamp: Date.now(),
+      timestamp: this.dependencies.clock.now(),
       type,
       actorId,
       payload,
@@ -149,7 +173,7 @@ class EventSimulator {
 
   private message(sessionId: string, role: AgentRole, content: string): void {
     this.emit(sessionId, 'message.created', role, {
-      messageId: crypto.randomUUID(),
+      messageId: this.dependencies.createId(),
       role: 'agent',
       agentRole: role,
       content,
@@ -158,7 +182,7 @@ class EventSimulator {
   }
 
   private tool(sessionId: string): void {
-    const messageId = crypto.randomUUID();
+    const messageId = this.dependencies.createId();
     const toolCall: ToolCallEvent = {
       id: 'demo-read-project',
       tool: 'read_file',
