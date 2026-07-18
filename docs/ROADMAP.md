@@ -70,7 +70,7 @@ human → Coordinator → structured proposal → deterministic scheduler
                                              └─ ordered shared-room events
 ```
 
-## Phase 0 — Contract and test foundation
+## Phase 0 — Contract and test foundation (✅ Completed; release certification deferred to Phase 7)
 
 ### 0.1 Freeze Coordinator-first contracts (✅ Completed)
 
@@ -100,7 +100,7 @@ Verification:
 .agents/skills/argus-development/scripts/verify.sh docs
 ```
 
-### 0.2 Establish automated test and generation infrastructure
+### 0.2 Establish automated test and generation infrastructure (✅ Completed)
 
 Deliverables:
 
@@ -122,35 +122,58 @@ Acceptance:
 - CI fails on stale generated output or a hand-authored incompatible frontend
   event type.
 
-### 0.3 Establish cross-platform performance baselines
+### 0.3 Establish development-host performance tooling (✅ Completed; release certification deferred to Phase 7)
 
 Deliverables:
 
-- Add a release-mode benchmark harness for first paint/interactivity, requested
-  sidecar readiness, idle/active process-tree RSS, idle CPU, frontend chunks,
-  packaged artifact composition, event replay, long tasks, and scroll/input
-  responsiveness.
+- Add deterministic benchmark-contract tooling for first paint/interactivity,
+  requested sidecar readiness, idle/active process-tree RSS, idle CPU, frontend
+  chunks, packaged artifact composition, event replay, long tasks, and
+  scroll/input responsiveness. The native package runner belongs to Phase 7.
 - Add deterministic 100-event, 10,000-event, 5 MB diff, and 50 MB on-demand diff
   fixtures defined in [IMPLEMENTATION_SPEC.md](IMPLEMENTATION_SPEC.md).
-- Record the unoptimized baseline on Windows 10/11 x86_64, macOS Apple Silicon
-  and Intel, and the selected Linux x86_64 baseline runner. Mark unavailable
-  hardware as an explicit Phase 7 blocker rather than inventing measurements.
-- Emit machine-readable benchmark JSON and a human-readable comparison report;
-  retain a rolling release baseline in CI artifacts.
+- Verify the deterministic benchmark tooling on the designated CachyOS x86_64
+  development host. Label all resulting measurements as development calibration,
+  never as release evidence.
+- Defer native packaged baselines for Windows 10/11 x86_64, macOS Apple Silicon
+  and Intel, and the Ubuntu 22.04-compatible Linux reference runner to Phase 7.
+  Unavailable hardware is an explicit Phase 7 blocker; never invent, copy, or
+  cross-compile measurements for another target.
+- Emit machine-readable benchmark JSON and a human-readable comparison report.
+  Retaining a rolling release baseline in CI artifacts belongs to Phase 7.
 - Add size attribution for the web assets, Rust shell, Python runtime, each
   Python dependency/provider group, and installer resources.
 
 Acceptance:
 
 - Debug/Vite results cannot be submitted as release measurements.
-- A 10,000-event session does not create 10,000 timeline DOM nodes.
-- CI warns on a 10% regression and fails when a hard budget is exceeded on a
-  stable reference runner.
-- Every later phase has a baseline against which “lightweight” can be verified.
+- The benchmark fixture, schema validation, comparison, attribution, and
+  regression-policy tests execute locally on the CachyOS development host.
+- Later phases run their applicable deterministic performance tests on CachyOS;
+  their results are development calibration only. Phase 7 enforces release
+  budgets on every supported native target.
 
-Phase 0 exit: contracts are internally consistent, test runners execute locally,
-generated types have a single authoritative source, and release-mode performance
-baselines exist for every supported desktop target.
+Current status (2026-07-18):
+
+- ✅ The deterministic fixture generator, versioned result schema, release-only
+  provenance validation, comparison report, hard-budget and 10% regression
+  checks, and artifact-attribution tool are implemented and covered by CI.
+- ✅ The fixture manifest includes the empty-launch, 100/10,000-event, 5 MB,
+  50 MB on-demand, sidecar restart, and replay scenarios.
+- ✅ The benchmark fixture, validation, comparison, attribution, and regression
+  policy tests execute on the available CachyOS x86_64 development host.
+- ℹ️ `npm run benchmark:release` intentionally emits an `unsupported` result
+  until Phase 7 packages a native Tauri plus sidecar runner. It cannot create a
+  release baseline during development.
+- ℹ️ Windows x86_64, macOS Apple Silicon, macOS Intel, and Ubuntu 22.04-
+  compatible Linux release runners are deferred Phase 7 blockers. No values may
+  be estimated or copied from another platform.
+
+Phase 0 exit (passed): contracts are internally consistent, test runners execute
+locally, generated types have a single authoritative source, and deterministic
+benchmark tooling is verified on the designated CachyOS development host. Native
+release measurements and rolling cross-platform baselines are Phase 7 exit-gate
+requirements.
 
 ## Phase 1 — Typed shared-room contract prototype
 

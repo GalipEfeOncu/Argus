@@ -313,10 +313,12 @@ are reported separately and do not count as UI latency. Their streaming and
 cancellation handling must still keep the UI responsive.
 
 Budgets are initial engineering targets, not measured claims about the current
-prototype. Phase 0 records the baseline on every supported OS. A budget may be
-changed only with a documented benchmark, user-visible impact analysis, and the
-same review as an architecture decision; it must not be relaxed merely to make
-CI pass.
+prototype. Phase 0 verifies deterministic performance tooling on the designated
+CachyOS development host; its results are development calibration and never
+release evidence. Phase 7 records the release baseline on every supported OS. A
+budget may be changed only with a documented benchmark, user-visible impact
+analysis, and the same review as an architecture decision; it must not be
+relaxed merely to make CI pass.
 
 ### Measurement fixtures
 
@@ -346,8 +348,9 @@ and macOS installer metrics are deliberately mutually platform-specific. The
 tools reject Vite/dev-server and debug provenance, incompatible baseline metadata,
 and unavailable runners as release evidence. They do not contain a measured
 baseline. Native packaged measurements on each supported target remain required
-for the Phase 0 exit gate; an unsupported runner must never be promoted to a
-baseline.
+for the Phase 7 release exit gate; an unsupported runner must never be promoted
+to a baseline. CachyOS development-host results may guide engineering work but
+must remain labelled as non-release calibration.
 
 ### Implementation constraints
 

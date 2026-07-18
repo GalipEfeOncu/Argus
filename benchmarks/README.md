@@ -1,8 +1,17 @@
 # Release benchmark evidence
 
 This directory contains the versioned benchmark-result schema and deterministic
-fixture manifest. It deliberately contains no measured baseline: Phase 0 still
-needs native, packaged release measurements on each supported target.
+fixture manifest. It deliberately contains no measured release baseline: native,
+packaged measurements on each supported target are a Phase 7 requirement.
+
+## Evidence status
+
+The benchmark infrastructure is complete and Phase 0 verifies it on the
+designated CachyOS x86_64 development host. Any measurements from that machine
+are development calibration, not release evidence. Native packaged release
+measurements on Ubuntu 22.04-compatible Linux, Windows x86_64, macOS Apple
+Silicon, and macOS Intel are Phase 7 blockers. Do not substitute debug, Vite,
+cross-compiled, or estimated results for any unavailable target.
 
 Complete release results must contain every metric required for that target OS
 with its prescribed unit and a measured value; Linux AppImage, Windows installer,
