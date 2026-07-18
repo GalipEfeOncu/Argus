@@ -1,0 +1,9 @@
+{
+  "commandId": "cmd_01",
+  "type": "decision.resolve",
+  "payload": {
+    "decisionId": "dec_01",
+    "choice": "change_approach",
+    "reasonSummary": "Use a smaller implementation slice."
+  }
+}

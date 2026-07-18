@@ -1,0 +1,8 @@
+{
+  "commandId": "cmd_01",
+  "type": "session.cancel",
+  "payload": {
+    "reasonSummary": "The user cancelled the session.",
+    "providerCredential": "not-allowed"
+  }
+}

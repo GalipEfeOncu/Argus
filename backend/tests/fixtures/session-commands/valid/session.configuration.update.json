@@ -1,0 +1,13 @@
+{
+  "commandId": "cmd_01",
+  "type": "session.configuration.update",
+  "payload": {
+    "expectedConfigurationVersion": 1,
+    "patch": {
+      "availableAgentIds": [
+        "agent_builder"
+      ]
+    },
+    "confirmConsequences": false
+  }
+}

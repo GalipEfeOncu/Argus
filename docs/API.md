@@ -71,6 +71,86 @@ Commands use `{ "commandId", "type", "payload" }`; `commandId` is the idempotenc
 | `session.configuration.update` | Update future team, gate, limit, or approval settings with an expected configuration version |
 | `decision.resolve` | Resolve a pending human limit or partial-completion decision |
 
+### Canonical target wire shapes
+
+The target Pydantic unions in `backend/app/schemas/session_events.py` and
+`backend/app/schemas/session_commands.py` are the normative machine-readable
+definitions. They reject unknown fields at every modeled level, serialize using
+camelCase, and use `type` as their discriminator. The existing live WebSocket
+handler is transitional and does not yet emit or consume these shapes.
+
+All server-event branches share the envelope shown above. `eventId`,
+`sessionId`, `actorId`, and optional `correlationId` are non-empty opaque IDs;
+`sequence` is a non-negative integer and `timestamp` is required ISO 8601 text
+with a `T` separator and UTC (`Z`) or numeric-offset timezone; numeric Unix
+timestamps and timezone-naive values are invalid.
+All client-command branches share a non-empty opaque `commandId`, which is the
+idempotency key. Strings labelled *summary* are user-visible redacted summaries,
+never provider credentials or private model reasoning. Lists are bounded by the
+schema and file payloads carry metadata rather than an unbounded inline diff.
+
+The following payload fields make each target union branch unambiguous. Every
+identifier field is an opaque ID except `filePath`, which is a relative artifact
+path. `filePath` rejects POSIX, Windows-drive, and UNC absolute forms and any
+`..` traversal segment without resolving a filesystem path. Optional fields may
+be omitted or set to `null` where the schema allows.
+
+| Event type | Required payload fields | Optional payload fields |
+| --- | --- | --- |
+| `session.snapshot` | `status`, `lastSequence` | — |
+| `session.status_changed` | `status` | `reasonSummary` |
+| `participant.status_changed` | `participantId`, `participantKind`, `status` | `actionSummary` |
+| `message.created` | `messageId`, `authorId`, `authorKind`, `content` | `mentionIds`, `streaming` |
+| `message.delta` | `messageId`, `delta` | — |
+| `message.completed` | `messageId` | — |
+| `session.configuration_updated` | `configurationVersion`, `policyHash`, `changedFields` | — |
+| `assignment.proposed` | `proposalId`, `assigneeAgentId`, `objective`, `acceptanceCriteria`, `operationClass`, `reasonSummary` | `parentId`, `requestedCapabilities` |
+| `assignment.created` | `assignmentId`, `proposalId`, `assigneeAgentId`, `configurationVersion`, `policyHash`, `operationClass` | — |
+| `assignment.started` | `assignmentId`, `assigneeAgentId` | — |
+| `assignment.completed` | `assignmentId`, `status`, `outputSummary` | `evidence` |
+| `assignment.failed` | `assignmentId`, `failureCode`, `failureSummary`, `recoverable` | — |
+| `assignment.cancelled` | `assignmentId`, `reasonSummary` | — |
+| `handoff.created` | `handoffId`, `sourceAssignmentId`, `summary` | `targetAgentId`, `artifactIds` |
+| `tool.requested` | `toolExecutionId`, `assignmentId`, `toolName`, `operationClass`, `requestSummary` | — |
+| `tool.started` | `toolExecutionId`, `assignmentId`, `toolName` | — |
+| `tool.completed` | `toolExecutionId`, `assignmentId`, `status`, `resultSummary`, `durationMs` | `artifactIds` |
+| `approval.requested` | `approvalId`, `capability`, `scopeSummary` | `assignmentId` |
+| `approval.resolved` | `approvalId`, `resolution` | `grantId`, `reasonSummary` |
+| `limit.warning`, `limit.reached` | `counter`, `scopeId`, `current`, `threshold`, `hard`, `resolution` | `fingerprint`, `occurrenceCount` |
+| `decision.requested` | `decisionId`, `scopeId`, `choices`, `reasonSummary` | — |
+| `decision.recorded` | `decisionId`, `choice`, `reasonSummary` | — |
+| `gate.status_changed` | `gateId`, `role`, `status` | `evidence` |
+| `artifact.diff_updated` | `artifactId`, `filePath`, `additions`, `deletions`, `byteLength` | `assignmentId`, `truncated` |
+| `usage.updated` | `scopeId`, `inputTokens`, `outputTokens`, `normalizedCost`, `durationMs` | — |
+| `error.created` | `errorId`, `code`, `summary`, `recoverable` | `relatedId` |
+
+`evidence` entries contain `kind`, a redacted `summary`, and optional
+`artifactIds`. Valid session statuses are `created`, `preparing`, `running`,
+`paused`, `waiting_approval`, `waiting_decision`, `completed`,
+`completed_partial`, `cancelled`, and `failed`; participant statuses are `idle`,
+`working`, `waiting`, `paused`, `errored`, and `stopped`. Assignment operation
+classes are `read_only` and `mutating`.
+
+| Command type | Required payload fields | Optional payload fields |
+| --- | --- | --- |
+| `message.send` | `content` | `mentionIds` |
+| `session.start`, `session.pause`, `session.resume` | none (empty object) | — |
+| `session.cancel` | none | `reasonSummary` |
+| `participant.interrupt` | `participantId`, `reasonSummary` | — |
+| `approval.resolve` | `approvalId`, `resolution` | `grantCapabilities`, `scopeSummary` |
+| `session.configuration.update` | `expectedConfigurationVersion`, non-empty `patch` | `confirmConsequences` |
+| `decision.resolve` | `decisionId`, `choice` | `reasonSummary` |
+
+For `approval.resolve`, `resolution` is `approve`, `reject`, or `grant`; a
+grant requires non-empty bounded `grantCapabilities` and a non-empty
+human-readable `scopeSummary`. `approve` and `reject` must not carry
+`grantCapabilities`, so ignored capabilities cannot widen a permission. A
+configuration `patch` may set `availableAgentIds`, `requiredRoleRules`,
+`approvalBehavior`, or `limitResolution`; a capability-based required-role rule
+includes `capability`, while other rule applicability values must omit it.
+Decision choices are `reassign`, `change_approach`, `deliver_partial`, or
+`stop`. Limit resolution is `ask_user`, `coordinator_decides`, or `stop`.
+
 ## Session configuration contract
 
 `POST /sessions` accepts durable configuration. IDs below reference existing

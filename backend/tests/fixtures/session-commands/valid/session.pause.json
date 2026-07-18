@@ -1,0 +1,5 @@
+{
+  "commandId": "cmd_01",
+  "type": "session.pause",
+  "payload": {}
+}

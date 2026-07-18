@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "eventId": "evt_01",
+  "sessionId": "ses_01",
+  "sequence": 1,
+  "timestamp": "2026-07-14T12:00:00Z",
+  "actorId": "system",
+  "type": "assignment.completed",
+  "payload": {
+    "assignmentId": "asn_01",
+    "status": "completed",
+    "outputSummary": "The contract is implemented.",
+    "evidence": [
+      {
+        "kind": "passing_test_run",
+        "summary": "Backend tests passed.",
+        "artifactIds": [
+          "art_01"
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "eventId": "evt_01",
+  "sessionId": "ses_01",
+  "sequence": 1,
+  "timestamp": "2026-07-14T12:00:00Z",
+  "actorId": "system",
+  "type": "decision.requested",
+  "payload": {
+    "decisionId": "dec_01",
+    "scopeId": "asn_01",
+    "choices": [
+      "reassign",
+      "stop"
+    ],
+    "reasonSummary": "A hard limit was reached.",
+    "providerCredential": "not-allowed"
+  }
+}

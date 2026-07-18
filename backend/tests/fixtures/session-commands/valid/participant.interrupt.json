@@ -1,0 +1,8 @@
+{
+  "commandId": "cmd_01",
+  "type": "participant.interrupt",
+  "payload": {
+    "participantId": "agent_builder",
+    "reasonSummary": "Pause the current work."
+  }
+}

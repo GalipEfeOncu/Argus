@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "eventId": "evt_01",
+  "sessionId": "ses_01",
+  "sequence": 1,
+  "timestamp": "2026-07-14T12:00:00Z",
+  "actorId": "system",
+  "type": "message.created",
+  "payload": {
+    "messageId": "msg_01",
+    "authorId": "human_01",
+    "authorKind": "human",
+    "content": "Please implement the contract.",
+    "mentionIds": [
+      "agent_builder"
+    ],
+    "streaming": false,
+    "providerCredential": "not-allowed"
+  }
+}

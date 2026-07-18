@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "eventId": "evt_01",
+  "sessionId": "ses_01",
+  "sequence": 1,
+  "timestamp": "2026-07-14T12:00:00Z",
+  "actorId": "system",
+  "type": "tool.completed",
+  "payload": {
+    "toolExecutionId": "tool_01",
+    "assignmentId": "asn_01",
+    "status": "succeeded",
+    "resultSummary": "Read completed.",
+    "durationMs": 12,
+    "artifactIds": [
+      "art_01"
+    ],
+    "providerCredential": "not-allowed"
+  }
+}

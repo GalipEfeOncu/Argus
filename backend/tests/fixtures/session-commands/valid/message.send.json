@@ -1,0 +1,10 @@
+{
+  "commandId": "cmd_01",
+  "type": "message.send",
+  "payload": {
+    "content": "Please implement the contract.",
+    "mentionIds": [
+      "agent_builder"
+    ]
+  }
+}

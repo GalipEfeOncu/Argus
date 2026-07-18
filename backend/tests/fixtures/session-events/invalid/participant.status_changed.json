@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "eventId": "evt_01",
+  "sessionId": "ses_01",
+  "sequence": 1,
+  "timestamp": "2026-07-14T12:00:00Z",
+  "actorId": "system",
+  "type": "participant.status_changed",
+  "payload": {
+    "participantId": "agent_builder",
+    "participantKind": "agent",
+    "status": "working",
+    "actionSummary": "Implementing the assigned slice.",
+    "providerCredential": "not-allowed"
+  }
+}

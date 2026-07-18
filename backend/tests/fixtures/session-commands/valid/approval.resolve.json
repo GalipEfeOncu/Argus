@@ -1,0 +1,12 @@
+{
+  "commandId": "cmd_01",
+  "type": "approval.resolve",
+  "payload": {
+    "approvalId": "apr_01",
+    "resolution": "grant",
+    "grantCapabilities": [
+      "workspace.write"
+    ],
+    "scopeSummary": "The active session worktree."
+  }
+}

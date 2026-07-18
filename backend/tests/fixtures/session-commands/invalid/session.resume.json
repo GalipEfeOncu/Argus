@@ -1,0 +1,7 @@
+{
+  "commandId": "cmd_01",
+  "type": "session.resume",
+  "payload": {
+    "providerCredential": "not-allowed"
+  }
+}
