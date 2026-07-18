@@ -59,22 +59,34 @@ class ParticipantInterruptCommand(CommandEnvelope):
     payload: ParticipantInterruptPayload
 
 
-class ApprovalResolvePayload(CamelModel):
+class ApprovalResolvePayloadBase(CamelModel):
     approval_id: Identifier
-    resolution: Literal["approve", "reject", "grant"]
-    grant_capabilities: list[Identifier] = Field(default_factory=list, max_length=50)
-    scope_summary: Summary | None = None
 
-    @model_validator(mode="after")
-    def validate_grant_scope(self) -> "ApprovalResolvePayload":
-        if self.resolution == "grant":
-            if not self.grant_capabilities:
-                raise ValueError("grantCapabilities is required when resolution is grant")
-            if self.scope_summary is None:
-                raise ValueError("scopeSummary is required when resolution is grant")
-        elif "grant_capabilities" in self.model_fields_set:
-            raise ValueError("grantCapabilities is only allowed when resolution is grant")
-        return self
+
+class ApprovalApprovePayload(ApprovalResolvePayloadBase):
+    """Resolve an approval without issuing a capability grant."""
+
+    resolution: Literal["approve"]
+
+
+class ApprovalRejectPayload(ApprovalResolvePayloadBase):
+    """Reject an approval without issuing a capability grant."""
+
+    resolution: Literal["reject"]
+
+
+class ApprovalGrantPayload(ApprovalResolvePayloadBase):
+    """Issue a bounded capability grant with its required human-readable scope."""
+
+    resolution: Literal["grant"]
+    grant_capabilities: list[Identifier] = Field(min_length=1, max_length=50)
+    scope_summary: Summary
+
+
+ApprovalResolvePayload = Annotated[
+    Union[ApprovalApprovePayload, ApprovalRejectPayload, ApprovalGrantPayload],
+    Field(discriminator="resolution"),
+]
 
 
 class ApprovalResolveCommand(CommandEnvelope):

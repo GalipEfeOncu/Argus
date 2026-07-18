@@ -1,11 +1,18 @@
-// ============================================================
-// ARGUS — Versioned Shared-Room Event Contract
-// ============================================================
+// Canonical target wire contracts are generated from backend Pydantic schemas.
+export type {
+  ArgusSessionEvent,
+  MessageCreatedPayload,
+} from './generated/session-events';
+export type { ArgusSessionCommand } from './generated/session-commands';
 
+/**
+ * Legacy live-WebSocket and simulator shapes. These are intentionally separate
+ * from the canonical shared-room envelope while the transport migration is in progress.
+ */
 import type { AgentRole, AgentStatus, DiffBlock, ToolCallEvent } from './agent';
 import type { SessionStatus, TokenUsage } from './session';
 
-export type SessionEventType =
+export type LegacySessionEventType =
   | 'session.snapshot'
   | 'session.status_changed'
   | 'participant.status_changed'
@@ -23,7 +30,7 @@ export type SessionEventType =
   | 'usage.updated'
   | 'error.created';
 
-export interface SessionEvent<TType extends SessionEventType, TPayload> {
+export interface LegacySessionEvent<TType extends LegacySessionEventType, TPayload> {
   version: 1;
   eventId: string;
   sessionId: string;
@@ -35,23 +42,23 @@ export interface SessionEvent<TType extends SessionEventType, TPayload> {
   payload: TPayload;
 }
 
-export interface SessionSnapshotPayload {
+export interface LegacySessionSnapshotPayload {
   status: SessionStatus;
   lastSequence: number;
 }
 
-export interface SessionStatusPayload {
+export interface LegacySessionStatusPayload {
   status: SessionStatus;
   reason?: string;
 }
 
-export interface ParticipantStatusPayload {
+export interface LegacyParticipantStatusPayload {
   role: AgentRole;
   status: AgentStatus;
   action?: string;
 }
 
-export interface MessageCreatedPayload {
+export interface LegacyMessageCreatedPayload {
   messageId: string;
   role: 'agent' | 'user' | 'system';
   agentRole?: AgentRole;
@@ -59,22 +66,22 @@ export interface MessageCreatedPayload {
   streaming?: boolean;
 }
 
-export interface MessageDeltaPayload {
+export interface LegacyMessageDeltaPayload {
   messageId: string;
   content: string;
 }
 
-export interface MessageCompletedPayload {
+export interface LegacyMessageCompletedPayload {
   messageId: string;
 }
 
-export interface ToolPayload {
+export interface LegacyToolPayload {
   messageId: string;
   role: AgentRole;
   toolCall: ToolCallEvent;
 }
 
-export interface ToolCompletedPayload {
+export interface LegacyToolCompletedPayload {
   messageId: string;
   toolCallId: string;
   result: string;
@@ -82,50 +89,38 @@ export interface ToolCompletedPayload {
   success: boolean;
 }
 
-export interface ApprovalPayload {
+export interface LegacyApprovalPayload {
   approvalId: string;
   reason: string;
   message: string;
   requestedBy: AgentRole;
 }
 
-export interface DiffPayload {
+export interface LegacyDiffPayload {
   messageId: string;
   diff: DiffBlock;
 }
 
-export interface UsagePayload {
+export interface LegacyUsagePayload {
   role: AgentRole;
   usage: Partial<TokenUsage>;
 }
 
-export interface ErrorPayload {
+export interface LegacyErrorPayload {
   message: string;
   recoverable: boolean;
 }
 
-export type ArgusSessionEvent =
-  | SessionEvent<'session.snapshot', SessionSnapshotPayload>
-  | SessionEvent<'session.status_changed', SessionStatusPayload>
-  | SessionEvent<'participant.status_changed', ParticipantStatusPayload>
-  | SessionEvent<'message.created', MessageCreatedPayload>
-  | SessionEvent<'message.delta', MessageDeltaPayload>
-  | SessionEvent<'message.completed', MessageCompletedPayload>
-  | SessionEvent<'tool.requested' | 'tool.started', ToolPayload>
-  | SessionEvent<'tool.completed', ToolCompletedPayload>
-  | SessionEvent<'approval.requested' | 'approval.resolved', ApprovalPayload>
-  | SessionEvent<'artifact.diff_updated', DiffPayload>
-  | SessionEvent<'usage.updated', UsagePayload>
-  | SessionEvent<'error.created', ErrorPayload>
-
-export interface SessionCommand<TType extends string, TPayload> {
-  commandId: string;
-  type: TType;
-  payload: TPayload;
-}
-
-export type ArgusSessionCommand =
-  | SessionCommand<'message.send', { content: string; mentions?: AgentRole[] }>
-  | SessionCommand<'session.pause' | 'session.resume' | 'session.cancel', Record<string, never>>
-  | SessionCommand<'participant.interrupt', { role: AgentRole }>
-  | SessionCommand<'approval.resolve', { approvalId: string; approved: boolean; feedback?: string }>;
+export type LegacySessionEventUnion =
+  | LegacySessionEvent<'session.snapshot', LegacySessionSnapshotPayload>
+  | LegacySessionEvent<'session.status_changed', LegacySessionStatusPayload>
+  | LegacySessionEvent<'participant.status_changed', LegacyParticipantStatusPayload>
+  | LegacySessionEvent<'message.created', LegacyMessageCreatedPayload>
+  | LegacySessionEvent<'message.delta', LegacyMessageDeltaPayload>
+  | LegacySessionEvent<'message.completed', LegacyMessageCompletedPayload>
+  | LegacySessionEvent<'tool.requested' | 'tool.started', LegacyToolPayload>
+  | LegacySessionEvent<'tool.completed', LegacyToolCompletedPayload>
+  | LegacySessionEvent<'approval.requested' | 'approval.resolved', LegacyApprovalPayload>
+  | LegacySessionEvent<'artifact.diff_updated', LegacyDiffPayload>
+  | LegacySessionEvent<'usage.updated', LegacyUsagePayload>
+  | LegacySessionEvent<'error.created', LegacyErrorPayload>;

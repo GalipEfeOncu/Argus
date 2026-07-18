@@ -224,11 +224,11 @@ lists unmet criteria and gates. Only the user can later promote or resume it.
 
 The backend Pydantic discriminated union is the canonical event source. Wire JSON is camelCase.
 
-1. Export `GET /contracts/session-events` schema to `contracts/session-events.schema.json`.
-2. Generate `src/types/generated/session-events.ts` with `json-schema-to-typescript`.
-3. Commit generated output.
-4. Add a CI check that fails if regenerating changes tracked output.
-5. Derive REST client types from FastAPI OpenAPI using `openapi-typescript` with the same check.
+1. Export `GET /contracts/session-events` and `GET /contracts/session-commands` schemas to `contracts/` from their Pydantic adapters.
+2. Generate `src/types/generated/session-events.ts` and `src/types/generated/session-commands.ts` with `json-schema-to-typescript`.
+3. Export FastAPI OpenAPI to `contracts/openapi.json` and derive `src/types/generated/rest.ts` with `openapi-typescript`.
+4. Run `npm run generate:contracts` to regenerate all of those files; commit the outputs and never edit them manually.
+5. Add a CI check that fails if regenerating changes tracked output.
 
 The legacy WebSocket message names are transitional. The runtime migration emits only the event types documented in [API.md](API.md), then removes the legacy reducer after the frontend consumes the new envelope.
 

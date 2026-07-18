@@ -30,7 +30,7 @@ Every server event uses the following envelope:
 - `sequence` is strictly increasing per session.
 - `correlationId` links an event to a client command, assignment, or tool execution.
 - Clients persist the highest applied sequence and request replay after reconnecting.
-- Pydantic event models are authoritative and exposed as JSON Schema. The frontend's typed contract mirrors this schema; automated type generation is the next contract-tooling step.
+- Pydantic event and command models are authoritative and exposed as JSON Schema. `npm run generate:contracts` exports those schemas, FastAPI OpenAPI, and the frontend's generated TypeScript contracts.
 
 ## WebSocket
 
@@ -277,6 +277,16 @@ The REST API manages durable configuration; real-time execution uses WebSocket c
 | `/artifacts` | Diffs, exports, and session files |
 
 REST schemas are generated from FastAPI OpenAPI. Clients must not hand-maintain duplicate request/response interfaces.
+
+## Generated contract artifacts
+
+`npm run generate:contracts` is the only regeneration command. It exports the
+canonical Pydantic adapters to `contracts/session-events.schema.json` and
+`contracts/session-commands.schema.json`, exports the FastAPI application to
+`contracts/openapi.json`, and generates the corresponding TypeScript files in
+`src/types/generated/`. Generated files carry a provenance marker and must not
+be edited by hand. The legacy WebSocket transport types remain separate and
+transitional until the runtime migration consumes the canonical envelope.
 
 ## Compatibility rule
 

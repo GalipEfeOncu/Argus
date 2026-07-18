@@ -10,7 +10,8 @@
     "tauri": "tauri",
     "tauri:dev": "tauri dev",
     "tauri:build": "tauri build",
-    "type-check": "tsc --noEmit"
+    "type-check": "tsc --noEmit",
+    "generate:contracts": "node scripts/generate-contracts.mjs"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.1.14",
@@ -38,6 +39,8 @@
     "@types/react": "^19.1.8",
     "@types/react-dom": "^19.1.6",
     "@vitejs/plugin-react": "^4.5.2",
+    "json-schema-to-typescript": "^15.0.4",
+    "openapi-typescript": "^7.10.1",
     "typescript": "^5.8.3",
     "vite": "^6.3.5"
   }

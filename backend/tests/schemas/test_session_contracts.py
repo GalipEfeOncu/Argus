@@ -2,13 +2,19 @@
 
 import json
 from pathlib import Path
+import re
 from typing import Callable
 
 import pytest
 from pydantic import ValidationError
 
 from app.schemas.session_commands import command_schema, parse_session_command
-from app.schemas.session_events import event_schema, parse_session_event
+from app.schemas.session_events import (
+    SAFE_RELATIVE_ARTIFACT_PATH_PATTERN,
+    TIMEZONE_AWARE_ISO_TIMESTAMP_PATTERN,
+    event_schema,
+    parse_session_event,
+)
 
 
 FIXTURES = Path(__file__).parents[1] / "fixtures"
@@ -187,3 +193,64 @@ def test_non_grant_approval_cannot_carry_explicit_capabilities(resolution: str) 
 
     with pytest.raises(ValidationError):
         parse_session_command(value)
+
+
+def test_command_schema_exposes_discriminated_approval_grant_semantics() -> None:
+    schema = command_schema()
+    approval_command = schema["$defs"]["ApprovalResolveCommand"]
+    payload = approval_command["properties"]["payload"]
+
+    assert payload["discriminator"]["propertyName"] == "resolution"
+    assert set(payload["discriminator"]["mapping"]) == {"approve", "reject", "grant"}
+
+    grant_payload = schema["$defs"]["ApprovalGrantPayload"]
+    assert {"grantCapabilities", "scopeSummary"}.issubset(grant_payload["required"])
+    for payload_name in ("ApprovalApprovePayload", "ApprovalRejectPayload"):
+        assert "grantCapabilities" not in schema["$defs"][payload_name]["properties"]
+
+
+@pytest.mark.parametrize(
+    "timestamp",
+    [
+        "2026-07-14T12:00:00Z",
+        "2026-07-14T12:00:00.123+03:00",
+    ],
+)
+def test_exported_event_schema_timestamp_pattern_accepts_canonical_wire_text(timestamp: str) -> None:
+    schema = event_schema()
+    timestamp_schema = schema["$defs"]["SessionSnapshotEvent"]["properties"]["timestamp"]
+
+    assert timestamp_schema["type"] == "string"
+    assert timestamp_schema["pattern"] == TIMEZONE_AWARE_ISO_TIMESTAMP_PATTERN
+    assert re.fullmatch(timestamp_schema["pattern"], timestamp)
+
+
+@pytest.mark.parametrize(
+    "timestamp",
+    [1_721_034_400, "2026-07-14T12:00:00", "2026-07-14 12:00:00Z", "before 2026-07-14T12:00:00Z"],
+)
+def test_exported_event_schema_timestamp_pattern_rejects_noncanonical_wire_values(timestamp: object) -> None:
+    schema = event_schema()
+    timestamp_schema = schema["$defs"]["SessionSnapshotEvent"]["properties"]["timestamp"]
+
+    assert not isinstance(timestamp, str) or re.fullmatch(timestamp_schema["pattern"], timestamp) is None
+
+
+@pytest.mark.parametrize("file_path", ["artifact.py", "backend/app/main.py", r"artifacts\\diff.patch"])
+def test_exported_event_schema_path_pattern_accepts_safe_relative_paths(file_path: str) -> None:
+    schema = event_schema()
+    path_schema = schema["$defs"]["ArtifactDiffUpdatedPayload"]["properties"]["filePath"]
+
+    assert path_schema["pattern"] == SAFE_RELATIVE_ARTIFACT_PATH_PATTERN
+    assert re.fullmatch(path_schema["pattern"], file_path)
+
+
+@pytest.mark.parametrize(
+    "file_path",
+    ["/etc/passwd", "../outside.py", r"C:\\Windows\\system32", r"\\\\server\\share\\file", r"artifacts\\..\\outside.py"],
+)
+def test_exported_event_schema_path_pattern_rejects_unsafe_paths(file_path: str) -> None:
+    schema = event_schema()
+    path_schema = schema["$defs"]["ArtifactDiffUpdatedPayload"]["properties"]["filePath"]
+
+    assert re.fullmatch(path_schema["pattern"], file_path) is None

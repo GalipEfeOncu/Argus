@@ -16,6 +16,12 @@ from pydantic.alias_generators import to_camel
 Identifier = Annotated[str, Field(min_length=1, max_length=160)]
 Summary = Annotated[str, Field(min_length=1, max_length=4_000)]
 Content = Annotated[str, Field(min_length=1, max_length=64_000)]
+TIMEZONE_AWARE_ISO_TIMESTAMP_PATTERN = (
+    r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$"
+)
+SAFE_RELATIVE_ARTIFACT_PATH_PATTERN = (
+    r"^(?![\\/])(?![A-Za-z]:)(?!\.\.(?:[\\/]|$))(?!.*[\\/]\.\.(?:[\\/]|$)).+$"
+)
 
 
 class CamelModel(BaseModel):
@@ -34,17 +40,14 @@ class EventEnvelope(CamelModel):
     event_id: Identifier
     session_id: Identifier
     sequence: int = Field(ge=0)
-    timestamp: datetime
+    timestamp: datetime = Field(json_schema_extra={"pattern": TIMEZONE_AWARE_ISO_TIMESTAMP_PATTERN})
     actor_id: Identifier
     correlation_id: Identifier | None = None
 
     @field_validator("timestamp", mode="before")
     @classmethod
     def require_timezone_aware_iso_timestamp(cls, value: object) -> object:
-        if not isinstance(value, str) or not re.fullmatch(
-            r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})",
-            value,
-        ):
+        if not isinstance(value, str) or not re.fullmatch(TIMEZONE_AWARE_ISO_TIMESTAMP_PATTERN, value):
             raise ValueError("timestamp must be timezone-aware ISO-8601 text")
         return value
 
@@ -350,7 +353,14 @@ class GateStatusChangedEvent(EventEnvelope):
 class ArtifactDiffUpdatedPayload(CamelModel):
     artifact_id: Identifier
     assignment_id: Identifier | None = None
-    file_path: Annotated[str, Field(min_length=1, max_length=4_000)]
+    file_path: Annotated[
+        str,
+        Field(
+            min_length=1,
+            max_length=4_000,
+            json_schema_extra={"pattern": SAFE_RELATIVE_ARTIFACT_PATH_PATTERN},
+        ),
+    ]
     additions: int = Field(ge=0)
     deletions: int = Field(ge=0)
     byte_length: int = Field(ge=0)

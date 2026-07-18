@@ -1,5 +1,5 @@
 import type { AgentInfo, AgentRole, ModelRef, ToolCallEvent } from '@/types/agent';
-import type { ArgusSessionEvent, MessageCreatedPayload } from '@/types/events';
+import type { LegacyMessageCreatedPayload, LegacySessionEventUnion } from '@/types/events';
 import { useAgentStore } from '@/stores/agentStore';
 import { useSessionStore } from '@/stores/sessionStore';
 
@@ -80,12 +80,12 @@ class EventSimulator {
     this.timers.get(sessionId)?.push(timer);
   }
 
-  private nextEvent<TType extends ArgusSessionEvent['type'], TPayload>(
+  private nextEvent<TType extends LegacySessionEventUnion['type'], TPayload>(
     sessionId: string,
     type: TType,
     actorId: string,
     payload: TPayload,
-  ): Extract<ArgusSessionEvent, { type: TType }> {
+  ): Extract<LegacySessionEventUnion, { type: TType }> {
     const sequence = (this.sequences.get(sessionId) ?? 0) + 1;
     this.sequences.set(sessionId, sequence);
     return {
@@ -97,14 +97,14 @@ class EventSimulator {
       type,
       actorId,
       payload,
-    } as unknown as Extract<ArgusSessionEvent, { type: TType }>;
+    } as unknown as Extract<LegacySessionEventUnion, { type: TType }>;
   }
 
-  private emit<TType extends ArgusSessionEvent['type'], TPayload>(sessionId: string, type: TType, actorId: string, payload: TPayload): void {
+  private emit<TType extends LegacySessionEventUnion['type'], TPayload>(sessionId: string, type: TType, actorId: string, payload: TPayload): void {
     this.apply(this.nextEvent(sessionId, type, actorId, payload));
   }
 
-  private apply(event: ArgusSessionEvent): void {
+  private apply(event: LegacySessionEventUnion): void {
     const agentStore = useAgentStore.getState();
     const sessionStore = useSessionStore.getState();
 
@@ -116,7 +116,7 @@ class EventSimulator {
         agentStore.updateAgentStatus(event.payload.role, event.payload.status, event.payload.action);
         break;
       case 'message.created': {
-        const payload = event.payload as MessageCreatedPayload;
+        const payload = event.payload as LegacyMessageCreatedPayload;
         agentStore.addMessage({
           id: payload.messageId,
           role: payload.role,
