@@ -177,7 +177,7 @@ requirements.
 
 ## Phase 1 — Typed shared-room contract prototype
 
-### 1.1 Event projection and transport boundary
+### 1.1 Event projection and transport boundary (✅ Completed)
 
 Deliverables:
 
@@ -191,6 +191,18 @@ Tests:
 
 - Initial snapshot, ordered stream, duplicate event, gap recovery, reconnect from
   last sequence, stale snapshot, malformed payload, and command retry.
+
+Current status (2026-07-19):
+
+- ✅ The frontend has one pure canonical-event projection reducer with ordered
+  buffering, exact-duplicate suppression, conflicting-ID/sequence detection,
+  stale-snapshot protection, and resync requests.
+- ✅ Both the deterministic simulator and the target WebSocket client use the
+  same validated transport boundary. Pending commands retain their idempotency
+  key until a correlated event confirms them.
+- ✅ Reducer and transport tests cover the listed acceptance paths. The backend
+  WebSocket runtime remains transitional until the Phase 2 durable control
+  plane supplies the replay endpoint.
 
 ### 1.2 Coordinator-first timeline
 

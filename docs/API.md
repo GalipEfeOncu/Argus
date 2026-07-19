@@ -36,6 +36,27 @@ Every server event uses the following envelope:
 
 Connect to `GET /ws/sessions/{session_id}?after_sequence={n}`. The server first emits `session.snapshot`, then all events after `n`.
 
+### Client projection and recovery
+
+The client applies canonical events through one pure projection reducer.  It
+keeps future sequence numbers in a bounded-in-time buffer, applies them only
+after every predecessor, ignores byte-for-byte duplicate `eventId` values,
+and requests a resync for a conflicting event ID, conflicting sequence,
+malformed wire payload, or an unresolved sequence gap. A snapshot whose
+`lastSequence` is older than the already applied sequence is stale and cannot
+overwrite the projection.
+
+The simulator and live WebSocket are transport implementations over that same
+validated reducer boundary. Client commands enter a separate pending-command
+collection keyed by `commandId`; a command is confirmed or cleared only by a
+correlated server event. Retrying retains the original `commandId`.
+
+The v1 snapshot payload currently supplies status and sequence metadata, not a
+complete timeline projection. Its `lastSequence` therefore never advances the
+client's applied-event cursor: ordered replay after the requested cursor
+rebuilds timeline state. A later full snapshot revision must be applied
+atomically with its projection data.
+
 ### Server event types
 
 | Type | Purpose |
