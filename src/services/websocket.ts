@@ -2,6 +2,7 @@ import type { ArgusSessionCommand } from '@/types/events';
 import type { ConnectionState } from './sessionProjection';
 import { eventSimulator } from '@/services/eventSimulator';
 import { syncLegacyProjection } from '@/services/legacyProjectionBridge';
+import { useSessionRoomStore } from '@/stores/sessionRoomStore';
 import {
   SessionStreamClient,
   type SessionTransport,
@@ -67,16 +68,19 @@ class WebSocketManager {
     if (eventSimulator.isActive(sessionId)) return;
     this.disconnect();
     this.client = new SessionStreamClient(new WebSocketSessionTransport(), sessionId);
-    this.unsubscribeProjection = this.client.subscribe((projection) => syncLegacyProjection(sessionId, projection));
+    this.unsubscribeProjection = this.client.subscribe((projection, update) => {
+      useSessionRoomStore.getState().publishProjection(sessionId, projection, update.isStreamingUpdate);
+      syncLegacyProjection(sessionId, projection);
+    });
     this.client.connect();
   }
 
-  sendMessage(content: string): void {
+  sendMessage(content: string, mentionIds: string[] = []): void {
     if (this.sessionId !== null && eventSimulator.isActive(this.sessionId)) {
-      eventSimulator.sendHumanMessage(this.sessionId, content);
+      eventSimulator.sendHumanMessage(this.sessionId, content, mentionIds);
       return;
     }
-    this.send({ commandId: crypto.randomUUID(), type: 'message.send', payload: { content } });
+    this.send({ commandId: crypto.randomUUID(), type: 'message.send', payload: { content, ...(mentionIds.length === 0 ? {} : { mentionIds }) } });
   }
 
   sendApproval(approved: boolean, _feedback?: string): void {
@@ -92,10 +96,16 @@ class WebSocketManager {
   }
 
   sendInterrupt(): void {
+    if (this.sessionId !== null && eventSimulator.isActive(this.sessionId)) {
+      eventSimulator.interruptActiveParticipant(this.sessionId);
+      return;
+    }
+    const participantId = this.activeStreamingParticipantId();
+    if (participantId === null) return;
     this.send({
       commandId: crypto.randomUUID(),
       type: 'participant.interrupt',
-      payload: { participantId: 'active-participant', reasonSummary: 'Interrupted by the user.' },
+      payload: { participantId, reasonSummary: 'Interrupted by the user.' },
     });
   }
 
@@ -112,6 +122,14 @@ class WebSocketManager {
 
   private send(command: ArgusSessionCommand): void {
     this.client?.send(command);
+  }
+
+  private activeStreamingParticipantId(): string | null {
+    const projection = this.client?.getProjection();
+    if (projection === undefined) return null;
+    const streamingAuthor = Object.values(projection.messages).find((message) => message.streaming)?.authorId;
+    if (streamingAuthor !== undefined) return streamingAuthor;
+    return Object.values(projection.participants).find((participant) => participant.status === 'working')?.id ?? null;
   }
 }
 

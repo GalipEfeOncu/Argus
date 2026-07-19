@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useWebSocket } from '@/hooks/useWebSocket';
 import { useSessionStore } from '@/stores/sessionStore';
 import { useAgentStore } from '@/stores/agentStore';
+import { useSessionRoomStore } from '@/stores/sessionRoomStore';
 import './MessageInput.css';
 
 interface MessageInputProps {
@@ -10,13 +11,17 @@ interface MessageInputProps {
 
 export const MessageInput: React.FC<MessageInputProps> = ({ sessionId }) => {
   const [content, setContent] = useState('');
-  const { sendMessage } = useWebSocket(sessionId);
+  const { sendMessage, sendInterrupt } = useWebSocket(sessionId);
   const { activeSessionId } = useSessionStore();
   const { isInterrupted } = useAgentStore();
+  const projection = useSessionRoomStore((state) => state.projections[sessionId]);
+  const isStreaming = Object.values(projection?.messages ?? {}).some((message) => message.streaming);
+  const mentions = extractMentions(content);
+  const targetLabel = mentions.length === 0 ? 'Coordinator' : mentions.join(', ');
 
   const handleSend = () => {
     if (!content.trim() || isInterrupted) return;
-    sendMessage(content);
+    sendMessage(content.trim(), mentions);
     setContent('');
   };
 
@@ -24,6 +29,10 @@ export const MessageInput: React.FC<MessageInputProps> = ({ sessionId }) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSend();
+    }
+    if (e.key === 'Escape' && isStreaming) {
+      e.preventDefault();
+      sendInterrupt();
     }
   };
 
@@ -38,7 +47,8 @@ export const MessageInput: React.FC<MessageInputProps> = ({ sessionId }) => {
         <textarea
           className="input-textarea"
           rows={3}
-          placeholder={isInterrupted ? 'Waiting for approval…' : 'Describe your task, / for agent roles, @ for project context'}
+          aria-label="Message for shared room"
+          placeholder={isInterrupted ? 'Waiting for approval…' : 'Describe your task; @name explicitly targets a participant'}
           value={content}
           onChange={(e) => setContent(e.target.value)}
           onKeyDown={handleKeyDown}
@@ -99,6 +109,8 @@ export const MessageInput: React.FC<MessageInputProps> = ({ sessionId }) => {
         </div>
       </div>
 
+      <p className="composer-target">Targets: {targetLabel}{isStreaming ? ' · Escape interrupts active streaming' : ''}</p>
+
       {/* ── Sub pills ───────────────────────────────────── */}
       <div className="input-sub-pills">
         <div className="sub-pill">
@@ -111,3 +123,11 @@ export const MessageInput: React.FC<MessageInputProps> = ({ sessionId }) => {
     </div>
   );
 };
+
+const knownMentionPattern = /@([a-z][a-z0-9_-]*)/gi;
+
+export function extractMentions(content: string): string[] {
+  const values = new Set<string>();
+  for (const match of content.matchAll(knownMentionPattern)) values.add(match[1].toLowerCase());
+  return [...values];
+}

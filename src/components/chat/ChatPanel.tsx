@@ -68,19 +68,9 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ sessionId, sessionName }) 
       </div>
 
       {/* ── Message List ─────────────────────────────────── */}
-      <div className="chat-messages-area flex-1 overflow-y-auto message-list-container">
+      <div className="chat-messages-area flex-1 min-h-0 message-list-container">
 
-        <MessageList />
-
-        {/* AGENTS WORKING separator */}
-        <div className="agents-working-separator">
-          <div className="agents-working-line" />
-          <div className="agents-working-pill">
-            <span className="pulse-dot" />
-            AGENTS WORKING
-          </div>
-          <div className="agents-working-line" />
-        </div>
+        <MessageList sessionId={sessionId} />
 
       </div>
 

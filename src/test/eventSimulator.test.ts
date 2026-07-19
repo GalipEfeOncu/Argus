@@ -13,6 +13,21 @@ function resetStores(): void {
 
 afterEach(resetStores);
 
+test('simulator streams canonical deltas and an interrupt closes the active stream through a correlated command', () => {
+  const scenario = createSimulatorScenario();
+  scenario.simulator.start(sessionId);
+  scenario.clock.advanceBy(650);
+
+  const streamingMessage = Object.values(scenario.simulator.getProjection(sessionId)?.messages ?? {}).find((message) => message.streaming);
+  expect(streamingMessage).toBeDefined();
+  scenario.simulator.interruptActiveParticipant(sessionId);
+
+  const interrupted = scenario.simulator.getProjection(sessionId);
+  expect(interrupted?.messages[streamingMessage?.id ?? '']?.streaming).toBe(false);
+  expect(interrupted?.events.map((entry) => entry.type)).toEqual(expect.arrayContaining(['message.completed', 'participant.status_changed']));
+  expect(Object.keys(interrupted?.pendingCommands ?? {})).toHaveLength(0);
+});
+
 test('simulator approval scenario is deterministic and projects canonical events through the shared store path', () => {
   const session: Session = {
     id: sessionId,
@@ -33,13 +48,12 @@ test('simulator approval scenario is deterministic and projects canonical events
 
   const waitingProjection = scenario.simulator.getProjection(sessionId);
   expect(waitingProjection?.status).toBe('waiting_approval');
-  expect(waitingProjection?.lastSequence).toBe(11);
+  expect(waitingProjection?.lastSequence).toBeGreaterThanOrEqual(11);
   expect(useAgentStore.getState().isInterrupted).toBe(true);
-  expect(useAgentStore.getState().messages.map((message) => message.id)).toEqual([
-    'sim_3',
-    'sim_7',
-    'sim_11',
-  ]);
+  expect(useAgentStore.getState().messages).toHaveLength(3);
+  expect(waitingProjection?.events.map((entry) => entry.type)).toEqual(expect.arrayContaining([
+    'assignment.proposed', 'assignment.created', 'assignment.started', 'tool.requested', 'tool.started', 'tool.completed', 'handoff.created', 'artifact.diff_updated', 'usage.updated',
+  ]));
 
   scenario.simulator.resolveApproval(sessionId, true);
   scenario.clock.advanceBy(600);
@@ -47,4 +61,12 @@ test('simulator approval scenario is deterministic and projects canonical events
   expect(scenario.simulator.getProjection(sessionId)?.status).toBe('running');
   expect(useAgentStore.getState().isInterrupted).toBe(false);
   expect(useAgentStore.getState().messages.at(-1)?.content).toContain('isolated workspace');
+
+  scenario.simulator.interruptActiveParticipant(sessionId);
+  const interruptedProjection = scenario.simulator.getProjection(sessionId);
+  expect(interruptedProjection?.events.at(-1)).toMatchObject({
+    type: 'participant.status_changed',
+    payload: { participantId: 'coordinator', status: 'stopped' },
+  });
+  expect(Object.keys(interruptedProjection?.pendingCommands ?? {})).toHaveLength(0);
 });

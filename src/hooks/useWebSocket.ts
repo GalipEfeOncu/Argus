@@ -10,7 +10,7 @@ export function useWebSocket(sessionId: string | null) {
   }, [sessionId]);
 
   return {
-    sendMessage: (content: string) => wsManager.sendMessage(content),
+    sendMessage: (content: string, mentionIds?: string[]) => wsManager.sendMessage(content, mentionIds),
     sendApproval: (approved: boolean, feedback?: string) => wsManager.sendApproval(approved, feedback),
     sendInterrupt: () => wsManager.sendInterrupt(),
   };

@@ -204,7 +204,7 @@ Current status (2026-07-19):
   WebSocket runtime remains transitional until the Phase 2 durable control
   plane supplies the replay endpoint.
 
-### 1.2 Coordinator-first timeline
+### 1.2 Coordinator-first timeline (✅ Completed)
 
 Deliverables:
 
@@ -224,6 +224,26 @@ Tests:
   screen-reader announcement throttling, and correlation links.
 - 10,000-event scroll/input benchmark, DOM-node ceiling, streaming render count,
   lazy-chunk assertion, reduced motion, and background-tab timer suspension.
+
+Current status (2026-07-19):
+
+- ✅ The shared room now renders directly from the canonical session projection.
+  Every target event has a typed human, Coordinator, specialist, system, tool,
+  assignment, handoff, evidence, gate, limit, decision, usage, diff, or error
+  representation, with stable correlation links and artifact evidence retained.
+- ✅ Unmentioned human messages visibly target Coordinator; explicit
+  `@participant` mentions are sent as canonical command targets. Specialist
+  detail can be collapsed without removing its ordered room event.
+- ✅ The timeline uses measured-height virtualization with bounded overscan,
+  stable event-ID focus/jumps, unread-event return-to-latest control,
+  animation-frame streaming paint coalescing, throttled live announcements, and
+  background-tab suspension. Diff enhancement loads only on request; plain text
+  remains readable first.
+- ✅ The typed simulator exercises real streaming deltas and correlated
+  interruption, plus assignment/tool/diff/usage/handoff relationships. Frontend
+  acceptance coverage includes keyboard send, mentions, collapsed detail,
+  correlation, 10,000-event DOM bound, streaming batching, screen-reader
+  throttling, and background return.
 
 ### 1.3 Session configuration UI
 

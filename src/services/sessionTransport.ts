@@ -28,6 +28,10 @@ export interface StreamClock {
   clearTimeout(timer: ReturnType<typeof setTimeout>): void;
 }
 
+export interface ProjectionUpdate {
+  isStreamingUpdate: boolean;
+}
+
 const browserClock: StreamClock = {
   setTimeout: (callback, delayMs) => setTimeout(callback, delayMs),
   clearTimeout: (timer) => clearTimeout(timer),
@@ -36,7 +40,7 @@ const browserClock: StreamClock = {
 export class SessionStreamClient {
   private projection: SessionProjection;
   private gapTimer: ReturnType<typeof setTimeout> | null = null;
-  private readonly listeners = new Set<(projection: SessionProjection) => void>();
+  private readonly listeners = new Set<(projection: SessionProjection, update: ProjectionUpdate) => void>();
 
   constructor(
     private readonly transport: SessionTransport,
@@ -55,22 +59,22 @@ export class SessionStreamClient {
     this.clearGapTimer();
     this.transport.disconnect();
     this.projection = setConnectionState(this.projection, 'idle');
-    this.publish();
+    this.publish({ isStreamingUpdate: false });
   }
 
   getProjection(): SessionProjection {
     return this.projection;
   }
 
-  subscribe(listener: (projection: SessionProjection) => void): () => void {
+  subscribe(listener: (projection: SessionProjection, update: ProjectionUpdate) => void): () => void {
     this.listeners.add(listener);
-    listener(this.projection);
+    listener(this.projection, { isStreamingUpdate: false });
     return () => this.listeners.delete(listener);
   }
 
   send(command: ArgusSessionCommand): boolean {
     this.projection = queueCommand(this.projection, command);
-    this.publish();
+    this.publish({ isStreamingUpdate: false });
     return this.transport.send(command);
   }
 
@@ -84,7 +88,7 @@ export class SessionStreamClient {
       onEvent: (value) => this.receive(value),
       onConnectionState: (connection) => {
         this.projection = setConnectionState(this.projection, connection);
-        this.publish();
+        this.publish({ isStreamingUpdate: false });
       },
       onReconnectRequested: () => this.resync(),
     };
@@ -94,14 +98,14 @@ export class SessionStreamClient {
     const event = parseSessionEvent(value);
     if (event === null) {
       this.projection = { ...this.projection, connection: 'resyncing', resyncReason: 'invalid_payload' };
-      this.publish();
+      this.publish({ isStreamingUpdate: false });
       this.resync();
       return;
     }
 
     const result = reduceSessionEvent(this.projection, event);
     this.projection = result.state;
-    this.publish();
+    this.publish({ isStreamingUpdate: event.type === 'message.delta' });
     if (result.disposition === 'buffered') this.armGapTimer();
     if (result.disposition === 'applied' && Object.keys(this.projection.bufferedEvents).length === 0) this.clearGapTimer();
     if (result.disposition === 'resync_required') this.resync();
@@ -113,7 +117,7 @@ export class SessionStreamClient {
       this.gapTimer = null;
       if (Object.keys(this.projection.bufferedEvents).length === 0) return;
       this.projection = { ...this.projection, connection: 'resyncing', resyncReason: 'sequence_gap' };
-      this.publish();
+      this.publish({ isStreamingUpdate: false });
       this.resync();
     }, this.gapTimeoutMs);
   }
@@ -130,8 +134,8 @@ export class SessionStreamClient {
     this.transport.connect(this.sessionId, this.projection.lastSequence, this.transportHandlers());
   }
 
-  private publish(): void {
-    this.listeners.forEach((listener) => listener(this.projection));
+  private publish(update: ProjectionUpdate): void {
+    this.listeners.forEach((listener) => listener(this.projection, update));
   }
 }
 

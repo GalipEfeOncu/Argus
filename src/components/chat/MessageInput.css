@@ -143,6 +143,8 @@
   padding: 0 2px;
 }
 
+.composer-target { margin: 0; padding: 0 2px; color: var(--text-muted); font-size: 11px; }
+
 .sub-pill {
   display: inline-flex;
   align-items: center;

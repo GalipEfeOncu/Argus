@@ -31,6 +31,7 @@ export interface SessionProjection {
   connection: ConnectionState;
   resyncReason: ResyncReason | null;
   events: ArgusSessionEvent[];
+  snapshot: Extract<ArgusSessionEvent, { type: 'session.snapshot' }> | null;
   messages: Record<string, ProjectedMessage>;
   participants: Record<string, ProjectedParticipant>;
   eventFingerprints: Record<string, string>;
@@ -53,6 +54,7 @@ export function createSessionProjection(sessionId: string | null = null): Sessio
     connection: 'idle',
     resyncReason: null,
     events: [],
+    snapshot: null,
     messages: {},
     participants: {},
     eventFingerprints: {},
@@ -135,6 +137,7 @@ function reduceSnapshot(
     ...state,
     sessionId: state.sessionId ?? event.sessionId,
     status: event.payload.status,
+    snapshot: event,
     resyncReason: null,
     eventFingerprints: { ...state.eventFingerprints, [event.eventId]: fingerprint },
     pendingCommands: resolveCommand(state.pendingCommands, event.correlationId),
