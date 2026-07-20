@@ -1,14 +1,14 @@
 import { create } from 'zustand';
-import type { AgentInfo, AgentRole, AgentStatus, Message, ToolCallEvent } from '@/types/agent';
+import type { AgentInfo, AgentStatus, Message, ToolCallEvent } from '@/types/agent';
 
 interface AgentStoreState {
-  agents: Record<string, AgentInfo>;    // keyed by role
+  agents: Record<string, AgentInfo>;    // keyed by immutable agent instance ID
   messages: Message[];
   isInterrupted: boolean;
   interruptReason?: string;
 
   initAgents: (infos: AgentInfo[]) => void;
-  updateAgentStatus: (role: AgentRole, status: AgentStatus, action?: string) => void;
+  updateAgentStatus: (agentId: string, status: AgentStatus, action?: string) => void;
   addMessage: (msg: Message | Omit<Message, 'id'>) => string;
   appendStreamToken: (msgId: string, token: string) => void;
   finalizeMessage: (msgId: string) => void;
@@ -16,7 +16,7 @@ interface AgentStoreState {
   updateToolCall: (msgId: string, toolCallId: string, updates: Partial<ToolCallEvent>) => void;
   setInterrupted: (interrupted: boolean, reason?: string) => void;
   clearSession: () => void;
-  incrementTokenCount: (role: AgentRole, count: number) => void;
+  incrementTokenCount: (agentId: string, count: number) => void;
 }
 
 export const useAgentStore = create<AgentStoreState>()((set) => ({
@@ -27,15 +27,15 @@ export const useAgentStore = create<AgentStoreState>()((set) => ({
 
   initAgents: (infos) => {
     const agents: Record<string, AgentInfo> = {};
-    infos.forEach((info) => { agents[info.role] = info; });
+    infos.forEach((info) => { agents[info.instanceId ?? info.role] = info; });
     set({ agents, messages: [], isInterrupted: false });
   },
 
-  updateAgentStatus: (role, status, action) => {
+      updateAgentStatus: (agentId, status, action) => {
     set((s) => ({
       agents: {
         ...s.agents,
-        [role]: { ...s.agents[role], status, currentAction: action },
+        [agentId]: { ...s.agents[agentId], status, currentAction: action },
       },
     }));
   },
@@ -95,11 +95,11 @@ export const useAgentStore = create<AgentStoreState>()((set) => ({
     set({ agents: {}, messages: [], isInterrupted: false, interruptReason: undefined });
   },
 
-  incrementTokenCount: (role, count) => {
+  incrementTokenCount: (agentId, count) => {
     set((s) => ({
       agents: {
         ...s.agents,
-        [role]: { ...s.agents[role], tokenCount: (s.agents[role]?.tokenCount ?? 0) + count },
+        [agentId]: { ...s.agents[agentId], tokenCount: (s.agents[agentId]?.tokenCount ?? 0) + count },
       },
     }));
   },

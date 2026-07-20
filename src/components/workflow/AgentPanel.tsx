@@ -65,6 +65,7 @@ const CheckIcon: React.FC = () => (
 );
 
 interface AgentPanelItem {
+  id: string;
   role: AgentRole;
   label: string;
   subtitle: string;
@@ -79,8 +80,9 @@ export const AgentPanel: React.FC = () => {
   const activeAgents = Object.values(agents);
 
   const displayAgents: AgentPanelItem[] = activeAgents.map((agent) => ({
+    id: agent.instanceId ?? agent.role,
     role: agent.role,
-    label: agent.role.charAt(0).toUpperCase() + agent.role.slice(1),
+    label: agent.label ?? (agent.role.charAt(0).toUpperCase() + agent.role.slice(1)),
     subtitle: agent.role.replace('_', ' ').toUpperCase(),
     status: agent.status,
     action: agent.currentAction || 'Idle',
@@ -112,7 +114,7 @@ export const AgentPanel: React.FC = () => {
 
           return (
             <div
-              key={agent.role}
+              key={agent.id}
               className={`agent-card ${highlight ? 'agent-card--active' : ''} ${isDone ? 'agent-card--done' : ''}`}
             >
               {/* Card top row */}
@@ -164,7 +166,7 @@ export const AgentPanel: React.FC = () => {
             const isActive = agent.status === 'thinking' || agent.status === 'streaming' || agent.status === 'using_tool' || agent.status === 'waiting_approval';
 
             return (
-              <div key={agent.role} className="pipeline-node">
+              <div key={agent.id} className="pipeline-node">
                 {/* Node circle */}
                 <div className={`pipeline-node-circle ${
                   isDone

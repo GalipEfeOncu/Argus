@@ -34,6 +34,7 @@ export const useSessionStore = create<SessionStoreState>()(
           task: config.task,
           status: 'setup',
           roleConfigs: config.roleConfigs,
+          configuration: config.configuration,
           messages: [],
           startedAt: Date.now(),
           tokenUsage: { inputTokens: 0, outputTokens: 0, totalTokens: 0 },

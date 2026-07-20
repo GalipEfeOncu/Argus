@@ -14,6 +14,9 @@ export type AgentStatus =
   | 'error';
 
 export interface AgentInfo {
+  /** Immutable agent-definition/session instance ID; role is not an identity. */
+  instanceId?: string;
+  label?: string;
   role: AgentRole;
   status: AgentStatus;
   modelRef: ModelRef;
@@ -78,6 +81,7 @@ export interface DiffBlock {
 // ── Role Config ──────────────────────────────────────────────
 
 export interface RoleConfig {
+  instanceId?: string;
   role: AgentRole;
   enabled: boolean;
   modelRef: ModelRef;

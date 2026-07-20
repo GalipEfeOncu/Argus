@@ -1,17 +1,15 @@
-import type { AgentRole, AgentStatus, Message } from '@/types/agent';
+import type { AgentStatus, Message } from '@/types/agent';
 import type { SessionStatus } from '@/types/session';
 import { useAgentStore } from '@/stores/agentStore';
 import { useSessionStore } from '@/stores/sessionStore';
 import type { ProjectedParticipant, SessionProjection } from './sessionProjection';
-
-const agentRoles: AgentRole[] = ['coordinator', 'planner', 'builder', 'reviewer', 'tester', 'ui_agent'];
 
 /** Temporary adapter while Phase 1.2 migrates the existing UI stores to the projection directly. */
 export function syncLegacyProjection(sessionId: string, projection: SessionProjection): void {
   const messages: Message[] = Object.values(projection.messages).map((message) => ({
     id: message.id,
     role: message.authorKind === 'human' ? 'user' : message.authorKind === 'system' ? 'system' : 'agent',
-    ...(isAgentRole(message.authorId) ? { agentRole: message.authorId } : {}),
+    ...(agentRoleForId(message.authorId) !== undefined ? { agentRole: agentRoleForId(message.authorId) } : {}),
     content: message.content,
     isStreaming: message.streaming,
     timestamp: Date.parse(message.timestamp),
@@ -22,15 +20,15 @@ export function syncLegacyProjection(sessionId: string, projection: SessionProje
     interruptReason: projection.status === 'waiting_approval' ? 'Waiting for approval' : undefined,
   });
   for (const participant of Object.values(projection.participants)) {
-    if (isAgentRole(participant.id)) {
+    if (useAgentStore.getState().agents[participant.id] !== undefined) {
       useAgentStore.getState().updateAgentStatus(participant.id, toLegacyAgentStatus(participant.status), participant.actionSummary);
     }
   }
   if (projection.status !== null) useSessionStore.getState().updateSessionStatus(sessionId, toLegacySessionStatus(projection.status));
 }
 
-function isAgentRole(value: string): value is AgentRole {
-  return agentRoles.includes(value as AgentRole);
+function agentRoleForId(instanceId: string) {
+  return useAgentStore.getState().agents[instanceId]?.role;
 }
 
 function toLegacyAgentStatus(status: ProjectedParticipant['status']): AgentStatus {

@@ -245,7 +245,7 @@ Current status (2026-07-19):
   correlation, 10,000-event DOM bound, streaming batching, screen-reader
   throttling, and background return.
 
-### 1.3 Session configuration UI
+### 1.3 Session configuration UI (✅ Completed)
 
 Deliverables:
 
@@ -263,6 +263,26 @@ Tests:
 - Builder-only pool; automatic broad pool; Reviewer and Tester required; invalid
   required role; unlimited user ceiling; zero revisions; no-interruption mode;
   preset-to-Custom transition; full keyboard and focus order.
+
+Current status (2026-07-20):
+
+- ✅ The seven-section setup flow now creates a typed session configuration
+  snapshot. Coordinator is mandatory; available agents are immutable instances,
+  not role-name aliases, and the selected instance IDs remain visible to the
+  simulator and legacy participant views.
+- ✅ Quick, Balanced, Thorough, and Custom resolve all values in-place. The
+  validator distinguishes blank ceilings from zero, checks model/evidence/gate
+  compatibility, accepts decimal cost amounts, and prevents unsafe or
+  impossible configurations before start.
+- ✅ No-interruption mode shows exact selected capabilities and workspace scope,
+  requires Autonomous acknowledgement that is invalidated by authority or scope
+  changes, and keeps non-bypassable restrictions visible. Direct-write mode
+  warns that rollback is limited and requires acknowledgement.
+- ✅ The typed simulator validates configuration even when called outside the
+  UI, respects the selected pool and pre-authorized writes, and preserves agent
+  instance identity. Frontend coverage now includes 38 tests for configuration,
+  simulator, transport, and timeline behavior. Durable backend persistence and
+  runtime enforcement remain Phase 2 responsibilities.
 
 ### 1.4 Runtime controls and terminal states
 

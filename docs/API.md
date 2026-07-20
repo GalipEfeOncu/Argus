@@ -217,8 +217,9 @@ project and agent-definition resources; secrets are never accepted here.
 }
 ```
 
-Every numeric maximum is an integer greater than or equal to zero or `null`.
-`0` prohibits the counted action; `null` removes the user ceiling but remains
+Every numeric maximum except `maxSessionCost` is an integer greater than or
+equal to zero or `null`; `maxSessionCost` is a non-negative decimal amount or
+`null`. `0` prohibits the counted action; `null` removes the user ceiling but remains
 subject to runtime resource and safety guards. `softWarningRatio` is greater
 than zero and at most one. The server returns a normalized snapshot,
 `configurationVersion`, policy hash, defaults resolved by the backend, and any

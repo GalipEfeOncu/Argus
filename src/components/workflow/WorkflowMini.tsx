@@ -13,20 +13,20 @@ export const WorkflowMini: React.FC = () => {
   if (!session) return null;
 
   // The order is roughly Planner -> Builder <-> Reviewer -> Tester (UI agent may parallel Builder)
-  const enabledRoles: AgentRole[] = session.roleConfigs
+  const enabledAgents = session.roleConfigs
     .filter(rc => rc.enabled)
-    .map(rc => rc.role as AgentRole)
+    .map((rc) => ({ id: rc.instanceId ?? rc.role, role: rc.role as AgentRole }))
     .sort((a, b) => {
       const order: Record<AgentRole, number> = { coordinator: 1, planner: 2, ui_agent: 3, builder: 4, reviewer: 5, tester: 6 };
-      return (order[a] || 99) - (order[b] || 99);
+      return (order[a.role] || 99) - (order[b.role] || 99);
     });
 
   // Determine active node
-  const activeRole = Object.keys(agents).find(
-    role => agents[role as AgentRole]?.status !== 'idle' && agents[role as AgentRole]?.status !== 'done'
-  ) as AgentRole | undefined;
+  const activeAgentId = Object.keys(agents).find(
+    (id) => agents[id]?.status !== 'idle' && agents[id]?.status !== 'done'
+  );
 
-  const activeIndex = activeRole ? enabledRoles.indexOf(activeRole) : -1;
+  const activeIndex = activeAgentId ? enabledAgents.findIndex((agent) => agent.id === activeAgentId) : -1;
 
   return (
     <div className="workflow-mini flex flex-col items-center justify-center p-6 w-full h-full glass">
@@ -38,25 +38,25 @@ export const WorkflowMini: React.FC = () => {
           {activeIndex >= 0 && (
             <div 
               className="h-full bg-accent-cyan transition-all duration-700 ease-in-out shadow-[0_0_8px_var(--accent-cyan)]"
-              style={{ width: `${(activeIndex / Math.max(1, enabledRoles.length - 1)) * 100}%` }}
+              style={{ width: `${(activeIndex / Math.max(1, enabledAgents.length - 1)) * 100}%` }}
             />
           )}
         </div>
 
-        {enabledRoles.map((role, idx) => {
-          const isDone = agents[role]?.status === 'done' || (activeIndex > idx && activeIndex !== -1);
-          const isActive = role === activeRole;
+        {enabledAgents.map((agent, idx) => {
+          const isDone = agents[agent.id]?.status === 'done' || (activeIndex > idx && activeIndex !== -1);
+          const isActive = agent.id === activeAgentId;
           const isNext = activeIndex === -1 ? idx === 0 : idx === activeIndex + 1;
 
           return (
-            <div key={role} className="flex items-center">
+            <div key={agent.id} className="flex items-center">
               <WorkflowNode 
-                role={role} 
+                role={agent.role}
                 isActive={isActive}
                 isDone={isDone}
                 isNext={isNext}
               />
-              {idx < enabledRoles.length - 1 && (
+              {idx < enabledAgents.length - 1 && (
                 <div className="w-8 md:w-16 h-0"></div> // Spacer for the line
               )}
             </div>

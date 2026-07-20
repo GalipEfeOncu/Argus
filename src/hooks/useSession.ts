@@ -23,6 +23,7 @@ export function useSession() {
     const agentInfos: AgentInfo[] = config.roleConfigs
       .filter((rc) => rc.enabled)
       .map((rc) => ({
+        instanceId: rc.instanceId,
         role: rc.role,
         status: 'idle',
         modelRef: rc.modelRef,

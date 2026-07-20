@@ -5,6 +5,8 @@ import { InMemorySessionTransport, SessionStreamClient } from './sessionTranspor
 import type { ProjectedParticipant, SessionProjection } from './sessionProjection';
 import { syncLegacyProjection } from './legacyProjectionBridge';
 import { useSessionRoomStore } from '@/stores/sessionRoomStore';
+import type { AgentInstance, SessionConfiguration } from '@/types/session';
+import { validateConfiguration } from './sessionConfiguration';
 
 const demoModel: ModelRef = {
   providerId: 'demo',
@@ -14,6 +16,8 @@ const demoModel: ModelRef = {
 
 const demoRoles: AgentRole[] = ['coordinator', 'planner', 'builder', 'reviewer', 'tester', 'ui_agent'];
 type SimulatorTimer = ReturnType<typeof setTimeout>;
+interface SimulatorAgent { id: string; role: AgentRole; }
+const coordinator: SimulatorAgent = { id: 'coordinator', role: 'coordinator' };
 
 export interface SimulatorClock {
   now(): number;
@@ -46,6 +50,7 @@ export class EventSimulator {
   private readonly clients = new Map<string, SessionStreamClient>();
   private readonly unsubscribeProjection = new Map<string, () => void>();
   private readonly streamingMessages = new Map<string, string>();
+  private readonly sessionAgents = new Map<string, SimulatorAgent[]>();
 
   constructor(private readonly dependencies: EventSimulatorDependencies = browserSimulatorDependencies) {}
 
@@ -57,13 +62,22 @@ export class EventSimulator {
     return this.clients.get(sessionId)?.getProjection();
   }
 
-  start(sessionId: string): void {
+  start(sessionId: string, configuration?: SessionConfiguration): void {
     if (this.isActive(sessionId)) return;
+    if (configuration !== undefined) {
+      const errors = validateConfiguration(configuration);
+      if (errors.length > 0) throw new Error(`Simulator configuration is invalid: ${errors.join(' ')}`);
+    }
 
     const transport = new InMemorySessionTransport();
     const client = new SessionStreamClient(transport, sessionId, this.dependencies.clock);
-    const agents: AgentInfo[] = demoRoles.map((role) => ({
-      role,
+    const selectedAgents: SimulatorAgent[] = configuration === undefined
+      ? demoRoles.map((role) => ({ id: role, role }))
+      : [coordinator, ...configuration.availableAgents.filter((agent) => configuration.availableAgentIds.includes(agent.id)).map(toSimulatorAgent)];
+    const agents: AgentInfo[] = selectedAgents.map((agent) => ({
+      instanceId: agent.id,
+      label: configuration?.availableAgents.find((candidate) => candidate.id === agent.id)?.label ?? (agent.role === 'coordinator' ? 'Coordinator' : agent.role),
+      role: agent.role,
       status: 'idle',
       modelRef: demoModel,
       tokenCount: 0,
@@ -73,6 +87,7 @@ export class EventSimulator {
     this.clients.set(sessionId, client);
     this.sequences.set(sessionId, 0);
     this.timers.set(sessionId, []);
+    this.sessionAgents.set(sessionId, selectedAgents);
     this.unsubscribeProjection.set(sessionId, client.subscribe((projection, update) => {
       useSessionRoomStore.getState().publishProjection(sessionId, projection, update.isStreamingUpdate);
       syncLegacyProjection(sessionId, projection);
@@ -80,26 +95,32 @@ export class EventSimulator {
     client.connect();
 
     this.snapshot(sessionId, 'running');
-    this.schedule(sessionId, 350, () => this.participant(sessionId, 'coordinator', 'working', 'Reviewing the task and available team capabilities'));
-    this.schedule(sessionId, 450, () => this.emit(sessionId, 'assignment.proposed', 'coordinator', {
-      proposalId: 'demo-proposal', assigneeAgentId: 'planner', objective: 'Map the project and propose the smallest safe change.',
+    this.schedule(sessionId, 350, () => this.participant(sessionId, coordinator, 'working', 'Reviewing the task and available team capabilities'));
+    const planningAgent = this.agentFor(sessionId, 'planner');
+    const implementationAgent = this.agentFor(sessionId, 'builder', planningAgent);
+    this.schedule(sessionId, 450, () => this.emit(sessionId, 'assignment.proposed', coordinator.id, {
+      proposalId: 'demo-proposal', assigneeAgentId: planningAgent.id, objective: 'Map the project and propose the smallest safe change.',
       acceptanceCriteria: ['Identify affected files', 'Hand off an implementation plan'], operationClass: 'read_only', reasonSummary: 'Start with a bounded visible plan.',
     }));
-    this.schedule(sessionId, 500, () => this.emit(sessionId, 'assignment.created', 'coordinator', {
-      assignmentId: 'demo-assignment', proposalId: 'demo-proposal', assigneeAgentId: 'planner', configurationVersion: 1, policyHash: 'demo-policy', operationClass: 'read_only',
+    this.schedule(sessionId, 500, () => this.emit(sessionId, 'assignment.created', coordinator.id, {
+      assignmentId: 'demo-assignment', proposalId: 'demo-proposal', assigneeAgentId: planningAgent.id, configurationVersion: 1, policyHash: 'demo-policy', operationClass: 'read_only',
     }));
-    this.schedule(sessionId, 550, () => this.emit(sessionId, 'assignment.started', 'planner', { assignmentId: 'demo-assignment', assigneeAgentId: 'planner' }));
+    this.schedule(sessionId, 550, () => this.emit(sessionId, 'assignment.started', planningAgent.id, { assignmentId: 'demo-assignment', assigneeAgentId: planningAgent.id }));
     this.schedule(sessionId, 650, () => this.streamMessage(
       sessionId,
-      'coordinator',
+      coordinator,
       'I will coordinate this session in the open.',
       [' I’m assigning planning first,', ' then I’ll request implementation and review.'],
     ));
-    this.schedule(sessionId, 1200, () => this.participant(sessionId, 'planner', 'working', 'Mapping the project and acceptance criteria'));
-    this.schedule(sessionId, 1600, () => this.message(sessionId, 'planner', 'I will inspect the relevant project files, identify the smallest safe change, and hand the implementation plan to Builder.'));
-    this.schedule(sessionId, 2200, () => this.participant(sessionId, 'builder', 'working', 'Reading project context'));
-    this.schedule(sessionId, 2500, () => this.tool(sessionId));
-    this.schedule(sessionId, 3300, () => this.approval(sessionId));
+    this.schedule(sessionId, 1200, () => this.participant(sessionId, planningAgent, 'working', 'Mapping the project and acceptance criteria'));
+    this.schedule(sessionId, 1600, () => this.message(sessionId, planningAgent, 'I will inspect the relevant project files, identify the smallest safe change, and hand the implementation plan to the next available specialist.'));
+    this.schedule(sessionId, 2200, () => this.participant(sessionId, implementationAgent, 'working', 'Reading project context'));
+    this.schedule(sessionId, 2500, () => this.tool(sessionId, implementationAgent, planningAgent));
+    const writePreauthorized = configuration?.approvalPolicy.behavior === 'preauthorize_session'
+      && configuration.approvalPolicy.preauthorizedCapabilities.includes('workspace.write');
+    this.schedule(sessionId, 3300, () => writePreauthorized
+      ? this.message(sessionId, implementationAgent, 'The pre-authorized workspace change completed within the selected session scope.')
+      : this.approval(sessionId, implementationAgent));
   }
 
   stop(sessionId: string): void {
@@ -112,6 +133,7 @@ export class EventSimulator {
     this.timers.delete(sessionId);
     this.sequences.delete(sessionId);
     this.streamingMessages.delete(sessionId);
+    this.sessionAgents.delete(sessionId);
     useSessionRoomStore.getState().clearProjection(sessionId);
   }
 
@@ -123,7 +145,7 @@ export class EventSimulator {
     this.emit(sessionId, 'message.created', 'human', {
       messageId: this.dependencies.createId(), authorId: 'human', authorKind: 'human', content, ...(mentionIds.length === 0 ? {} : { mentionIds }),
     }, commandId);
-    this.schedule(sessionId, 300, () => this.message(sessionId, 'coordinator', 'Acknowledged. I added your instruction to the active assignment and will keep it visible to the team.'));
+    this.schedule(sessionId, 300, () => this.message(sessionId, coordinator, 'Acknowledged. I added your instruction to the active assignment and will keep it visible to the team.'));
   }
 
   resolveApproval(sessionId: string, approved: boolean): void {
@@ -139,8 +161,9 @@ export class EventSimulator {
       reasonSummary: approved ? 'User approved the requested workspace action.' : 'User rejected the requested workspace action.',
     }, commandId);
     this.emit(sessionId, 'session.status_changed', 'system', { status: 'running' });
-    this.participant(sessionId, 'builder', 'working', approved ? 'Applying an isolated workspace change' : 'Replanning after user feedback');
-    this.schedule(sessionId, 600, () => this.message(sessionId, 'builder', approved ? 'The change was applied in the isolated workspace. I am preparing a diff for review.' : 'I will revise the approach before making a workspace change.'));
+    const implementationAgent = this.agentFor(sessionId, 'builder');
+    this.participant(sessionId, implementationAgent, 'working', approved ? 'Applying an isolated workspace change' : 'Replanning after user feedback');
+    this.schedule(sessionId, 600, () => this.message(sessionId, implementationAgent, approved ? 'The change was applied in the isolated workspace. I am preparing a diff for review.' : 'I will revise the approach before making a workspace change.'));
   }
 
   interruptActiveParticipant(sessionId: string): void {
@@ -197,58 +220,58 @@ export class EventSimulator {
     this.transport(sessionId).emit(event);
   }
 
-  private participant(sessionId: string, id: AgentRole, status: ProjectedParticipant['status'], actionSummary: string): void {
-    this.emit(sessionId, 'participant.status_changed', id, {
-      participantId: id, participantKind: id === 'coordinator' ? 'coordinator' : 'agent', status, actionSummary,
+  private participant(sessionId: string, agent: SimulatorAgent, status: ProjectedParticipant['status'], actionSummary: string): void {
+    this.emit(sessionId, 'participant.status_changed', agent.id, {
+      participantId: agent.id, participantKind: agent.role === 'coordinator' ? 'coordinator' : 'agent', status, actionSummary,
     });
   }
 
-  private message(sessionId: string, authorId: AgentRole, content: string): void {
-    this.emit(sessionId, 'message.created', authorId, {
-      messageId: this.dependencies.createId(), authorId, authorKind: authorId === 'coordinator' ? 'coordinator' : 'agent', content,
+  private message(sessionId: string, author: SimulatorAgent, content: string): void {
+    this.emit(sessionId, 'message.created', author.id, {
+      messageId: this.dependencies.createId(), authorId: author.id, authorKind: author.role === 'coordinator' ? 'coordinator' : 'agent', content,
     });
-    this.participant(sessionId, authorId, 'stopped', 'Shared an update');
+    this.participant(sessionId, author, 'stopped', 'Shared an update');
   }
 
-  private streamMessage(sessionId: string, authorId: AgentRole, initialContent: string, deltas: string[]): void {
+  private streamMessage(sessionId: string, author: SimulatorAgent, initialContent: string, deltas: string[]): void {
     const messageId = this.dependencies.createId();
     this.streamingMessages.set(sessionId, messageId);
-    this.emit(sessionId, 'message.created', authorId, {
-      messageId, authorId, authorKind: authorId === 'coordinator' ? 'coordinator' : 'agent', content: initialContent, streaming: true,
+    this.emit(sessionId, 'message.created', author.id, {
+      messageId, authorId: author.id, authorKind: author.role === 'coordinator' ? 'coordinator' : 'agent', content: initialContent, streaming: true,
     });
     deltas.forEach((delta, index) => this.schedule(sessionId, (index + 1) * 90, () => {
       if (this.streamingMessages.get(sessionId) !== messageId) return;
-      this.emit(sessionId, 'message.delta', authorId, { messageId, delta });
+      this.emit(sessionId, 'message.delta', author.id, { messageId, delta });
       if (index === deltas.length - 1) {
-        this.emit(sessionId, 'message.completed', authorId, { messageId });
+        this.emit(sessionId, 'message.completed', author.id, { messageId });
         this.streamingMessages.delete(sessionId);
       }
     }));
   }
 
-  private tool(sessionId: string): void {
-    this.emit(sessionId, 'message.created', 'builder', {
-      messageId: this.dependencies.createId(), authorId: 'builder', authorKind: 'agent', content: 'I am reading the current project context before proposing a change.',
+  private tool(sessionId: string, implementationAgent: SimulatorAgent, planningAgent: SimulatorAgent): void {
+    this.emit(sessionId, 'message.created', implementationAgent.id, {
+      messageId: this.dependencies.createId(), authorId: implementationAgent.id, authorKind: 'agent', content: 'I am reading the current project context before proposing a change.',
     });
-    this.emit(sessionId, 'tool.requested', 'builder', {
+    this.emit(sessionId, 'tool.requested', implementationAgent.id, {
       toolExecutionId: 'demo-read-project', assignmentId: 'demo-assignment', toolName: 'read_file', operationClass: 'read_only', requestSummary: 'Read the current project context.',
     });
-    this.emit(sessionId, 'tool.started', 'builder', { toolExecutionId: 'demo-read-project', assignmentId: 'demo-assignment', toolName: 'read_file' });
-    this.emit(sessionId, 'artifact.diff_updated', 'builder', {
+    this.emit(sessionId, 'tool.started', implementationAgent.id, { toolExecutionId: 'demo-read-project', assignmentId: 'demo-assignment', toolName: 'read_file' });
+    this.emit(sessionId, 'artifact.diff_updated', implementationAgent.id, {
       artifactId: 'demo-diff', assignmentId: 'demo-assignment', filePath: 'src/components/example.tsx', additions: 4, deletions: 1, byteLength: 220,
     });
-    this.emit(sessionId, 'tool.completed', 'builder', {
+    this.emit(sessionId, 'tool.completed', implementationAgent.id, {
       toolExecutionId: 'demo-read-project', assignmentId: 'demo-assignment', status: 'succeeded', resultSummary: 'Read the project context and prepared a compact diff summary.', durationMs: 120, artifactIds: ['demo-diff'],
     });
-    this.emit(sessionId, 'usage.updated', 'builder', { scopeId: 'demo-assignment', inputTokens: 120, outputTokens: 60, normalizedCost: 0.002, durationMs: 120 });
-    this.emit(sessionId, 'handoff.created', 'planner', {
-      handoffId: 'demo-handoff', sourceAssignmentId: 'demo-assignment', targetAgentId: 'builder', summary: 'The scoped plan and diff summary are ready for implementation.', artifactIds: ['demo-diff'],
+    this.emit(sessionId, 'usage.updated', implementationAgent.id, { scopeId: 'demo-assignment', inputTokens: 120, outputTokens: 60, normalizedCost: 0.002, durationMs: 120 });
+    this.emit(sessionId, 'handoff.created', planningAgent.id, {
+      handoffId: 'demo-handoff', sourceAssignmentId: 'demo-assignment', targetAgentId: implementationAgent.id, summary: 'The scoped plan and diff summary are ready for implementation.', artifactIds: ['demo-diff'],
     });
   }
 
-  private approval(sessionId: string): void {
-    this.participant(sessionId, 'builder', 'waiting', 'Waiting for workspace permission');
-    this.emit(sessionId, 'approval.requested', 'builder', {
+  private approval(sessionId: string, implementationAgent: SimulatorAgent): void {
+    this.participant(sessionId, implementationAgent, 'waiting', 'Waiting for workspace permission');
+    this.emit(sessionId, 'approval.requested', implementationAgent.id, {
       approvalId: 'demo-approval', capability: 'workspace_write', scopeSummary: 'Write an isolated workspace change.', assignmentId: 'demo-assignment',
     });
   }
@@ -259,6 +282,15 @@ export class EventSimulator {
     return transport;
   }
 
+  private agentFor(sessionId: string, preferred: Exclude<AgentRole, 'coordinator'>, fallback?: SimulatorAgent): SimulatorAgent {
+    const selected = this.sessionAgents.get(sessionId) ?? [];
+    return selected.find((agent) => agent.role === preferred) ?? fallback ?? selected.find((agent) => agent.role !== 'coordinator') ?? coordinator;
+  }
+
 }
 
 export const eventSimulator = new EventSimulator();
+
+function toSimulatorAgent(agent: AgentInstance): SimulatorAgent {
+  return { id: agent.id, role: agent.role };
+}
