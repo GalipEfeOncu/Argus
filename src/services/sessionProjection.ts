@@ -1,4 +1,5 @@
 import type { ArgusSessionCommand, ArgusSessionEvent } from '@/types/events';
+import type { SessionConfigurationPatch } from '@/types/generated/session-commands';
 
 export type ConnectionState = 'idle' | 'connected' | 'reconnecting' | 'resyncing';
 export type ResyncReason = 'conflicting_event' | 'conflicting_sequence' | 'invalid_payload' | 'sequence_gap' | 'session_mismatch';
@@ -24,6 +25,48 @@ export interface PendingCommand {
   attempts: number;
 }
 
+export interface ProjectedGate {
+  id: string;
+  role: string;
+  status: string;
+  evidence: string[];
+}
+
+export interface ProjectedLimit {
+  counter: string;
+  current: number;
+  threshold: number;
+  hard: boolean;
+  resolution: string;
+}
+
+export interface ProjectedApproval {
+  id: string;
+  capability: string;
+  scopeSummary: string;
+  assignmentId?: string;
+}
+
+export interface ProjectedDecision {
+  id: string;
+  scopeId: string;
+  choices: string[];
+  reasonSummary: string;
+}
+
+export interface ProjectedUsage {
+  inputTokens: number;
+  outputTokens: number;
+  normalizedCost: number;
+  durationMs: number;
+}
+
+interface ProjectedAssignment {
+  id: string;
+  assigneeAgentId: string;
+  operationClass: 'read_only' | 'mutating';
+}
+
 export interface SessionProjection {
   sessionId: string | null;
   status: string | null;
@@ -37,6 +80,20 @@ export interface SessionProjection {
   eventFingerprints: Record<string, string>;
   bufferedEvents: Record<number, ArgusSessionEvent>;
   pendingCommands: Record<string, PendingCommand>;
+  configurationVersion: number;
+  gates: Record<string, ProjectedGate>;
+  limits: Record<string, ProjectedLimit>;
+  activeGrants: Record<string, { capability: string; scopeSummary: string }>;
+  approvals: Record<string, ProjectedApproval>;
+  decisions: Record<string, ProjectedDecision>;
+  assignments: Record<string, ProjectedAssignment>;
+  currentWriter: string | null;
+  lastError: { summary: string; recoverable: boolean } | null;
+  usageByScope: Record<string, ProjectedUsage>;
+  assignmentAttempts: number;
+  toolCalls: number;
+  lastAcceptedConfigurationPatch: SessionConfigurationPatch | null;
+  configurationPreview: { patch: SessionConfigurationPatch; summary: string } | null;
 }
 
 export type EventDisposition = 'applied' | 'buffered' | 'ignored' | 'resync_required';
@@ -60,6 +117,20 @@ export function createSessionProjection(sessionId: string | null = null): Sessio
     eventFingerprints: {},
     bufferedEvents: {},
     pendingCommands: {},
+    configurationVersion: 1,
+    gates: {},
+    limits: {},
+    activeGrants: {},
+    approvals: {},
+    decisions: {},
+    assignments: {},
+    currentWriter: null,
+    lastError: null,
+    usageByScope: {},
+    assignmentAttempts: 0,
+    toolCalls: 0,
+    lastAcceptedConfigurationPatch: null,
+    configurationPreview: null,
   };
 }
 
@@ -159,7 +230,7 @@ function applyOrderedEvent(
     pendingCommands: resolveCommand(state.pendingCommands, event.correlationId),
   };
 
-  next = projectEvent(next, event);
+  next = projectEvent(next, event, state.pendingCommands[event.correlationId ?? '']?.command);
   return drainBufferedEvents(next, 'applied');
 }
 
@@ -172,7 +243,7 @@ function drainBufferedEvents(state: SessionProjection, disposition: EventDisposi
   return { ...reduced, disposition };
 }
 
-function projectEvent(state: SessionProjection, event: ArgusSessionEvent): SessionProjection {
+function projectEvent(state: SessionProjection, event: ArgusSessionEvent, correlatedCommand?: ArgusSessionCommand): SessionProjection {
   switch (event.type) {
     case 'session.status_changed':
       return { ...state, status: event.payload.status };
@@ -225,9 +296,131 @@ function projectEvent(state: SessionProjection, event: ArgusSessionEvent): Sessi
         : { ...state, messages: { ...state.messages, [message.id]: { ...message, streaming: false } } };
     }
     case 'approval.requested':
-      return { ...state, status: 'waiting_approval' };
+      return {
+        ...state,
+        status: 'waiting_approval',
+        approvals: {
+          ...state.approvals,
+          [event.payload.approvalId]: {
+            id: event.payload.approvalId,
+            capability: event.payload.capability,
+            scopeSummary: event.payload.scopeSummary,
+            ...(event.payload.assignmentId === null || event.payload.assignmentId === undefined ? {} : { assignmentId: event.payload.assignmentId }),
+          },
+        },
+      };
+    case 'approval.resolved': {
+      const approval = state.approvals[event.payload.approvalId];
+      const { [event.payload.approvalId]: _resolved, ...approvals } = state.approvals;
+      return {
+        ...state,
+        approvals,
+        activeGrants: event.payload.grantId === null || event.payload.grantId === undefined || approval === undefined
+          ? state.activeGrants
+          : { ...state.activeGrants, [event.payload.grantId]: { capability: approval.capability, scopeSummary: approval.scopeSummary } },
+      };
+    }
     case 'decision.requested':
-      return { ...state, status: 'waiting_decision' };
+      return {
+        ...state,
+        status: 'waiting_decision',
+        decisions: {
+          ...state.decisions,
+          [event.payload.decisionId]: {
+            id: event.payload.decisionId,
+            scopeId: event.payload.scopeId,
+            choices: [...event.payload.choices],
+            reasonSummary: event.payload.reasonSummary,
+          },
+        },
+      };
+    case 'decision.recorded': {
+      const { [event.payload.decisionId]: _resolved, ...decisions } = state.decisions;
+      return { ...state, decisions };
+    }
+    case 'session.configuration_updated':
+      return {
+        ...state,
+        configurationVersion: event.payload.configurationVersion,
+        lastAcceptedConfigurationPatch: correlatedCommand?.type === 'session.configuration.update' ? correlatedCommand.payload.patch : state.lastAcceptedConfigurationPatch,
+        configurationPreview: null,
+      };
+    case 'gate.status_changed':
+      return {
+        ...state,
+        gates: {
+          ...state.gates,
+          [event.payload.gateId]: {
+            id: event.payload.gateId,
+            role: event.payload.role,
+            status: event.payload.status,
+            evidence: (event.payload.evidence ?? []).map((item) => item.summary),
+          },
+        },
+      };
+    case 'limit.warning':
+    case 'limit.reached':
+      return {
+        ...state,
+        limits: {
+          ...state.limits,
+          [event.payload.counter]: {
+            counter: event.payload.counter,
+            current: event.payload.current,
+            threshold: event.payload.threshold,
+            hard: event.payload.hard,
+            resolution: event.payload.resolution,
+          },
+        },
+      };
+    case 'assignment.created':
+      return {
+        ...state,
+        assignments: {
+          ...state.assignments,
+          [event.payload.assignmentId]: {
+            id: event.payload.assignmentId,
+            assigneeAgentId: event.payload.assigneeAgentId,
+            operationClass: event.payload.operationClass,
+          },
+        },
+        currentWriter: event.payload.operationClass === 'mutating' ? event.payload.assigneeAgentId : state.currentWriter,
+        assignmentAttempts: state.assignmentAttempts + 1,
+      };
+    case 'tool.requested':
+      return { ...state, toolCalls: state.toolCalls + 1 };
+    case 'assignment.completed':
+    case 'assignment.failed':
+    case 'assignment.cancelled': {
+      const assignment = state.assignments[event.payload.assignmentId];
+      const { [event.payload.assignmentId]: _finished, ...assignments } = state.assignments;
+      return {
+        ...state,
+        assignments,
+        currentWriter: assignment?.operationClass === 'mutating' ? null : state.currentWriter,
+      };
+    }
+    case 'error.created':
+      return {
+        ...state,
+        lastError: { summary: event.payload.summary, recoverable: event.payload.recoverable },
+        configurationPreview: event.payload.code === 'configuration_preview_required' && correlatedCommand?.type === 'session.configuration.update'
+          ? { patch: correlatedCommand.payload.patch, summary: event.payload.summary }
+          : state.configurationPreview,
+      };
+    case 'usage.updated':
+      return {
+        ...state,
+        usageByScope: {
+          ...state.usageByScope,
+          [event.payload.scopeId]: {
+            inputTokens: event.payload.inputTokens,
+            outputTokens: event.payload.outputTokens,
+            normalizedCost: event.payload.normalizedCost,
+            durationMs: event.payload.durationMs,
+          },
+        },
+      };
     default:
       return state;
   }

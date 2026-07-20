@@ -3,6 +3,7 @@ import { useUIStore } from '@/stores/uiStore';
 import { MessageList } from './MessageList';
 import { MessageInput } from './MessageInput';
 import { ApprovalBar } from './ApprovalBar';
+import { SessionControls } from './SessionControls';
 import './ChatPanel.css';
 
 interface ChatPanelProps {
@@ -43,6 +44,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ sessionId, sessionName }) 
 
         {/* Right: toggle agents + menu */}
         <div className="chat-header-right">
+          <SessionControls sessionId={sessionId} />
           <button
             onClick={toggleAgentPanel}
             className={`chat-agents-toggle ${agentPanelVisible ? 'chat-agents-toggle--active' : ''}`}

@@ -25,6 +25,7 @@ export function syncLegacyProjection(sessionId: string, projection: SessionProje
     }
   }
   if (projection.status !== null) useSessionStore.getState().updateSessionStatus(sessionId, toLegacySessionStatus(projection.status));
+  if (projection.lastAcceptedConfigurationPatch !== null) useSessionStore.getState().patchSessionConfiguration(sessionId, projection.lastAcceptedConfigurationPatch);
 }
 
 function agentRoleForId(instanceId: string) {
@@ -45,8 +46,8 @@ function toLegacySessionStatus(status: string): SessionStatus {
   switch (status) {
     case 'created': return 'setup';
     case 'failed':
-    case 'completed_partial': return 'error';
-    case 'waiting_decision': return 'waiting_approval';
+    case 'completed_partial': return status;
+    case 'waiting_decision': return status;
     case 'preparing':
     case 'running':
     case 'paused':

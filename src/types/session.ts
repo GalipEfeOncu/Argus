@@ -12,8 +12,11 @@ export type SessionStatus =
   | 'running'
   | 'paused'
   | 'waiting_approval'
+  | 'waiting_decision'
   | 'completed'
+  | 'completed_partial'
   | 'cancelled'
+  | 'failed'
   | 'error';
 
 export interface Session {

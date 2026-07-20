@@ -22,6 +22,8 @@ test('simulator streams canonical deltas and an interrupt closes the active stre
   const streamingMessage = Object.values(scenario.simulator.getProjection(sessionId)?.messages ?? {}).find((message) => message.streaming);
   expect(streamingMessage).toBeDefined();
   scenario.simulator.interruptActiveParticipant(sessionId);
+  expect(Object.keys(scenario.simulator.getProjection(sessionId)?.pendingCommands ?? {})).toHaveLength(1);
+  scenario.clock.advanceBy(25);
 
   const interrupted = scenario.simulator.getProjection(sessionId);
   expect(interrupted?.messages[streamingMessage?.id ?? '']?.streaming).toBe(false);
@@ -58,13 +60,14 @@ test('simulator approval scenario is deterministic and projects canonical events
   ]));
 
   scenario.simulator.resolveApproval(sessionId, true);
-  scenario.clock.advanceBy(600);
+  scenario.clock.advanceBy(625);
 
   expect(scenario.simulator.getProjection(sessionId)?.status).toBe('running');
   expect(useAgentStore.getState().isInterrupted).toBe(false);
   expect(useAgentStore.getState().messages.at(-1)?.content).toContain('isolated workspace');
 
   scenario.simulator.interruptActiveParticipant(sessionId);
+  scenario.clock.advanceBy(25);
   const interruptedProjection = scenario.simulator.getProjection(sessionId);
   expect(interruptedProjection?.events.at(-1)).toMatchObject({
     type: 'participant.status_changed',
@@ -129,4 +132,61 @@ test('simulator rejects invalid pre-authorization when invoked outside the setup
     approvalPolicy: { ...base.approvalPolicy, permissionProfile: 'autonomous' as const, behavior: 'preauthorize_session' as const, preauthorizedCapabilities: ['workspace.write'] },
   };
   expect(() => scenario.simulator.start(sessionId, unsafe)).toThrow('Simulator configuration is invalid');
+});
+
+test('Phase 1.4 simulator paths expose gate success, partial completion, denial replan, and reconnect states', () => {
+  const scenario = createSimulatorScenario();
+  scenario.simulator.start(sessionId);
+
+  scenario.simulator.runScenario(sessionId, 'review_test_success');
+  let projection = scenario.simulator.getProjection(sessionId)!;
+  expect(projection.status).toBe('completed');
+  expect(Object.values(projection.gates).map((gate) => gate.status)).toEqual(['satisfied', 'satisfied']);
+
+  scenario.simulator.runScenario(sessionId, 'limit_partial');
+  projection = scenario.simulator.getProjection(sessionId)!;
+  expect(projection.status).toBe('waiting_decision');
+  scenario.simulator.resolveDecision(sessionId, 'demo-decision', 'deliver_partial');
+  scenario.clock.advanceBy(25);
+  expect(scenario.simulator.getProjection(sessionId)?.status).toBe('completed_partial');
+
+  scenario.simulator.runScenario(sessionId, 'denied_capability_replan');
+  projection = scenario.simulator.getProjection(sessionId)!;
+  expect(projection.events.map((event) => event.type)).toContain('approval.resolved');
+  expect(Object.values(projection.messages).at(-1)?.content).toContain('replan');
+
+  scenario.simulator.runScenario(sessionId, 'reconnect_streaming');
+  scenario.simulator.runScenario(sessionId, 'waiting_decision');
+  expect(scenario.simulator.getProjection(sessionId)?.connection).toBe('connected');
+  expect(scenario.simulator.getProjection(sessionId)?.status).toBe('waiting_decision');
+  expect(scenario.simulator.getConnectionHistory(sessionId)).toContain('reconnecting');
+  expect(scenario.simulator.getReconnectCursors(sessionId).some((cursor) => cursor > 0)).toBe(true);
+
+  scenario.simulator.runScenario(sessionId, 'recoverable_failure');
+  expect(scenario.simulator.getProjection(sessionId)?.lastError).toMatchObject({ recoverable: true });
+  scenario.simulator.runScenario(sessionId, 'terminal_failure');
+  expect(scenario.simulator.getProjection(sessionId)?.lastError).toMatchObject({ recoverable: false });
+});
+
+test('runtime controls remain event-confirmed and expose configuration updates', () => {
+  const scenario = createSimulatorScenario();
+  scenario.simulator.start(sessionId);
+  scenario.simulator.controlSession(sessionId, 'pause');
+  expect(Object.keys(scenario.simulator.getProjection(sessionId)?.pendingCommands ?? {})).toHaveLength(1);
+  scenario.clock.advanceBy(25);
+  expect(scenario.simulator.getProjection(sessionId)?.status).toBe('paused');
+  scenario.simulator.updateConfiguration(sessionId, 1, { limitResolution: 'ask_user' });
+  scenario.clock.advanceBy(25);
+  expect(scenario.simulator.getProjection(sessionId)?.configurationPreview).not.toBeNull();
+  expect(scenario.simulator.getProjection(sessionId)?.configurationVersion).toBe(1);
+  scenario.simulator.updateConfiguration(sessionId, 1, { limitResolution: 'ask_user' }, true);
+  scenario.clock.advanceBy(25);
+  expect(scenario.simulator.getProjection(sessionId)?.configurationVersion).toBe(2);
+  scenario.simulator.controlSession(sessionId, 'resume');
+  scenario.clock.advanceBy(25);
+  expect(scenario.simulator.getProjection(sessionId)?.status).toBe('running');
+  scenario.simulator.controlSession(sessionId, 'cancel');
+  scenario.clock.advanceBy(25);
+  expect(scenario.simulator.getProjection(sessionId)?.status).toBe('cancelled');
+  expect(Object.keys(scenario.simulator.getProjection(sessionId)?.pendingCommands ?? {})).toHaveLength(0);
 });

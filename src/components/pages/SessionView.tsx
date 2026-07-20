@@ -27,7 +27,7 @@ export const SessionView: React.FC = () => {
       </div>
 
       {/* Right Sidebar (Agent Status & Workflow) */}
-      {agentPanelVisible && <AgentPanel />}
+      {agentPanelVisible && <AgentPanel sessionId={session.id} />}
       
     </div>
   );

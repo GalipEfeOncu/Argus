@@ -284,7 +284,7 @@ Current status (2026-07-20):
   simulator, transport, and timeline behavior. Durable backend persistence and
   runtime enforcement remain Phase 2 responsibilities.
 
-### 1.4 Runtime controls and terminal states
+### 1.4 Runtime controls and terminal states (✅ Completed)
 
 Deliverables:
 
@@ -304,6 +304,25 @@ Simulator scenarios:
 - Preauthorized task completes without an approval prompt.
 - Denied capability causes Coordinator replan.
 - Reconnect during streaming and during `waiting_decision`.
+
+Current status (2026-07-20):
+
+- ✅ The runtime context projects participant groups, required gates, all eight
+  remaining user ceilings, active grants, current writer, configuration version,
+  command-pending state, and distinct completed, partial, cancelled, recoverable,
+  and terminal failure states from canonical events.
+- ✅ Pause and Cancel remain in the shared-room header when the context panel is
+  hidden. Approval, decision, interruption, pause/resume/cancel, and configuration
+  commands stay pending until a correlated event resolves them.
+- ✅ Future team, required-gate, approval-behavior, and limit-resolution patches
+  are visible before sending. The typed simulator models a non-mutating
+  consequence preview followed by an explicit `confirmConsequences: true`
+  acceptance; the durable backend preview/confirm response loop remains a
+  Phase 2 control-plane responsibility.
+- ✅ The deterministic simulator covers Builder success, review/test evidence,
+  partial completion, prompt-free preauthorization, denied-capability replanning,
+  streaming and decision reconnects, plus recoverable and terminal failures.
+  Accepted configuration patches update the client snapshot for subsequent edits.
 
 Phase 1 exit: every target event and command has accessible visible behavior
 using typed simulation, with no dependency on a live provider.

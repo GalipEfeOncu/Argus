@@ -163,6 +163,12 @@ export class InMemorySessionTransport implements SessionTransport {
   emit(event: ArgusSessionEvent | unknown): void {
     this.handlers?.onEvent(event);
   }
+
+  /** Test-only connection loss that exercises the same reconnect path as WebSocket. */
+  dropConnection(): void {
+    this.handlers?.onConnectionState('reconnecting');
+    this.handlers?.onReconnectRequested();
+  }
 }
 
 const eventValidator = new Ajv({

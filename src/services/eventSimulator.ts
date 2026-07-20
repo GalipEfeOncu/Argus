@@ -6,6 +6,7 @@ import type { ProjectedParticipant, SessionProjection } from './sessionProjectio
 import { syncLegacyProjection } from './legacyProjectionBridge';
 import { useSessionRoomStore } from '@/stores/sessionRoomStore';
 import type { AgentInstance, SessionConfiguration } from '@/types/session';
+import type { SessionConfigurationPatch } from '@/types/generated/session-commands';
 import { validateConfiguration } from './sessionConfiguration';
 
 const demoModel: ModelRef = {
@@ -18,6 +19,17 @@ const demoRoles: AgentRole[] = ['coordinator', 'planner', 'builder', 'reviewer',
 type SimulatorTimer = ReturnType<typeof setTimeout>;
 interface SimulatorAgent { id: string; role: AgentRole; }
 const coordinator: SimulatorAgent = { id: 'coordinator', role: 'coordinator' };
+
+export type SimulatorScenario =
+  | 'builder_success'
+  | 'review_test_success'
+  | 'limit_partial'
+  | 'preauthorized_success'
+  | 'denied_capability_replan'
+  | 'reconnect_streaming'
+  | 'waiting_decision'
+  | 'recoverable_failure'
+  | 'terminal_failure';
 
 export interface SimulatorClock {
   now(): number;
@@ -51,6 +63,8 @@ export class EventSimulator {
   private readonly unsubscribeProjection = new Map<string, () => void>();
   private readonly streamingMessages = new Map<string, string>();
   private readonly sessionAgents = new Map<string, SimulatorAgent[]>();
+  private readonly pausedSessions = new Set<string>();
+  private readonly connectionHistory = new Map<string, string[]>();
 
   constructor(private readonly dependencies: EventSimulatorDependencies = browserSimulatorDependencies) {}
 
@@ -60,6 +74,14 @@ export class EventSimulator {
 
   getProjection(sessionId: string): SessionProjection | undefined {
     return this.clients.get(sessionId)?.getProjection();
+  }
+
+  getConnectionHistory(sessionId: string): string[] {
+    return [...(this.connectionHistory.get(sessionId) ?? [])];
+  }
+
+  getReconnectCursors(sessionId: string): number[] {
+    return this.transports.get(sessionId)?.connections.map((connection) => connection.afterSequence) ?? [];
   }
 
   start(sessionId: string, configuration?: SessionConfiguration): void {
@@ -88,7 +110,10 @@ export class EventSimulator {
     this.sequences.set(sessionId, 0);
     this.timers.set(sessionId, []);
     this.sessionAgents.set(sessionId, selectedAgents);
+    this.connectionHistory.set(sessionId, []);
+    this.pausedSessions.delete(sessionId);
     this.unsubscribeProjection.set(sessionId, client.subscribe((projection, update) => {
+      this.connectionHistory.get(sessionId)?.push(projection.connection);
       useSessionRoomStore.getState().publishProjection(sessionId, projection, update.isStreamingUpdate);
       syncLegacyProjection(sessionId, projection);
     }));
@@ -134,6 +159,8 @@ export class EventSimulator {
     this.sequences.delete(sessionId);
     this.streamingMessages.delete(sessionId);
     this.sessionAgents.delete(sessionId);
+    this.connectionHistory.delete(sessionId);
+    this.pausedSessions.delete(sessionId);
     useSessionRoomStore.getState().clearProjection(sessionId);
   }
 
@@ -148,41 +175,160 @@ export class EventSimulator {
     this.schedule(sessionId, 300, () => this.message(sessionId, coordinator, 'Acknowledged. I added your instruction to the active assignment and will keep it visible to the team.'));
   }
 
-  resolveApproval(sessionId: string, approved: boolean): void {
+  resolveApproval(sessionId: string, approved: boolean, approvalId = 'demo-approval'): void {
     const client = this.clients.get(sessionId);
     if (client === undefined) return;
     const commandId = this.dependencies.createId();
     const command: ArgusSessionCommand = approved
-      ? { commandId, type: 'approval.resolve', payload: { approvalId: 'demo-approval', resolution: 'approve' } }
-      : { commandId, type: 'approval.resolve', payload: { approvalId: 'demo-approval', resolution: 'reject' } };
+      ? { commandId, type: 'approval.resolve', payload: { approvalId, resolution: 'approve' } }
+      : { commandId, type: 'approval.resolve', payload: { approvalId, resolution: 'reject' } };
     client.send(command);
-    this.emit(sessionId, 'approval.resolved', 'human', {
-      approvalId: 'demo-approval', resolution: approved ? 'approved' : 'rejected',
-      reasonSummary: approved ? 'User approved the requested workspace action.' : 'User rejected the requested workspace action.',
-    }, commandId);
-    this.emit(sessionId, 'session.status_changed', 'system', { status: 'running' });
-    const implementationAgent = this.agentFor(sessionId, 'builder');
-    this.participant(sessionId, implementationAgent, 'working', approved ? 'Applying an isolated workspace change' : 'Replanning after user feedback');
-    this.schedule(sessionId, 600, () => this.message(sessionId, implementationAgent, approved ? 'The change was applied in the isolated workspace. I am preparing a diff for review.' : 'I will revise the approach before making a workspace change.'));
+    this.schedule(sessionId, 25, () => {
+      this.emit(sessionId, 'approval.resolved', 'human', {
+        approvalId, resolution: approved ? 'approved' : 'rejected',
+        reasonSummary: approved ? 'User approved the requested workspace action.' : 'User rejected the requested workspace action.',
+      }, commandId);
+      this.emit(sessionId, 'session.status_changed', 'system', { status: 'running' });
+      const implementationAgent = this.agentFor(sessionId, 'builder');
+      this.participant(sessionId, implementationAgent, 'working', approved ? 'Applying an isolated workspace change' : 'Replanning after user feedback');
+      this.schedule(sessionId, 600, () => this.message(sessionId, implementationAgent, approved ? 'The change was applied in the isolated workspace. I am preparing a diff for review.' : 'I will revise the approach before making a workspace change.'));
+    }, true);
   }
 
-  interruptActiveParticipant(sessionId: string): void {
+  interruptActiveParticipant(sessionId: string, participantId?: string): void {
+    const client = this.clients.get(sessionId);
+    if (client === undefined) return;
+    const targetId = participantId
+      ?? Object.values(client.getProjection().participants).find((participant) => participant.status === 'working')?.id
+      ?? 'coordinator';
+    const commandId = this.dependencies.createId();
+    client.send({
+      commandId,
+      type: 'participant.interrupt',
+      payload: { participantId: targetId, reasonSummary: 'Interrupted by the user.' },
+    });
+    const streamingMessageId = this.streamingMessages.get(sessionId);
+    this.schedule(sessionId, 25, () => {
+      if (streamingMessageId !== undefined) {
+        this.emit(sessionId, 'message.completed', 'human', { messageId: streamingMessageId }, commandId);
+        this.streamingMessages.delete(sessionId);
+      }
+      this.emit(sessionId, 'participant.status_changed', 'human', {
+        participantId: targetId, participantKind: targetId === 'coordinator' ? 'coordinator' : 'agent', status: 'stopped', actionSummary: 'Interrupted by the user.',
+      }, commandId);
+    }, true);
+  }
+
+  controlSession(sessionId: string, action: 'pause' | 'resume' | 'cancel'): void {
+    const client = this.clients.get(sessionId);
+    if (client === undefined) return;
+    const commandId = this.dependencies.createId();
+    const command: ArgusSessionCommand = action === 'cancel'
+      ? { commandId, type: 'session.cancel', payload: { reasonSummary: 'Cancelled by the user.' } }
+      : { commandId, type: action === 'pause' ? 'session.pause' : 'session.resume', payload: {} };
+    client.send(command);
+    this.schedule(sessionId, 25, () => {
+      this.emit(sessionId, 'session.status_changed', 'human', {
+        status: action === 'pause' ? 'paused' : action === 'resume' ? 'running' : 'cancelled',
+        reasonSummary: action === 'cancel' ? 'Cancelled by the user.' : `Session ${action}d by the user.`,
+      }, commandId);
+      if (action === 'pause') this.pausedSessions.add(sessionId);
+      if (action === 'resume') this.pausedSessions.delete(sessionId);
+      if (action === 'cancel') this.stopScheduledWork(sessionId);
+    }, true);
+  }
+
+  updateConfiguration(sessionId: string, version: number, patch: SessionConfigurationPatch, confirmConsequences = false): void {
     const client = this.clients.get(sessionId);
     if (client === undefined) return;
     const commandId = this.dependencies.createId();
     client.send({
       commandId,
-      type: 'participant.interrupt',
-      payload: { participantId: 'coordinator', reasonSummary: 'Interrupted by the user.' },
+      type: 'session.configuration.update',
+      payload: { expectedConfigurationVersion: version, patch, confirmConsequences },
     });
-    const streamingMessageId = this.streamingMessages.get(sessionId);
-    if (streamingMessageId !== undefined) {
-      this.emit(sessionId, 'message.completed', 'human', { messageId: streamingMessageId }, commandId);
-      this.streamingMessages.delete(sessionId);
+    if (!confirmConsequences) {
+      this.schedule(sessionId, 25, () => this.emit(sessionId, 'error.created', 'system', {
+        errorId: 'configuration-preview', code: 'configuration_preview_required', summary: `Consequence preview: ${Object.keys(patch).join(', ')} affects future dispatch only; confirm to apply.`, recoverable: true,
+      }, commandId), true);
+      return;
     }
-    this.emit(sessionId, 'participant.status_changed', 'human', {
-      participantId: 'coordinator', participantKind: 'coordinator', status: 'stopped', actionSummary: 'Interrupted by the user.',
-    }, commandId);
+    this.schedule(sessionId, 25, () => this.emit(sessionId, 'session.configuration_updated', 'human', {
+      configurationVersion: version + 1,
+      policyHash: 'demo-policy-v2',
+      changedFields: Object.keys(patch),
+    }, commandId), true);
+  }
+
+  resolveDecision(sessionId: string, decisionId: string, choice: 'reassign' | 'change_approach' | 'deliver_partial' | 'stop'): void {
+    const client = this.clients.get(sessionId);
+    if (client === undefined) return;
+    const commandId = this.dependencies.createId();
+    client.send({ commandId, type: 'decision.resolve', payload: { decisionId, choice, reasonSummary: 'Visible human decision.' } });
+    this.schedule(sessionId, 25, () => {
+      this.emit(sessionId, 'decision.recorded', 'human', { decisionId, choice, reasonSummary: 'Visible human decision.' }, commandId);
+      this.emit(sessionId, 'session.status_changed', 'system', {
+        status: choice === 'deliver_partial' ? 'completed_partial' : choice === 'stop' ? 'cancelled' : 'running',
+        reasonSummary: choice === 'deliver_partial' ? 'A hard limit ended the session with unmet gates listed in the timeline.' : 'Decision applied to future dispatches.',
+      });
+    }, true);
+  }
+
+  /** Deterministic Phase 1.4 paths used by UI and acceptance tests. */
+  runScenario(sessionId: string, scenario: SimulatorScenario): void {
+    if (!this.isActive(sessionId)) return;
+    const builder = this.agentFor(sessionId, 'builder');
+    const reviewer = this.agentFor(sessionId, 'reviewer', builder);
+    const tester = this.agentFor(sessionId, 'tester', reviewer);
+    switch (scenario) {
+      case 'builder_success':
+      case 'preauthorized_success':
+        this.complete(sessionId, builder, 'Builder completed the scoped change.', []);
+        this.emit(sessionId, 'session.status_changed', 'system', { status: 'completed', reasonSummary: 'The selected Builder completed the scoped session.' });
+        break;
+      case 'review_test_success':
+        this.complete(sessionId, builder, 'Builder completed the change.', []);
+        this.emit(sessionId, 'assignment.proposed', coordinator.id, { proposalId: 'review-proposal', assigneeAgentId: reviewer.id, objective: 'Review the proposed change and request a revision if needed.', acceptanceCriteria: ['Record review evidence'], operationClass: 'read_only', reasonSummary: 'A Reviewer gate is applicable.' });
+        this.emit(sessionId, 'assignment.created', coordinator.id, { assignmentId: 'review-assignment', proposalId: 'review-proposal', assigneeAgentId: reviewer.id, configurationVersion: 1, policyHash: 'demo-policy', operationClass: 'read_only' });
+        this.emit(sessionId, 'assignment.started', reviewer.id, { assignmentId: 'review-assignment', assigneeAgentId: reviewer.id });
+        this.message(sessionId, reviewer, 'One finding needs a small revision; the Builder updated the scoped change.');
+        this.emit(sessionId, 'assignment.completed', reviewer.id, { assignmentId: 'review-assignment', status: 'completed', outputSummary: 'Reviewer approved the revision.', evidence: [{ kind: 'approved_review', summary: 'Reviewer approved the revised change.' }] });
+        this.gate(sessionId, 'gate-review', reviewer, 'satisfied', 'approved_review', 'Reviewer approved the change.');
+        this.emit(sessionId, 'assignment.proposed', coordinator.id, { proposalId: 'test-proposal', assigneeAgentId: tester.id, objective: 'Run the required verification.', acceptanceCriteria: ['Record passing test evidence'], operationClass: 'read_only', reasonSummary: 'A Tester gate is applicable.' });
+        this.emit(sessionId, 'assignment.created', coordinator.id, { assignmentId: 'test-assignment', proposalId: 'test-proposal', assigneeAgentId: tester.id, configurationVersion: 1, policyHash: 'demo-policy', operationClass: 'read_only' });
+        this.emit(sessionId, 'assignment.started', tester.id, { assignmentId: 'test-assignment', assigneeAgentId: tester.id });
+        this.emit(sessionId, 'assignment.completed', tester.id, { assignmentId: 'test-assignment', status: 'completed', outputSummary: 'Required tests passed.', evidence: [{ kind: 'passing_test_run', summary: 'Required tests passed.' }] });
+        this.gate(sessionId, 'gate-test', tester, 'satisfied', 'passing_test_run', 'Tester recorded a passing test run.');
+        this.emit(sessionId, 'session.status_changed', 'system', { status: 'completed', reasonSummary: 'All applicable gates are satisfied.' });
+        break;
+      case 'limit_partial':
+        this.emit(sessionId, 'limit.reached', coordinator.id, { counter: 'revisions', scopeId: 'demo-assignment', current: 3, threshold: 3, hard: true, resolution: 'ask_user', fingerprint: 'repeat-finding', occurrenceCount: 3 });
+        this.emit(sessionId, 'decision.requested', coordinator.id, { decisionId: 'demo-decision', scopeId: 'demo-assignment', choices: ['reassign', 'change_approach', 'deliver_partial', 'stop'], reasonSummary: 'Repeated finding reached the configured revision limit.' });
+        break;
+      case 'denied_capability_replan':
+        this.emit(sessionId, 'approval.requested', builder.id, { approvalId: 'demo-denied-approval', capability: 'workspace.write', scopeSummary: 'Write the isolated workspace change.', assignmentId: 'demo-assignment' });
+        this.emit(sessionId, 'approval.resolved', 'human', { approvalId: 'demo-denied-approval', resolution: 'rejected', reasonSummary: 'User denied the requested capability.' });
+        this.emit(sessionId, 'session.status_changed', 'system', { status: 'running', reasonSummary: 'Capability denied; Coordinator is replanning.' });
+        this.message(sessionId, coordinator, 'The write capability was denied. I will replan with the remaining read-only tools.');
+        break;
+      case 'reconnect_streaming':
+        this.streamMessage(sessionId, coordinator, 'Reconnecting while streaming', [' preserves the ordered message.', ' The connection recovered.']);
+        this.transport(sessionId).dropConnection();
+        break;
+      case 'waiting_decision':
+        this.emit(sessionId, 'decision.requested', coordinator.id, { decisionId: 'demo-decision', scopeId: 'demo-assignment', choices: ['reassign', 'change_approach', 'deliver_partial', 'stop'], reasonSummary: 'A visible decision is required before dispatch can continue.' });
+        this.transport(sessionId).dropConnection();
+        break;
+      case 'recoverable_failure':
+        this.emit(sessionId, 'error.created', builder.id, { errorId: 'recoverable-error', code: 'tool_timed_out', summary: 'A diagnostic tool timed out; the Coordinator can retry with a narrower scope.', recoverable: true, relatedId: 'demo-assignment' });
+        this.emit(sessionId, 'session.status_changed', 'system', { status: 'failed', reasonSummary: 'Recoverable failure awaiting a new scheduler action.' });
+        break;
+      case 'terminal_failure':
+        this.gate(sessionId, 'gate-test', tester, 'failed', 'passing_test_run', 'The required test evidence could not be produced.');
+        this.emit(sessionId, 'error.created', tester.id, { errorId: 'terminal-error', code: 'required_gate_failed', summary: 'A required completion gate failed.', recoverable: false, relatedId: 'gate-test' });
+        this.emit(sessionId, 'session.status_changed', 'system', { status: 'failed', reasonSummary: 'Terminal failure: required gate failed.' });
+        break;
+    }
   }
 
   private snapshot(sessionId: string, status: 'running' | 'waiting_approval'): void {
@@ -198,9 +344,20 @@ export class EventSimulator {
     });
   }
 
-  private schedule(sessionId: string, delay: number, action: () => void): void {
-    const timer = this.dependencies.clock.setTimeout(action, delay);
+  private schedule(sessionId: string, delay: number, action: () => void, runWhenPaused = false): void {
+    const timer = this.dependencies.clock.setTimeout(() => {
+      if (this.pausedSessions.has(sessionId) && !runWhenPaused) {
+        this.schedule(sessionId, 50, action, runWhenPaused);
+        return;
+      }
+      action();
+    }, delay);
     this.timers.get(sessionId)?.push(timer);
+  }
+
+  private stopScheduledWork(sessionId: string): void {
+    (this.timers.get(sessionId) ?? []).forEach((timer) => this.dependencies.clock.clearTimeout(timer));
+    this.timers.set(sessionId, []);
   }
 
   private emit(sessionId: string, type: ArgusSessionEvent['type'], actorId: string, payload: Record<string, unknown>, correlationId?: string): void {
@@ -273,6 +430,21 @@ export class EventSimulator {
     this.participant(sessionId, implementationAgent, 'waiting', 'Waiting for workspace permission');
     this.emit(sessionId, 'approval.requested', implementationAgent.id, {
       approvalId: 'demo-approval', capability: 'workspace_write', scopeSummary: 'Write an isolated workspace change.', assignmentId: 'demo-assignment',
+    });
+  }
+
+  private complete(sessionId: string, agent: SimulatorAgent, summary: string, evidence: Array<{ kind: string; summary: string }>): void {
+    this.emit(sessionId, 'assignment.completed', agent.id, {
+      assignmentId: 'demo-assignment', status: 'completed', outputSummary: summary,
+      ...(evidence.length === 0 ? {} : { evidence }),
+    });
+    this.participant(sessionId, agent, 'stopped', summary);
+  }
+
+  private gate(sessionId: string, gateId: string, agent: SimulatorAgent, status: 'satisfied' | 'failed', evidenceKind: string, summary: string): void {
+    this.participant(sessionId, agent, 'stopped', summary);
+    this.emit(sessionId, 'gate.status_changed', agent.id, {
+      gateId, role: agent.role, status, evidence: [{ kind: evidenceKind, summary }],
     });
   }
 

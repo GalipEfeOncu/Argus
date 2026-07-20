@@ -6,6 +6,13 @@
   background-color: var(--bg-main);
 }
 
+.session-emergency-controls { display: inline-flex; align-items: center; gap: 5px; }
+.session-emergency-controls button { background: var(--bg-element); border: 1px solid var(--border-medium); border-radius: var(--radius-sm); color: var(--text-primary); cursor: pointer; font: inherit; font-size: 11px; padding: 5px 8px; }
+.session-emergency-controls button:last-of-type { color: var(--status-error); }
+.session-emergency-controls button:focus-visible { outline: 2px solid var(--accent-primary); outline-offset: 2px; }
+.session-emergency-controls button:disabled { cursor: not-allowed; opacity: .55; }
+.session-emergency-controls span { color: var(--status-warning); font-size: 10px; }
+
 /* ── Header ─────────────────────────────────────────────────── */
 
 .chat-header {

@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { Session, SessionConfig, SessionStatus } from '@/types/session';
+import type { Session, SessionConfig, SessionConfiguration, SessionStatus } from '@/types/session';
+import type { SessionConfigurationPatch } from '@/types/generated/session-commands';
 
 interface SessionStoreState {
   sessions: Session[];
@@ -9,6 +10,7 @@ interface SessionStoreState {
   getActiveSession: () => Session | undefined;
   createSession: (config: SessionConfig) => string;
   updateSessionStatus: (id: string, status: SessionStatus) => void;
+  patchSessionConfiguration: (id: string, patch: SessionConfigurationPatch) => void;
   setActiveSession: (id: string | null) => void;
   addMessageToSession: (sessionId: string, messageId: string) => void;
   deleteSession: (id: string) => void;
@@ -47,11 +49,33 @@ export const useSessionStore = create<SessionStoreState>()(
         set((s) => ({
           sessions: s.sessions.map((session) =>
             session.id === id
-              ? { ...session, status, completedAt: status === 'completed' ? Date.now() : session.completedAt }
+              ? { ...session, status, completedAt: ['completed', 'completed_partial', 'cancelled', 'failed'].includes(status) ? Date.now() : session.completedAt }
               : session
           ),
         }));
       },
+
+      patchSessionConfiguration: (id, patch) => set((state) => ({
+        sessions: state.sessions.map((session) => {
+          if (session.id !== id) return session;
+          return {
+            ...session,
+            configuration: {
+              ...session.configuration,
+              ...(patch.availableAgentIds === undefined || patch.availableAgentIds === null ? {} : { availableAgentIds: patch.availableAgentIds }),
+              ...(patch.requiredRoleRules === undefined || patch.requiredRoleRules === null ? {} : { requiredRoleRules: patch.requiredRoleRules.map((rule) => {
+                const { capability, ...rest } = rule;
+                return { ...rest, ...(capability === undefined || capability === null ? {} : { capability }) };
+              }) }),
+              approvalPolicy: {
+                ...session.configuration.approvalPolicy,
+                ...(patch.approvalBehavior === undefined || patch.approvalBehavior === null || patch.approvalBehavior === 'ask_each_time' ? {} : { behavior: patch.approvalBehavior }),
+                ...(patch.limitResolution === undefined || patch.limitResolution === null ? {} : { limitResolution: patch.limitResolution }),
+              },
+            } as SessionConfiguration,
+          };
+        }),
+      })),
 
       setActiveSession: (id) => set({ activeSessionId: id }),
 

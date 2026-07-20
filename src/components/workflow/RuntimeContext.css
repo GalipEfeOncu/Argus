@@ -1,0 +1,27 @@
+.runtime-context { border-top: 1px solid var(--border-subtle); margin-top: 14px; padding-top: 14px; color: var(--text-secondary); font-size: 11px; }
+.runtime-context__heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.runtime-context h2, .runtime-context h3 { color: var(--text-primary); font-size: 10px; font-weight: 800; letter-spacing: .08em; margin: 0 0 6px; text-transform: uppercase; }
+.runtime-context__heading span { color: var(--accent-primary); font-family: var(--font-mono); font-size: 9px; }
+.runtime-context__status, .runtime-context p { margin: 0 0 8px; line-height: 1.4; }
+.runtime-controls { display: grid; gap: 6px; grid-template-columns: 1fr 1fr; margin-bottom: 10px; }
+.runtime-controls button, .runtime-groups button, .runtime-decision button { background: var(--bg-element); border: 1px solid var(--border-medium); border-radius: var(--radius-sm); color: var(--text-primary); cursor: pointer; font: inherit; padding: 5px 6px; }
+.runtime-controls button:hover, .runtime-groups button:hover, .runtime-decision button:hover { border-color: var(--accent-primary); }
+.runtime-controls button:focus-visible, .runtime-groups button:focus-visible, .runtime-decision button:focus-visible { outline: 2px solid var(--accent-primary); outline-offset: 2px; }
+.runtime-controls button:disabled { cursor: not-allowed; opacity: .5; }
+.runtime-controls__cancel { color: var(--status-error) !important; }
+.runtime-context__pending { color: var(--status-warning); }
+.runtime-groups { display: grid; gap: 8px; grid-template-columns: 1fr 1fr; }
+.runtime-groups ul, .runtime-detail ul { list-style: none; margin: 0; padding: 0; }
+.runtime-groups li { border-left: 2px solid var(--border-medium); display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 5px; padding-left: 6px; }
+.runtime-groups li span { color: var(--text-primary); font-weight: 600; overflow-wrap: anywhere; }
+.runtime-groups li small { flex-basis: 100%; color: var(--text-muted); }
+.runtime-groups button { margin-left: auto; padding: 2px 4px; }
+.runtime-facts { display: grid; gap: 5px; margin: 10px 0; }
+.runtime-facts div { display: flex; justify-content: space-between; gap: 8px; }
+.runtime-facts dt { color: var(--text-muted); }
+.runtime-facts dd { color: var(--text-primary); margin: 0; overflow-wrap: anywhere; text-align: right; }
+.runtime-detail { border-top: 1px solid var(--border-subtle); margin-top: 8px; padding-top: 8px; }
+.runtime-detail li { margin-bottom: 4px; }
+.runtime-decision { background: var(--bg-card); border: 1px solid var(--status-warning); border-radius: var(--radius-sm); margin-top: 10px; padding: 8px; }
+.runtime-decision p { margin-top: 4px; }
+.runtime-decision button { margin: 0 4px 4px 0; }

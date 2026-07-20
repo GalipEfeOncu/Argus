@@ -1,4 +1,5 @@
 import type { ArgusSessionCommand } from '@/types/events';
+import type { SessionConfigurationPatch } from '@/types/generated/session-commands';
 import type { ConnectionState } from './sessionProjection';
 import { eventSimulator } from '@/services/eventSimulator';
 import { syncLegacyProjection } from '@/services/legacyProjectionBridge';
@@ -83,30 +84,62 @@ class WebSocketManager {
     this.send({ commandId: crypto.randomUUID(), type: 'message.send', payload: { content, ...(mentionIds.length === 0 ? {} : { mentionIds }) } });
   }
 
-  sendApproval(approved: boolean, _feedback?: string): void {
+  sendApproval(approved: boolean, approvalId = 'active-approval'): void {
     if (this.sessionId !== null && eventSimulator.isActive(this.sessionId)) {
-      eventSimulator.resolveApproval(this.sessionId, approved);
+      eventSimulator.resolveApproval(this.sessionId, approved, approvalId);
       return;
     }
     this.send({
       commandId: crypto.randomUUID(),
       type: 'approval.resolve',
-      payload: { approvalId: 'active-approval', resolution: approved ? 'approve' : 'reject' },
+      payload: { approvalId, resolution: approved ? 'approve' : 'reject' },
     });
   }
 
-  sendInterrupt(): void {
+  sendInterrupt(participantId?: string): void {
     if (this.sessionId !== null && eventSimulator.isActive(this.sessionId)) {
-      eventSimulator.interruptActiveParticipant(this.sessionId);
+      eventSimulator.interruptActiveParticipant(this.sessionId, participantId);
       return;
     }
-    const participantId = this.activeStreamingParticipantId();
-    if (participantId === null) return;
+    const targetParticipantId = participantId ?? this.activeStreamingParticipantId();
+    if (targetParticipantId === null) return;
     this.send({
       commandId: crypto.randomUUID(),
       type: 'participant.interrupt',
-      payload: { participantId, reasonSummary: 'Interrupted by the user.' },
+      payload: { participantId: targetParticipantId, reasonSummary: 'Interrupted by the user.' },
     });
+  }
+
+  controlSession(action: 'pause' | 'resume' | 'cancel'): void {
+    if (this.sessionId !== null && eventSimulator.isActive(this.sessionId)) {
+      eventSimulator.controlSession(this.sessionId, action);
+      return;
+    }
+    const commandId = crypto.randomUUID();
+    const command: ArgusSessionCommand = action === 'cancel'
+      ? { commandId, type: 'session.cancel', payload: { reasonSummary: 'Cancelled by the user.' } }
+      : { commandId, type: action === 'pause' ? 'session.pause' : 'session.resume', payload: {} };
+    this.send(command);
+  }
+
+  updateConfiguration(configurationVersion: number, patch: SessionConfigurationPatch, confirmConsequences = false): void {
+    if (this.sessionId !== null && eventSimulator.isActive(this.sessionId)) {
+      eventSimulator.updateConfiguration(this.sessionId, configurationVersion, patch, confirmConsequences);
+      return;
+    }
+    this.send({
+      commandId: crypto.randomUUID(),
+      type: 'session.configuration.update',
+      payload: { expectedConfigurationVersion: configurationVersion, patch, confirmConsequences },
+    });
+  }
+
+  resolveDecision(decisionId: string, choice: 'reassign' | 'change_approach' | 'deliver_partial' | 'stop'): void {
+    if (this.sessionId !== null && eventSimulator.isActive(this.sessionId)) {
+      eventSimulator.resolveDecision(this.sessionId, decisionId, choice);
+      return;
+    }
+    this.send({ commandId: crypto.randomUUID(), type: 'decision.resolve', payload: { decisionId, choice, reasonSummary: 'Visible human decision.' } });
   }
 
   getConnectionState(): ConnectionState | null {

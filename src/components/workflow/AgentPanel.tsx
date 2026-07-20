@@ -2,6 +2,7 @@ import React from 'react';
 import { useAgentStore } from '@/stores/agentStore';
 import { useUIStore } from '@/stores/uiStore';
 import type { AgentStatus, AgentRole } from '@/types/agent';
+import { RuntimeContext } from './RuntimeContext';
 import './AgentPanel.css';
 
 /* ── Role-specific SVG icons ──────────────────────────────── */
@@ -74,7 +75,7 @@ interface AgentPanelItem {
   tokens: number;
 }
 
-export const AgentPanel: React.FC = () => {
+export const AgentPanel: React.FC<{ sessionId: string }> = ({ sessionId }) => {
   const { agents } = useAgentStore();
   const { agentPanelVisible } = useUIStore();
   const activeAgents = Object.values(agents);
@@ -104,6 +105,8 @@ export const AgentPanel: React.FC = () => {
           LIVE
         </span>
       </div>
+
+      <RuntimeContext sessionId={sessionId} />
 
       {/* ── Agent Cards ──────────────────────────────────── */}
       <div className="agents-list flex flex-col gap-2 overflow-y-auto agents-cards-scroll flex-1 min-h-0">
@@ -200,19 +203,6 @@ export const AgentPanel: React.FC = () => {
             );
           })}
         </div>
-      </div>
-
-      {/* ── Halt All Agents ──────────────────────────────── */}
-      <div className="halt-section">
-        <button
-          className="halt-btn"
-          onClick={() => console.log('HALT ALL AGENTS')}
-        >
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-            <rect x="3" y="3" width="18" height="18" rx="2" />
-          </svg>
-          <span>Halt All Agents</span>
-        </button>
       </div>
 
     </aside>
