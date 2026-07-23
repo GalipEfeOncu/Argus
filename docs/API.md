@@ -2,7 +2,14 @@
 
 ## Status
 
-This is the target contract for the shared-room runtime. Existing endpoints and WebSocket handlers are transitional and will be migrated to this protocol before they are treated as stable.
+The canonical shared-room transport is available at
+`/ws/sessions/{session_id}`. It validates v1 commands, commits an accepted
+outcome before sending it, and replays ordered events after reconnect. The
+older singular `/ws/session/{session_id}` agent-graph stream remains
+transitional until the scheduler is migrated to the durable control plane.
+Accepted canonical events are broadcast to every currently connected client in
+the session; a slow client is disconnected and can safely reconnect from its
+last confirmed sequence.
 
 ## Base URLs
 
@@ -34,7 +41,10 @@ Every server event uses the following envelope:
 
 ## WebSocket
 
-Connect to `GET /ws/sessions/{session_id}?after_sequence={n}`. The server first emits `session.snapshot`, then all events after `n`.
+Connect to `/ws/sessions/{session_id}?after_sequence={n}`. The server first
+emits `session.snapshot`, then a bounded ordered page of events after `n`.
+Clients use the returned cursor through the timeline resource when more history
+is needed, so a connection never hydrates an unbounded event log.
 
 ### Client projection and recovery
 
@@ -297,6 +307,13 @@ The REST API manages durable configuration; real-time execution uses WebSocket c
 | `/policies` | Permission profiles and session overrides |
 | `/session-presets` | Built-in and user-saved team, limit, gate, and approval presets |
 | `/artifacts` | Diffs, exports, and session files |
+
+`GET /sessions/{sessionId}/timeline?after_sequence={n}&limit={n}` returns at
+most 200 canonical events and exposes `nextAfterSequence` when more rows exist.
+`GET /sessions/{sessionId}/artifacts?cursor={createdAtMs}:{id}&limit={n}`
+returns at most 100 artifact summaries and exposes `nextCursor`. Both queries
+use their session cursor indexes and return metadata only; neither endpoint
+hydrates artifact bodies or the complete event log.
 
 REST schemas are generated from FastAPI OpenAPI. Clients must not hand-maintain duplicate request/response interfaces.
 

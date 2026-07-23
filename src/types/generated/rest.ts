@@ -154,14 +154,892 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/sessions/{session_id}/artifacts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Artifact Summaries
+         * @description Return bounded artifact metadata using a stable created-at/id cursor.
+         */
+        get: operations["get_artifact_summaries_sessions__session_id__artifacts_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sessions/{session_id}/timeline": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Timeline Page
+         * @description Return one indexed timeline page; never hydrate the full event log.
+         */
+        get: operations["get_timeline_page_sessions__session_id__timeline_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** ApprovalRequestedEvent */
+        ApprovalRequestedEvent: {
+            /** Actorid */
+            actorId: string;
+            /** Correlationid */
+            correlationId?: string | null;
+            /** Eventid */
+            eventId: string;
+            payload: components["schemas"]["ApprovalRequestedPayload"];
+            /** Sequence */
+            sequence: number;
+            /** Sessionid */
+            sessionId: string;
+            /**
+             * Timestamp
+             * Format: date-time
+             */
+            timestamp: string;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "approval.requested";
+            /**
+             * Version
+             * @constant
+             */
+            version: 1;
+        };
+        /** ApprovalRequestedPayload */
+        ApprovalRequestedPayload: {
+            /** Approvalid */
+            approvalId: string;
+            /** Assignmentid */
+            assignmentId?: string | null;
+            /** Capability */
+            capability: string;
+            /** Scopesummary */
+            scopeSummary: string;
+        };
+        /** ApprovalResolvedEvent */
+        ApprovalResolvedEvent: {
+            /** Actorid */
+            actorId: string;
+            /** Correlationid */
+            correlationId?: string | null;
+            /** Eventid */
+            eventId: string;
+            payload: components["schemas"]["ApprovalResolvedPayload"];
+            /** Sequence */
+            sequence: number;
+            /** Sessionid */
+            sessionId: string;
+            /**
+             * Timestamp
+             * Format: date-time
+             */
+            timestamp: string;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "approval.resolved";
+            /**
+             * Version
+             * @constant
+             */
+            version: 1;
+        };
+        /** ApprovalResolvedPayload */
+        ApprovalResolvedPayload: {
+            /** Approvalid */
+            approvalId: string;
+            /** Grantid */
+            grantId?: string | null;
+            /** Reasonsummary */
+            reasonSummary?: string | null;
+            /**
+             * Resolution
+             * @enum {string}
+             */
+            resolution: "approved" | "rejected" | "granted";
+        };
+        /** ArtifactDiffUpdatedEvent */
+        ArtifactDiffUpdatedEvent: {
+            /** Actorid */
+            actorId: string;
+            /** Correlationid */
+            correlationId?: string | null;
+            /** Eventid */
+            eventId: string;
+            payload: components["schemas"]["ArtifactDiffUpdatedPayload"];
+            /** Sequence */
+            sequence: number;
+            /** Sessionid */
+            sessionId: string;
+            /**
+             * Timestamp
+             * Format: date-time
+             */
+            timestamp: string;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "artifact.diff_updated";
+            /**
+             * Version
+             * @constant
+             */
+            version: 1;
+        };
+        /** ArtifactDiffUpdatedPayload */
+        ArtifactDiffUpdatedPayload: {
+            /** Additions */
+            additions: number;
+            /** Artifactid */
+            artifactId: string;
+            /** Assignmentid */
+            assignmentId?: string | null;
+            /** Bytelength */
+            byteLength: number;
+            /** Deletions */
+            deletions: number;
+            /** Filepath */
+            filePath: string;
+            /**
+             * Truncated
+             * @default false
+             */
+            truncated: boolean;
+        };
+        /** ArtifactPageResponse */
+        ArtifactPageResponse: {
+            /** Items */
+            items: components["schemas"]["ArtifactSummaryResponse"][];
+            /** Nextcursor */
+            nextCursor?: string | null;
+        };
+        /** ArtifactSummaryResponse */
+        ArtifactSummaryResponse: {
+            /** Checksum */
+            checksum: string;
+            /** Createdatms */
+            createdAtMs: number;
+            /** Id */
+            id: string;
+            /** Kind */
+            kind: string;
+            /** Metadata */
+            metadata: {
+                [key: string]: unknown;
+            };
+            /** Relativepath */
+            relativePath?: string | null;
+        };
+        /** AssignmentCancelledEvent */
+        AssignmentCancelledEvent: {
+            /** Actorid */
+            actorId: string;
+            /** Correlationid */
+            correlationId?: string | null;
+            /** Eventid */
+            eventId: string;
+            payload: components["schemas"]["AssignmentCancelledPayload"];
+            /** Sequence */
+            sequence: number;
+            /** Sessionid */
+            sessionId: string;
+            /**
+             * Timestamp
+             * Format: date-time
+             */
+            timestamp: string;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "assignment.cancelled";
+            /**
+             * Version
+             * @constant
+             */
+            version: 1;
+        };
+        /** AssignmentCancelledPayload */
+        AssignmentCancelledPayload: {
+            /** Assignmentid */
+            assignmentId: string;
+            /** Reasonsummary */
+            reasonSummary: string;
+        };
+        /** AssignmentCompletedEvent */
+        AssignmentCompletedEvent: {
+            /** Actorid */
+            actorId: string;
+            /** Correlationid */
+            correlationId?: string | null;
+            /** Eventid */
+            eventId: string;
+            payload: components["schemas"]["AssignmentCompletedPayload"];
+            /** Sequence */
+            sequence: number;
+            /** Sessionid */
+            sessionId: string;
+            /**
+             * Timestamp
+             * Format: date-time
+             */
+            timestamp: string;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "assignment.completed";
+            /**
+             * Version
+             * @constant
+             */
+            version: 1;
+        };
+        /** AssignmentCompletedPayload */
+        AssignmentCompletedPayload: {
+            /** Assignmentid */
+            assignmentId: string;
+            /** Evidence */
+            evidence?: components["schemas"]["Evidence"][];
+            /** Outputsummary */
+            outputSummary: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "completed" | "completed_partial";
+        };
+        /** AssignmentCreatedEvent */
+        AssignmentCreatedEvent: {
+            /** Actorid */
+            actorId: string;
+            /** Correlationid */
+            correlationId?: string | null;
+            /** Eventid */
+            eventId: string;
+            payload: components["schemas"]["AssignmentCreatedPayload"];
+            /** Sequence */
+            sequence: number;
+            /** Sessionid */
+            sessionId: string;
+            /**
+             * Timestamp
+             * Format: date-time
+             */
+            timestamp: string;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "assignment.created";
+            /**
+             * Version
+             * @constant
+             */
+            version: 1;
+        };
+        /** AssignmentCreatedPayload */
+        AssignmentCreatedPayload: {
+            /** Assigneeagentid */
+            assigneeAgentId: string;
+            /** Assignmentid */
+            assignmentId: string;
+            /** Configurationversion */
+            configurationVersion: number;
+            /**
+             * Operationclass
+             * @enum {string}
+             */
+            operationClass: "read_only" | "mutating";
+            /** Policyhash */
+            policyHash: string;
+            /** Proposalid */
+            proposalId: string;
+        };
+        /** AssignmentFailedEvent */
+        AssignmentFailedEvent: {
+            /** Actorid */
+            actorId: string;
+            /** Correlationid */
+            correlationId?: string | null;
+            /** Eventid */
+            eventId: string;
+            payload: components["schemas"]["AssignmentFailedPayload"];
+            /** Sequence */
+            sequence: number;
+            /** Sessionid */
+            sessionId: string;
+            /**
+             * Timestamp
+             * Format: date-time
+             */
+            timestamp: string;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "assignment.failed";
+            /**
+             * Version
+             * @constant
+             */
+            version: 1;
+        };
+        /** AssignmentFailedPayload */
+        AssignmentFailedPayload: {
+            /** Assignmentid */
+            assignmentId: string;
+            /** Failurecode */
+            failureCode: string;
+            /** Failuresummary */
+            failureSummary: string;
+            /** Recoverable */
+            recoverable: boolean;
+        };
+        /** AssignmentProposedEvent */
+        AssignmentProposedEvent: {
+            /** Actorid */
+            actorId: string;
+            /** Correlationid */
+            correlationId?: string | null;
+            /** Eventid */
+            eventId: string;
+            payload: components["schemas"]["AssignmentProposedPayload"];
+            /** Sequence */
+            sequence: number;
+            /** Sessionid */
+            sessionId: string;
+            /**
+             * Timestamp
+             * Format: date-time
+             */
+            timestamp: string;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "assignment.proposed";
+            /**
+             * Version
+             * @constant
+             */
+            version: 1;
+        };
+        /** AssignmentProposedPayload */
+        AssignmentProposedPayload: {
+            /** Acceptancecriteria */
+            acceptanceCriteria: string[];
+            /** Assigneeagentid */
+            assigneeAgentId: string;
+            /** Objective */
+            objective: string;
+            /**
+             * Operationclass
+             * @enum {string}
+             */
+            operationClass: "read_only" | "mutating";
+            /** Parentid */
+            parentId?: string | null;
+            /** Proposalid */
+            proposalId: string;
+            /** Reasonsummary */
+            reasonSummary: string;
+            /** Requestedcapabilities */
+            requestedCapabilities?: string[];
+        };
+        /** AssignmentStartedEvent */
+        AssignmentStartedEvent: {
+            /** Actorid */
+            actorId: string;
+            /** Correlationid */
+            correlationId?: string | null;
+            /** Eventid */
+            eventId: string;
+            payload: components["schemas"]["AssignmentStartedPayload"];
+            /** Sequence */
+            sequence: number;
+            /** Sessionid */
+            sessionId: string;
+            /**
+             * Timestamp
+             * Format: date-time
+             */
+            timestamp: string;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "assignment.started";
+            /**
+             * Version
+             * @constant
+             */
+            version: 1;
+        };
+        /** AssignmentStartedPayload */
+        AssignmentStartedPayload: {
+            /** Assigneeagentid */
+            assigneeAgentId: string;
+            /** Assignmentid */
+            assignmentId: string;
+        };
+        /** ConfigurationUpdatedPayload */
+        ConfigurationUpdatedPayload: {
+            /** Changedfields */
+            changedFields: string[];
+            /** Configurationversion */
+            configurationVersion: number;
+            /** Policyhash */
+            policyHash: string;
+        };
+        /** DecisionRecordedEvent */
+        DecisionRecordedEvent: {
+            /** Actorid */
+            actorId: string;
+            /** Correlationid */
+            correlationId?: string | null;
+            /** Eventid */
+            eventId: string;
+            payload: components["schemas"]["DecisionRecordedPayload"];
+            /** Sequence */
+            sequence: number;
+            /** Sessionid */
+            sessionId: string;
+            /**
+             * Timestamp
+             * Format: date-time
+             */
+            timestamp: string;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "decision.recorded";
+            /**
+             * Version
+             * @constant
+             */
+            version: 1;
+        };
+        /** DecisionRecordedPayload */
+        DecisionRecordedPayload: {
+            /**
+             * Choice
+             * @enum {string}
+             */
+            choice: "reassign" | "change_approach" | "deliver_partial" | "stop";
+            /** Decisionid */
+            decisionId: string;
+            /** Reasonsummary */
+            reasonSummary: string;
+        };
+        /** DecisionRequestedEvent */
+        DecisionRequestedEvent: {
+            /** Actorid */
+            actorId: string;
+            /** Correlationid */
+            correlationId?: string | null;
+            /** Eventid */
+            eventId: string;
+            payload: components["schemas"]["DecisionRequestedPayload"];
+            /** Sequence */
+            sequence: number;
+            /** Sessionid */
+            sessionId: string;
+            /**
+             * Timestamp
+             * Format: date-time
+             */
+            timestamp: string;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "decision.requested";
+            /**
+             * Version
+             * @constant
+             */
+            version: 1;
+        };
+        /** DecisionRequestedPayload */
+        DecisionRequestedPayload: {
+            /** Choices */
+            choices: ("reassign" | "change_approach" | "deliver_partial" | "stop")[];
+            /** Decisionid */
+            decisionId: string;
+            /** Reasonsummary */
+            reasonSummary: string;
+            /** Scopeid */
+            scopeId: string;
+        };
+        /** ErrorCreatedEvent */
+        ErrorCreatedEvent: {
+            /** Actorid */
+            actorId: string;
+            /** Correlationid */
+            correlationId?: string | null;
+            /** Eventid */
+            eventId: string;
+            payload: components["schemas"]["ErrorCreatedPayload"];
+            /** Sequence */
+            sequence: number;
+            /** Sessionid */
+            sessionId: string;
+            /**
+             * Timestamp
+             * Format: date-time
+             */
+            timestamp: string;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "error.created";
+            /**
+             * Version
+             * @constant
+             */
+            version: 1;
+        };
+        /** ErrorCreatedPayload */
+        ErrorCreatedPayload: {
+            /** Code */
+            code: string;
+            /** Errorid */
+            errorId: string;
+            /** Recoverable */
+            recoverable: boolean;
+            /** Relatedid */
+            relatedId?: string | null;
+            /** Summary */
+            summary: string;
+        };
+        /** Evidence */
+        Evidence: {
+            /** Artifactids */
+            artifactIds?: string[];
+            /** Kind */
+            kind: string;
+            /** Summary */
+            summary: string;
+        };
+        /** GateStatusChangedEvent */
+        GateStatusChangedEvent: {
+            /** Actorid */
+            actorId: string;
+            /** Correlationid */
+            correlationId?: string | null;
+            /** Eventid */
+            eventId: string;
+            payload: components["schemas"]["GateStatusPayload"];
+            /** Sequence */
+            sequence: number;
+            /** Sessionid */
+            sessionId: string;
+            /**
+             * Timestamp
+             * Format: date-time
+             */
+            timestamp: string;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "gate.status_changed";
+            /**
+             * Version
+             * @constant
+             */
+            version: 1;
+        };
+        /** GateStatusPayload */
+        GateStatusPayload: {
+            /** Evidence */
+            evidence?: components["schemas"]["Evidence"][];
+            /** Gateid */
+            gateId: string;
+            /** Role */
+            role: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "not_applicable" | "pending" | "satisfied" | "failed";
+        };
+        /** HandoffCreatedEvent */
+        HandoffCreatedEvent: {
+            /** Actorid */
+            actorId: string;
+            /** Correlationid */
+            correlationId?: string | null;
+            /** Eventid */
+            eventId: string;
+            payload: components["schemas"]["HandoffCreatedPayload"];
+            /** Sequence */
+            sequence: number;
+            /** Sessionid */
+            sessionId: string;
+            /**
+             * Timestamp
+             * Format: date-time
+             */
+            timestamp: string;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "handoff.created";
+            /**
+             * Version
+             * @constant
+             */
+            version: 1;
+        };
+        /** HandoffCreatedPayload */
+        HandoffCreatedPayload: {
+            /** Artifactids */
+            artifactIds?: string[];
+            /** Handoffid */
+            handoffId: string;
+            /** Sourceassignmentid */
+            sourceAssignmentId: string;
+            /** Summary */
+            summary: string;
+            /** Targetagentid */
+            targetAgentId?: string | null;
+        };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
+        };
+        /** LimitPayload */
+        LimitPayload: {
+            /**
+             * Counter
+             * @enum {string}
+             */
+            counter: "revisions" | "assignment_attempts" | "model_iterations" | "tool_calls" | "wall_clock_seconds" | "tokens" | "cost" | "parallel_read_only_assignments";
+            /** Current */
+            current: number;
+            /** Fingerprint */
+            fingerprint?: string | null;
+            /** Hard */
+            hard: boolean;
+            /** Occurrencecount */
+            occurrenceCount?: number | null;
+            /**
+             * Resolution
+             * @enum {string}
+             */
+            resolution: "ask_user" | "coordinator_decides" | "stop";
+            /** Scopeid */
+            scopeId: string;
+            /** Threshold */
+            threshold: number;
+        };
+        /** LimitReachedEvent */
+        LimitReachedEvent: {
+            /** Actorid */
+            actorId: string;
+            /** Correlationid */
+            correlationId?: string | null;
+            /** Eventid */
+            eventId: string;
+            payload: components["schemas"]["LimitPayload"];
+            /** Sequence */
+            sequence: number;
+            /** Sessionid */
+            sessionId: string;
+            /**
+             * Timestamp
+             * Format: date-time
+             */
+            timestamp: string;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "limit.reached";
+            /**
+             * Version
+             * @constant
+             */
+            version: 1;
+        };
+        /** LimitWarningEvent */
+        LimitWarningEvent: {
+            /** Actorid */
+            actorId: string;
+            /** Correlationid */
+            correlationId?: string | null;
+            /** Eventid */
+            eventId: string;
+            payload: components["schemas"]["LimitPayload"];
+            /** Sequence */
+            sequence: number;
+            /** Sessionid */
+            sessionId: string;
+            /**
+             * Timestamp
+             * Format: date-time
+             */
+            timestamp: string;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "limit.warning";
+            /**
+             * Version
+             * @constant
+             */
+            version: 1;
+        };
+        /** MessageCompletedEvent */
+        MessageCompletedEvent: {
+            /** Actorid */
+            actorId: string;
+            /** Correlationid */
+            correlationId?: string | null;
+            /** Eventid */
+            eventId: string;
+            payload: components["schemas"]["MessageCompletedPayload"];
+            /** Sequence */
+            sequence: number;
+            /** Sessionid */
+            sessionId: string;
+            /**
+             * Timestamp
+             * Format: date-time
+             */
+            timestamp: string;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "message.completed";
+            /**
+             * Version
+             * @constant
+             */
+            version: 1;
+        };
+        /** MessageCompletedPayload */
+        MessageCompletedPayload: {
+            /** Messageid */
+            messageId: string;
+        };
+        /** MessageCreatedEvent */
+        MessageCreatedEvent: {
+            /** Actorid */
+            actorId: string;
+            /** Correlationid */
+            correlationId?: string | null;
+            /** Eventid */
+            eventId: string;
+            payload: components["schemas"]["MessageCreatedPayload"];
+            /** Sequence */
+            sequence: number;
+            /** Sessionid */
+            sessionId: string;
+            /**
+             * Timestamp
+             * Format: date-time
+             */
+            timestamp: string;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "message.created";
+            /**
+             * Version
+             * @constant
+             */
+            version: 1;
+        };
+        /** MessageCreatedPayload */
+        MessageCreatedPayload: {
+            /** Authorid */
+            authorId: string;
+            /**
+             * Authorkind
+             * @enum {string}
+             */
+            authorKind: "human" | "system" | "coordinator" | "agent";
+            /** Content */
+            content: string;
+            /** Mentionids */
+            mentionIds?: string[];
+            /** Messageid */
+            messageId: string;
+            /**
+             * Streaming
+             * @default false
+             */
+            streaming: boolean;
+        };
+        /** MessageDeltaEvent */
+        MessageDeltaEvent: {
+            /** Actorid */
+            actorId: string;
+            /** Correlationid */
+            correlationId?: string | null;
+            /** Eventid */
+            eventId: string;
+            payload: components["schemas"]["MessageDeltaPayload"];
+            /** Sequence */
+            sequence: number;
+            /** Sessionid */
+            sessionId: string;
+            /**
+             * Timestamp
+             * Format: date-time
+             */
+            timestamp: string;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "message.delta";
+            /**
+             * Version
+             * @constant
+             */
+            version: 1;
+        };
+        /** MessageDeltaPayload */
+        MessageDeltaPayload: {
+            /** Delta */
+            delta: string;
+            /** Messageid */
+            messageId: string;
         };
         /** ModelsListRequest */
         ModelsListRequest: {
@@ -171,6 +1049,52 @@ export interface components {
             base_url?: string | null;
             /** Type */
             type: string;
+        };
+        /** ParticipantStatusChangedEvent */
+        ParticipantStatusChangedEvent: {
+            /** Actorid */
+            actorId: string;
+            /** Correlationid */
+            correlationId?: string | null;
+            /** Eventid */
+            eventId: string;
+            payload: components["schemas"]["ParticipantStatusPayload"];
+            /** Sequence */
+            sequence: number;
+            /** Sessionid */
+            sessionId: string;
+            /**
+             * Timestamp
+             * Format: date-time
+             */
+            timestamp: string;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "participant.status_changed";
+            /**
+             * Version
+             * @constant
+             */
+            version: 1;
+        };
+        /** ParticipantStatusPayload */
+        ParticipantStatusPayload: {
+            /** Actionsummary */
+            actionSummary?: string | null;
+            /** Participantid */
+            participantId: string;
+            /**
+             * Participantkind
+             * @enum {string}
+             */
+            participantKind: "human" | "system" | "coordinator" | "agent";
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "idle" | "working" | "waiting" | "paused" | "errored" | "stopped";
         };
         /** ProviderTestRequest */
         ProviderTestRequest: {
@@ -208,6 +1132,35 @@ export interface components {
             /** Role */
             role: string;
         };
+        /** SessionConfigurationUpdatedEvent */
+        SessionConfigurationUpdatedEvent: {
+            /** Actorid */
+            actorId: string;
+            /** Correlationid */
+            correlationId?: string | null;
+            /** Eventid */
+            eventId: string;
+            payload: components["schemas"]["ConfigurationUpdatedPayload"];
+            /** Sequence */
+            sequence: number;
+            /** Sessionid */
+            sessionId: string;
+            /**
+             * Timestamp
+             * Format: date-time
+             */
+            timestamp: string;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "session.configuration_updated";
+            /**
+             * Version
+             * @constant
+             */
+            version: 1;
+        };
         /** SessionCreateRequest */
         SessionCreateRequest: {
             /** Name */
@@ -218,6 +1171,263 @@ export interface components {
             role_configs: components["schemas"]["RoleConfigSchema"][];
             /** Task */
             task: string;
+        };
+        /** SessionSnapshotEvent */
+        SessionSnapshotEvent: {
+            /** Actorid */
+            actorId: string;
+            /** Correlationid */
+            correlationId?: string | null;
+            /** Eventid */
+            eventId: string;
+            payload: components["schemas"]["SessionSnapshotPayload"];
+            /** Sequence */
+            sequence: number;
+            /** Sessionid */
+            sessionId: string;
+            /**
+             * Timestamp
+             * Format: date-time
+             */
+            timestamp: string;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "session.snapshot";
+            /**
+             * Version
+             * @constant
+             */
+            version: 1;
+        };
+        /** SessionSnapshotPayload */
+        SessionSnapshotPayload: {
+            /** Lastsequence */
+            lastSequence: number;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "created" | "preparing" | "running" | "paused" | "waiting_approval" | "waiting_decision" | "completed" | "completed_partial" | "cancelled" | "failed";
+        };
+        /** SessionStatusChangedEvent */
+        SessionStatusChangedEvent: {
+            /** Actorid */
+            actorId: string;
+            /** Correlationid */
+            correlationId?: string | null;
+            /** Eventid */
+            eventId: string;
+            payload: components["schemas"]["SessionStatusPayload"];
+            /** Sequence */
+            sequence: number;
+            /** Sessionid */
+            sessionId: string;
+            /**
+             * Timestamp
+             * Format: date-time
+             */
+            timestamp: string;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "session.status_changed";
+            /**
+             * Version
+             * @constant
+             */
+            version: 1;
+        };
+        /** SessionStatusPayload */
+        SessionStatusPayload: {
+            /** Reasonsummary */
+            reasonSummary?: string | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "created" | "preparing" | "running" | "paused" | "waiting_approval" | "waiting_decision" | "completed" | "completed_partial" | "cancelled" | "failed";
+        };
+        /** TimelinePageResponse */
+        TimelinePageResponse: {
+            /** Events */
+            events: (components["schemas"]["SessionSnapshotEvent"] | components["schemas"]["SessionStatusChangedEvent"] | components["schemas"]["ParticipantStatusChangedEvent"] | components["schemas"]["MessageCreatedEvent"] | components["schemas"]["MessageDeltaEvent"] | components["schemas"]["MessageCompletedEvent"] | components["schemas"]["SessionConfigurationUpdatedEvent"] | components["schemas"]["AssignmentProposedEvent"] | components["schemas"]["AssignmentCreatedEvent"] | components["schemas"]["AssignmentStartedEvent"] | components["schemas"]["AssignmentCompletedEvent"] | components["schemas"]["AssignmentFailedEvent"] | components["schemas"]["AssignmentCancelledEvent"] | components["schemas"]["HandoffCreatedEvent"] | components["schemas"]["ToolRequestedEvent"] | components["schemas"]["ToolStartedEvent"] | components["schemas"]["ToolCompletedEvent"] | components["schemas"]["ApprovalRequestedEvent"] | components["schemas"]["ApprovalResolvedEvent"] | components["schemas"]["LimitWarningEvent"] | components["schemas"]["LimitReachedEvent"] | components["schemas"]["DecisionRequestedEvent"] | components["schemas"]["DecisionRecordedEvent"] | components["schemas"]["GateStatusChangedEvent"] | components["schemas"]["ArtifactDiffUpdatedEvent"] | components["schemas"]["UsageUpdatedEvent"] | components["schemas"]["ErrorCreatedEvent"])[];
+            /** Nextaftersequence */
+            nextAfterSequence?: number | null;
+        };
+        /** ToolCompletedEvent */
+        ToolCompletedEvent: {
+            /** Actorid */
+            actorId: string;
+            /** Correlationid */
+            correlationId?: string | null;
+            /** Eventid */
+            eventId: string;
+            payload: components["schemas"]["ToolCompletedPayload"];
+            /** Sequence */
+            sequence: number;
+            /** Sessionid */
+            sessionId: string;
+            /**
+             * Timestamp
+             * Format: date-time
+             */
+            timestamp: string;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "tool.completed";
+            /**
+             * Version
+             * @constant
+             */
+            version: 1;
+        };
+        /** ToolCompletedPayload */
+        ToolCompletedPayload: {
+            /** Artifactids */
+            artifactIds?: string[];
+            /** Assignmentid */
+            assignmentId: string;
+            /** Durationms */
+            durationMs: number;
+            /** Resultsummary */
+            resultSummary: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "succeeded" | "failed" | "cancelled";
+            /** Toolexecutionid */
+            toolExecutionId: string;
+        };
+        /** ToolRequestedEvent */
+        ToolRequestedEvent: {
+            /** Actorid */
+            actorId: string;
+            /** Correlationid */
+            correlationId?: string | null;
+            /** Eventid */
+            eventId: string;
+            payload: components["schemas"]["ToolRequestedPayload"];
+            /** Sequence */
+            sequence: number;
+            /** Sessionid */
+            sessionId: string;
+            /**
+             * Timestamp
+             * Format: date-time
+             */
+            timestamp: string;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "tool.requested";
+            /**
+             * Version
+             * @constant
+             */
+            version: 1;
+        };
+        /** ToolRequestedPayload */
+        ToolRequestedPayload: {
+            /** Assignmentid */
+            assignmentId: string;
+            /**
+             * Operationclass
+             * @enum {string}
+             */
+            operationClass: "read_only" | "mutating";
+            /** Requestsummary */
+            requestSummary: string;
+            /** Toolexecutionid */
+            toolExecutionId: string;
+            /** Toolname */
+            toolName: string;
+        };
+        /** ToolStartedEvent */
+        ToolStartedEvent: {
+            /** Actorid */
+            actorId: string;
+            /** Correlationid */
+            correlationId?: string | null;
+            /** Eventid */
+            eventId: string;
+            payload: components["schemas"]["ToolStartedPayload"];
+            /** Sequence */
+            sequence: number;
+            /** Sessionid */
+            sessionId: string;
+            /**
+             * Timestamp
+             * Format: date-time
+             */
+            timestamp: string;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "tool.started";
+            /**
+             * Version
+             * @constant
+             */
+            version: 1;
+        };
+        /** ToolStartedPayload */
+        ToolStartedPayload: {
+            /** Assignmentid */
+            assignmentId: string;
+            /** Toolexecutionid */
+            toolExecutionId: string;
+            /** Toolname */
+            toolName: string;
+        };
+        /** UsageUpdatedEvent */
+        UsageUpdatedEvent: {
+            /** Actorid */
+            actorId: string;
+            /** Correlationid */
+            correlationId?: string | null;
+            /** Eventid */
+            eventId: string;
+            payload: components["schemas"]["UsageUpdatedPayload"];
+            /** Sequence */
+            sequence: number;
+            /** Sessionid */
+            sessionId: string;
+            /**
+             * Timestamp
+             * Format: date-time
+             */
+            timestamp: string;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "usage.updated";
+            /**
+             * Version
+             * @constant
+             */
+            version: 1;
+        };
+        /** UsageUpdatedPayload */
+        UsageUpdatedPayload: {
+            /** Durationms */
+            durationMs: number;
+            /** Inputtokens */
+            inputTokens: number;
+            /** Normalizedcost */
+            normalizedCost: number;
+            /** Outputtokens */
+            outputTokens: number;
+            /** Scopeid */
+            scopeId: string;
         };
         /** ValidationError */
         ValidationError: {
@@ -495,6 +1705,74 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_artifact_summaries_sessions__session_id__artifacts_get: {
+        parameters: {
+            query?: {
+                cursor?: string | null;
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ArtifactPageResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_timeline_page_sessions__session_id__timeline_get: {
+        parameters: {
+            query?: {
+                after_sequence?: number;
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TimelinePageResponse"];
                 };
             };
             /** @description Validation Error */

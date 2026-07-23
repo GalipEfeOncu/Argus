@@ -1,9 +1,11 @@
 import uuid
 from datetime import datetime
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 from app.schemas.session import SessionCreateRequest
 from app.db.database import get_db
-from app.db.repositories import SessionRepository
+from app.db.repositories import EventRepository, SessionRepository
+from app.schemas.session_store import ArtifactPageResponse, TimelinePageResponse
+from app.services.command_processor import event_wire_value
 
 router = APIRouter()
 
@@ -44,6 +46,51 @@ async def get_session(session_id: str):
     if not row:
         raise HTTPException(404, "Session not found")
     return dict(row)
+
+
+@router.get("/{session_id}/timeline", response_model=TimelinePageResponse)
+async def get_timeline_page(
+    session_id: str,
+    after_sequence: int = Query(default=-1, ge=-1),
+    limit: int = Query(default=100, ge=1, le=200),
+):
+    """Return one indexed timeline page; never hydrate the full event log."""
+
+    db = await get_db()
+    try:
+        page = await EventRepository(db).page_after(session_id, after_sequence=after_sequence, limit=limit)
+    finally:
+        await db.close()
+    return {
+        "events": [event_wire_value(event) for event in page.events],
+        "nextAfterSequence": page.next_after_sequence,
+    }
+
+
+@router.get("/{session_id}/artifacts", response_model=ArtifactPageResponse)
+async def get_artifact_summaries(
+    session_id: str,
+    cursor: str | None = None,
+    limit: int = Query(default=50, ge=1, le=100),
+):
+    """Return bounded artifact metadata using a stable created-at/id cursor."""
+
+    before: tuple[int, str] | None = None
+    if cursor is not None:
+        timestamp, separator, artifact_id = cursor.partition(":")
+        if not separator or not artifact_id:
+            raise HTTPException(422, "Invalid artifact cursor")
+        try:
+            before = (int(timestamp), artifact_id)
+        except ValueError as error:
+            raise HTTPException(422, "Invalid artifact cursor") from error
+    db = await get_db()
+    try:
+        page = await EventRepository(db).page_artifact_summaries(session_id, before=before, limit=limit)
+    finally:
+        await db.close()
+    next_cursor = None if page.next_cursor is None else f"{page.next_cursor[0]}:{page.next_cursor[1]}"
+    return {"items": list(page.items), "nextCursor": next_cursor}
 
 
 @router.delete("/{session_id}")

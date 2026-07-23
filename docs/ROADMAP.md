@@ -384,6 +384,15 @@ Tests:
 - Query-plan snapshots, bounded row counts, 10,000-event replay throughput, and
   memory stability across repeated page navigation.
 
+Current status (2026-07-23):
+
+- ✅ The canonical session transport commits command outcomes atomically before
+  broadcasting them, validates the lifecycle transition table, and returns the
+  original correlated result for reconnect retries.
+- ✅ Checksummed event snapshots, bounded sequence replay, timeline cursor
+  pages, and artifact-summary cursor pages are persisted and covered by query
+  plan and 10,000-event bounded-page tests.
+
 ### 2.3 Project and workspace service
 
 Deliverables:

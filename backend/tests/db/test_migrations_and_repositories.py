@@ -12,7 +12,7 @@ REQUIRED_TABLES = {
     "projects", "sessions", "events", "agent_definitions", "session_agents",
     "session_configurations", "skills", "assignments", "assignment_attempts",
     "gate_evidence", "limit_counters", "approvals", "tool_executions",
-    "artifacts", "provider_profiles", "schema_migrations",
+    "artifacts", "provider_profiles", "command_receipts", "event_snapshots", "schema_migrations",
 }
 
 
@@ -40,7 +40,7 @@ async def test_fresh_database_has_every_phase_2_1_table_and_migration_metadata(t
         await database.close()
 
     assert REQUIRED_TABLES <= tables
-    assert versions == [1, 2, 3]
+    assert versions == [1, 2, 3, 4]
     assert "idx_events_session_sequence" in event_indexes
 
 
@@ -116,7 +116,7 @@ async def test_event_sequence_is_unique_and_transactionally_allocated_under_conc
         await first.close()
         await second.close()
 
-    assert sorted(result.sequence for result in results) == [0, 1]
+    assert sorted(result.sequence for result in results) == [1, 2]
 
 
 @pytest.mark.asyncio
@@ -144,7 +144,7 @@ async def test_event_projection_rebuilds_identically_from_immutable_events(tempo
 
     assert stored_projection == "paused"
     assert first_projection == second_projection == {
-        "sessionId": "session_1", "status": "paused", "lastSequence": 1,
+        "sessionId": "session_1", "status": "paused", "lastSequence": 2,
     }
 
 

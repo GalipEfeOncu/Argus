@@ -1,6 +1,1668 @@
 {
   "components": {
     "schemas": {
+      "ApprovalRequestedEvent": {
+        "additionalProperties": false,
+        "properties": {
+          "actorId": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Actorid",
+            "type": "string"
+          },
+          "correlationId": {
+            "anyOf": [
+              {
+                "maxLength": 160,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Correlationid"
+          },
+          "eventId": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Eventid",
+            "type": "string"
+          },
+          "payload": {
+            "$ref": "#/components/schemas/ApprovalRequestedPayload"
+          },
+          "sequence": {
+            "minimum": 0.0,
+            "title": "Sequence",
+            "type": "integer"
+          },
+          "sessionId": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Sessionid",
+            "type": "string"
+          },
+          "timestamp": {
+            "format": "date-time",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?(?:Z|[+-]\\d{2}:\\d{2})$",
+            "title": "Timestamp",
+            "type": "string"
+          },
+          "type": {
+            "const": "approval.requested",
+            "title": "Type",
+            "type": "string"
+          },
+          "version": {
+            "const": 1,
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "version",
+          "eventId",
+          "sessionId",
+          "sequence",
+          "timestamp",
+          "actorId",
+          "type",
+          "payload"
+        ],
+        "title": "ApprovalRequestedEvent",
+        "type": "object"
+      },
+      "ApprovalRequestedPayload": {
+        "additionalProperties": false,
+        "properties": {
+          "approvalId": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Approvalid",
+            "type": "string"
+          },
+          "assignmentId": {
+            "anyOf": [
+              {
+                "maxLength": 160,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Assignmentid"
+          },
+          "capability": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Capability",
+            "type": "string"
+          },
+          "scopeSummary": {
+            "maxLength": 4000,
+            "minLength": 1,
+            "title": "Scopesummary",
+            "type": "string"
+          }
+        },
+        "required": [
+          "approvalId",
+          "capability",
+          "scopeSummary"
+        ],
+        "title": "ApprovalRequestedPayload",
+        "type": "object"
+      },
+      "ApprovalResolvedEvent": {
+        "additionalProperties": false,
+        "properties": {
+          "actorId": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Actorid",
+            "type": "string"
+          },
+          "correlationId": {
+            "anyOf": [
+              {
+                "maxLength": 160,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Correlationid"
+          },
+          "eventId": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Eventid",
+            "type": "string"
+          },
+          "payload": {
+            "$ref": "#/components/schemas/ApprovalResolvedPayload"
+          },
+          "sequence": {
+            "minimum": 0.0,
+            "title": "Sequence",
+            "type": "integer"
+          },
+          "sessionId": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Sessionid",
+            "type": "string"
+          },
+          "timestamp": {
+            "format": "date-time",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?(?:Z|[+-]\\d{2}:\\d{2})$",
+            "title": "Timestamp",
+            "type": "string"
+          },
+          "type": {
+            "const": "approval.resolved",
+            "title": "Type",
+            "type": "string"
+          },
+          "version": {
+            "const": 1,
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "version",
+          "eventId",
+          "sessionId",
+          "sequence",
+          "timestamp",
+          "actorId",
+          "type",
+          "payload"
+        ],
+        "title": "ApprovalResolvedEvent",
+        "type": "object"
+      },
+      "ApprovalResolvedPayload": {
+        "additionalProperties": false,
+        "properties": {
+          "approvalId": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Approvalid",
+            "type": "string"
+          },
+          "grantId": {
+            "anyOf": [
+              {
+                "maxLength": 160,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Grantid"
+          },
+          "reasonSummary": {
+            "anyOf": [
+              {
+                "maxLength": 4000,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reasonsummary"
+          },
+          "resolution": {
+            "enum": [
+              "approved",
+              "rejected",
+              "granted"
+            ],
+            "title": "Resolution",
+            "type": "string"
+          }
+        },
+        "required": [
+          "approvalId",
+          "resolution"
+        ],
+        "title": "ApprovalResolvedPayload",
+        "type": "object"
+      },
+      "ArtifactDiffUpdatedEvent": {
+        "additionalProperties": false,
+        "properties": {
+          "actorId": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Actorid",
+            "type": "string"
+          },
+          "correlationId": {
+            "anyOf": [
+              {
+                "maxLength": 160,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Correlationid"
+          },
+          "eventId": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Eventid",
+            "type": "string"
+          },
+          "payload": {
+            "$ref": "#/components/schemas/ArtifactDiffUpdatedPayload"
+          },
+          "sequence": {
+            "minimum": 0.0,
+            "title": "Sequence",
+            "type": "integer"
+          },
+          "sessionId": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Sessionid",
+            "type": "string"
+          },
+          "timestamp": {
+            "format": "date-time",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?(?:Z|[+-]\\d{2}:\\d{2})$",
+            "title": "Timestamp",
+            "type": "string"
+          },
+          "type": {
+            "const": "artifact.diff_updated",
+            "title": "Type",
+            "type": "string"
+          },
+          "version": {
+            "const": 1,
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "version",
+          "eventId",
+          "sessionId",
+          "sequence",
+          "timestamp",
+          "actorId",
+          "type",
+          "payload"
+        ],
+        "title": "ArtifactDiffUpdatedEvent",
+        "type": "object"
+      },
+      "ArtifactDiffUpdatedPayload": {
+        "additionalProperties": false,
+        "properties": {
+          "additions": {
+            "minimum": 0.0,
+            "title": "Additions",
+            "type": "integer"
+          },
+          "artifactId": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Artifactid",
+            "type": "string"
+          },
+          "assignmentId": {
+            "anyOf": [
+              {
+                "maxLength": 160,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Assignmentid"
+          },
+          "byteLength": {
+            "minimum": 0.0,
+            "title": "Bytelength",
+            "type": "integer"
+          },
+          "deletions": {
+            "minimum": 0.0,
+            "title": "Deletions",
+            "type": "integer"
+          },
+          "filePath": {
+            "maxLength": 4000,
+            "minLength": 1,
+            "pattern": "^(?![\\\\/])(?![A-Za-z]:)(?!\\.\\.(?:[\\\\/]|$))(?!.*[\\\\/]\\.\\.(?:[\\\\/]|$)).+$",
+            "title": "Filepath",
+            "type": "string"
+          },
+          "truncated": {
+            "default": false,
+            "title": "Truncated",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "artifactId",
+          "filePath",
+          "additions",
+          "deletions",
+          "byteLength"
+        ],
+        "title": "ArtifactDiffUpdatedPayload",
+        "type": "object"
+      },
+      "ArtifactPageResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ArtifactSummaryResponse"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "nextCursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nextcursor"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "ArtifactPageResponse",
+        "type": "object"
+      },
+      "ArtifactSummaryResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "checksum": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Checksum",
+            "type": "string"
+          },
+          "createdAtMs": {
+            "title": "Createdatms",
+            "type": "integer"
+          },
+          "id": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Kind",
+            "type": "string"
+          },
+          "metadata": {
+            "additionalProperties": true,
+            "title": "Metadata",
+            "type": "object"
+          },
+          "relativePath": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Relativepath"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "checksum",
+          "metadata",
+          "createdAtMs"
+        ],
+        "title": "ArtifactSummaryResponse",
+        "type": "object"
+      },
+      "AssignmentCancelledEvent": {
+        "additionalProperties": false,
+        "properties": {
+          "actorId": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Actorid",
+            "type": "string"
+          },
+          "correlationId": {
+            "anyOf": [
+              {
+                "maxLength": 160,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Correlationid"
+          },
+          "eventId": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Eventid",
+            "type": "string"
+          },
+          "payload": {
+            "$ref": "#/components/schemas/AssignmentCancelledPayload"
+          },
+          "sequence": {
+            "minimum": 0.0,
+            "title": "Sequence",
+            "type": "integer"
+          },
+          "sessionId": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Sessionid",
+            "type": "string"
+          },
+          "timestamp": {
+            "format": "date-time",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?(?:Z|[+-]\\d{2}:\\d{2})$",
+            "title": "Timestamp",
+            "type": "string"
+          },
+          "type": {
+            "const": "assignment.cancelled",
+            "title": "Type",
+            "type": "string"
+          },
+          "version": {
+            "const": 1,
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "version",
+          "eventId",
+          "sessionId",
+          "sequence",
+          "timestamp",
+          "actorId",
+          "type",
+          "payload"
+        ],
+        "title": "AssignmentCancelledEvent",
+        "type": "object"
+      },
+      "AssignmentCancelledPayload": {
+        "additionalProperties": false,
+        "properties": {
+          "assignmentId": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Assignmentid",
+            "type": "string"
+          },
+          "reasonSummary": {
+            "maxLength": 4000,
+            "minLength": 1,
+            "title": "Reasonsummary",
+            "type": "string"
+          }
+        },
+        "required": [
+          "assignmentId",
+          "reasonSummary"
+        ],
+        "title": "AssignmentCancelledPayload",
+        "type": "object"
+      },
+      "AssignmentCompletedEvent": {
+        "additionalProperties": false,
+        "properties": {
+          "actorId": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Actorid",
+            "type": "string"
+          },
+          "correlationId": {
+            "anyOf": [
+              {
+                "maxLength": 160,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Correlationid"
+          },
+          "eventId": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Eventid",
+            "type": "string"
+          },
+          "payload": {
+            "$ref": "#/components/schemas/AssignmentCompletedPayload"
+          },
+          "sequence": {
+            "minimum": 0.0,
+            "title": "Sequence",
+            "type": "integer"
+          },
+          "sessionId": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Sessionid",
+            "type": "string"
+          },
+          "timestamp": {
+            "format": "date-time",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?(?:Z|[+-]\\d{2}:\\d{2})$",
+            "title": "Timestamp",
+            "type": "string"
+          },
+          "type": {
+            "const": "assignment.completed",
+            "title": "Type",
+            "type": "string"
+          },
+          "version": {
+            "const": 1,
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "version",
+          "eventId",
+          "sessionId",
+          "sequence",
+          "timestamp",
+          "actorId",
+          "type",
+          "payload"
+        ],
+        "title": "AssignmentCompletedEvent",
+        "type": "object"
+      },
+      "AssignmentCompletedPayload": {
+        "additionalProperties": false,
+        "properties": {
+          "assignmentId": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Assignmentid",
+            "type": "string"
+          },
+          "evidence": {
+            "items": {
+              "$ref": "#/components/schemas/Evidence"
+            },
+            "maxItems": 50,
+            "title": "Evidence",
+            "type": "array"
+          },
+          "outputSummary": {
+            "maxLength": 4000,
+            "minLength": 1,
+            "title": "Outputsummary",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "completed",
+              "completed_partial"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "assignmentId",
+          "status",
+          "outputSummary"
+        ],
+        "title": "AssignmentCompletedPayload",
+        "type": "object"
+      },
+      "AssignmentCreatedEvent": {
+        "additionalProperties": false,
+        "properties": {
+          "actorId": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Actorid",
+            "type": "string"
+          },
+          "correlationId": {
+            "anyOf": [
+              {
+                "maxLength": 160,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Correlationid"
+          },
+          "eventId": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Eventid",
+            "type": "string"
+          },
+          "payload": {
+            "$ref": "#/components/schemas/AssignmentCreatedPayload"
+          },
+          "sequence": {
+            "minimum": 0.0,
+            "title": "Sequence",
+            "type": "integer"
+          },
+          "sessionId": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Sessionid",
+            "type": "string"
+          },
+          "timestamp": {
+            "format": "date-time",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?(?:Z|[+-]\\d{2}:\\d{2})$",
+            "title": "Timestamp",
+            "type": "string"
+          },
+          "type": {
+            "const": "assignment.created",
+            "title": "Type",
+            "type": "string"
+          },
+          "version": {
+            "const": 1,
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "version",
+          "eventId",
+          "sessionId",
+          "sequence",
+          "timestamp",
+          "actorId",
+          "type",
+          "payload"
+        ],
+        "title": "AssignmentCreatedEvent",
+        "type": "object"
+      },
+      "AssignmentCreatedPayload": {
+        "additionalProperties": false,
+        "properties": {
+          "assigneeAgentId": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Assigneeagentid",
+            "type": "string"
+          },
+          "assignmentId": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Assignmentid",
+            "type": "string"
+          },
+          "configurationVersion": {
+            "minimum": 0.0,
+            "title": "Configurationversion",
+            "type": "integer"
+          },
+          "operationClass": {
+            "enum": [
+              "read_only",
+              "mutating"
+            ],
+            "title": "Operationclass",
+            "type": "string"
+          },
+          "policyHash": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Policyhash",
+            "type": "string"
+          },
+          "proposalId": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Proposalid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "assignmentId",
+          "proposalId",
+          "assigneeAgentId",
+          "configurationVersion",
+          "policyHash",
+          "operationClass"
+        ],
+        "title": "AssignmentCreatedPayload",
+        "type": "object"
+      },
+      "AssignmentFailedEvent": {
+        "additionalProperties": false,
+        "properties": {
+          "actorId": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Actorid",
+            "type": "string"
+          },
+          "correlationId": {
+            "anyOf": [
+              {
+                "maxLength": 160,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Correlationid"
+          },
+          "eventId": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Eventid",
+            "type": "string"
+          },
+          "payload": {
+            "$ref": "#/components/schemas/AssignmentFailedPayload"
+          },
+          "sequence": {
+            "minimum": 0.0,
+            "title": "Sequence",
+            "type": "integer"
+          },
+          "sessionId": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Sessionid",
+            "type": "string"
+          },
+          "timestamp": {
+            "format": "date-time",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?(?:Z|[+-]\\d{2}:\\d{2})$",
+            "title": "Timestamp",
+            "type": "string"
+          },
+          "type": {
+            "const": "assignment.failed",
+            "title": "Type",
+            "type": "string"
+          },
+          "version": {
+            "const": 1,
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "version",
+          "eventId",
+          "sessionId",
+          "sequence",
+          "timestamp",
+          "actorId",
+          "type",
+          "payload"
+        ],
+        "title": "AssignmentFailedEvent",
+        "type": "object"
+      },
+      "AssignmentFailedPayload": {
+        "additionalProperties": false,
+        "properties": {
+          "assignmentId": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Assignmentid",
+            "type": "string"
+          },
+          "failureCode": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Failurecode",
+            "type": "string"
+          },
+          "failureSummary": {
+            "maxLength": 4000,
+            "minLength": 1,
+            "title": "Failuresummary",
+            "type": "string"
+          },
+          "recoverable": {
+            "title": "Recoverable",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "assignmentId",
+          "failureCode",
+          "failureSummary",
+          "recoverable"
+        ],
+        "title": "AssignmentFailedPayload",
+        "type": "object"
+      },
+      "AssignmentProposedEvent": {
+        "additionalProperties": false,
+        "properties": {
+          "actorId": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Actorid",
+            "type": "string"
+          },
+          "correlationId": {
+            "anyOf": [
+              {
+                "maxLength": 160,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Correlationid"
+          },
+          "eventId": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Eventid",
+            "type": "string"
+          },
+          "payload": {
+            "$ref": "#/components/schemas/AssignmentProposedPayload"
+          },
+          "sequence": {
+            "minimum": 0.0,
+            "title": "Sequence",
+            "type": "integer"
+          },
+          "sessionId": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Sessionid",
+            "type": "string"
+          },
+          "timestamp": {
+            "format": "date-time",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?(?:Z|[+-]\\d{2}:\\d{2})$",
+            "title": "Timestamp",
+            "type": "string"
+          },
+          "type": {
+            "const": "assignment.proposed",
+            "title": "Type",
+            "type": "string"
+          },
+          "version": {
+            "const": 1,
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "version",
+          "eventId",
+          "sessionId",
+          "sequence",
+          "timestamp",
+          "actorId",
+          "type",
+          "payload"
+        ],
+        "title": "AssignmentProposedEvent",
+        "type": "object"
+      },
+      "AssignmentProposedPayload": {
+        "additionalProperties": false,
+        "properties": {
+          "acceptanceCriteria": {
+            "items": {
+              "maxLength": 4000,
+              "minLength": 1,
+              "type": "string"
+            },
+            "maxItems": 50,
+            "minItems": 1,
+            "title": "Acceptancecriteria",
+            "type": "array"
+          },
+          "assigneeAgentId": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Assigneeagentid",
+            "type": "string"
+          },
+          "objective": {
+            "maxLength": 4000,
+            "minLength": 1,
+            "title": "Objective",
+            "type": "string"
+          },
+          "operationClass": {
+            "enum": [
+              "read_only",
+              "mutating"
+            ],
+            "title": "Operationclass",
+            "type": "string"
+          },
+          "parentId": {
+            "anyOf": [
+              {
+                "maxLength": 160,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parentid"
+          },
+          "proposalId": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Proposalid",
+            "type": "string"
+          },
+          "reasonSummary": {
+            "maxLength": 4000,
+            "minLength": 1,
+            "title": "Reasonsummary",
+            "type": "string"
+          },
+          "requestedCapabilities": {
+            "items": {
+              "maxLength": 160,
+              "minLength": 1,
+              "type": "string"
+            },
+            "maxItems": 50,
+            "title": "Requestedcapabilities",
+            "type": "array"
+          }
+        },
+        "required": [
+          "proposalId",
+          "assigneeAgentId",
+          "objective",
+          "acceptanceCriteria",
+          "operationClass",
+          "reasonSummary"
+        ],
+        "title": "AssignmentProposedPayload",
+        "type": "object"
+      },
+      "AssignmentStartedEvent": {
+        "additionalProperties": false,
+        "properties": {
+          "actorId": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Actorid",
+            "type": "string"
+          },
+          "correlationId": {
+            "anyOf": [
+              {
+                "maxLength": 160,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Correlationid"
+          },
+          "eventId": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Eventid",
+            "type": "string"
+          },
+          "payload": {
+            "$ref": "#/components/schemas/AssignmentStartedPayload"
+          },
+          "sequence": {
+            "minimum": 0.0,
+            "title": "Sequence",
+            "type": "integer"
+          },
+          "sessionId": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Sessionid",
+            "type": "string"
+          },
+          "timestamp": {
+            "format": "date-time",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?(?:Z|[+-]\\d{2}:\\d{2})$",
+            "title": "Timestamp",
+            "type": "string"
+          },
+          "type": {
+            "const": "assignment.started",
+            "title": "Type",
+            "type": "string"
+          },
+          "version": {
+            "const": 1,
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "version",
+          "eventId",
+          "sessionId",
+          "sequence",
+          "timestamp",
+          "actorId",
+          "type",
+          "payload"
+        ],
+        "title": "AssignmentStartedEvent",
+        "type": "object"
+      },
+      "AssignmentStartedPayload": {
+        "additionalProperties": false,
+        "properties": {
+          "assigneeAgentId": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Assigneeagentid",
+            "type": "string"
+          },
+          "assignmentId": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Assignmentid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "assignmentId",
+          "assigneeAgentId"
+        ],
+        "title": "AssignmentStartedPayload",
+        "type": "object"
+      },
+      "ConfigurationUpdatedPayload": {
+        "additionalProperties": false,
+        "properties": {
+          "changedFields": {
+            "items": {
+              "maxLength": 160,
+              "minLength": 1,
+              "type": "string"
+            },
+            "maxItems": 20,
+            "minItems": 1,
+            "title": "Changedfields",
+            "type": "array"
+          },
+          "configurationVersion": {
+            "minimum": 0.0,
+            "title": "Configurationversion",
+            "type": "integer"
+          },
+          "policyHash": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Policyhash",
+            "type": "string"
+          }
+        },
+        "required": [
+          "configurationVersion",
+          "policyHash",
+          "changedFields"
+        ],
+        "title": "ConfigurationUpdatedPayload",
+        "type": "object"
+      },
+      "DecisionRecordedEvent": {
+        "additionalProperties": false,
+        "properties": {
+          "actorId": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Actorid",
+            "type": "string"
+          },
+          "correlationId": {
+            "anyOf": [
+              {
+                "maxLength": 160,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Correlationid"
+          },
+          "eventId": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Eventid",
+            "type": "string"
+          },
+          "payload": {
+            "$ref": "#/components/schemas/DecisionRecordedPayload"
+          },
+          "sequence": {
+            "minimum": 0.0,
+            "title": "Sequence",
+            "type": "integer"
+          },
+          "sessionId": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Sessionid",
+            "type": "string"
+          },
+          "timestamp": {
+            "format": "date-time",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?(?:Z|[+-]\\d{2}:\\d{2})$",
+            "title": "Timestamp",
+            "type": "string"
+          },
+          "type": {
+            "const": "decision.recorded",
+            "title": "Type",
+            "type": "string"
+          },
+          "version": {
+            "const": 1,
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "version",
+          "eventId",
+          "sessionId",
+          "sequence",
+          "timestamp",
+          "actorId",
+          "type",
+          "payload"
+        ],
+        "title": "DecisionRecordedEvent",
+        "type": "object"
+      },
+      "DecisionRecordedPayload": {
+        "additionalProperties": false,
+        "properties": {
+          "choice": {
+            "enum": [
+              "reassign",
+              "change_approach",
+              "deliver_partial",
+              "stop"
+            ],
+            "title": "Choice",
+            "type": "string"
+          },
+          "decisionId": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Decisionid",
+            "type": "string"
+          },
+          "reasonSummary": {
+            "maxLength": 4000,
+            "minLength": 1,
+            "title": "Reasonsummary",
+            "type": "string"
+          }
+        },
+        "required": [
+          "decisionId",
+          "choice",
+          "reasonSummary"
+        ],
+        "title": "DecisionRecordedPayload",
+        "type": "object"
+      },
+      "DecisionRequestedEvent": {
+        "additionalProperties": false,
+        "properties": {
+          "actorId": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Actorid",
+            "type": "string"
+          },
+          "correlationId": {
+            "anyOf": [
+              {
+                "maxLength": 160,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Correlationid"
+          },
+          "eventId": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Eventid",
+            "type": "string"
+          },
+          "payload": {
+            "$ref": "#/components/schemas/DecisionRequestedPayload"
+          },
+          "sequence": {
+            "minimum": 0.0,
+            "title": "Sequence",
+            "type": "integer"
+          },
+          "sessionId": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Sessionid",
+            "type": "string"
+          },
+          "timestamp": {
+            "format": "date-time",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?(?:Z|[+-]\\d{2}:\\d{2})$",
+            "title": "Timestamp",
+            "type": "string"
+          },
+          "type": {
+            "const": "decision.requested",
+            "title": "Type",
+            "type": "string"
+          },
+          "version": {
+            "const": 1,
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "version",
+          "eventId",
+          "sessionId",
+          "sequence",
+          "timestamp",
+          "actorId",
+          "type",
+          "payload"
+        ],
+        "title": "DecisionRequestedEvent",
+        "type": "object"
+      },
+      "DecisionRequestedPayload": {
+        "additionalProperties": false,
+        "properties": {
+          "choices": {
+            "items": {
+              "enum": [
+                "reassign",
+                "change_approach",
+                "deliver_partial",
+                "stop"
+              ],
+              "type": "string"
+            },
+            "maxItems": 4,
+            "minItems": 1,
+            "title": "Choices",
+            "type": "array"
+          },
+          "decisionId": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Decisionid",
+            "type": "string"
+          },
+          "reasonSummary": {
+            "maxLength": 4000,
+            "minLength": 1,
+            "title": "Reasonsummary",
+            "type": "string"
+          },
+          "scopeId": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Scopeid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "decisionId",
+          "scopeId",
+          "choices",
+          "reasonSummary"
+        ],
+        "title": "DecisionRequestedPayload",
+        "type": "object"
+      },
+      "ErrorCreatedEvent": {
+        "additionalProperties": false,
+        "properties": {
+          "actorId": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Actorid",
+            "type": "string"
+          },
+          "correlationId": {
+            "anyOf": [
+              {
+                "maxLength": 160,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Correlationid"
+          },
+          "eventId": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Eventid",
+            "type": "string"
+          },
+          "payload": {
+            "$ref": "#/components/schemas/ErrorCreatedPayload"
+          },
+          "sequence": {
+            "minimum": 0.0,
+            "title": "Sequence",
+            "type": "integer"
+          },
+          "sessionId": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Sessionid",
+            "type": "string"
+          },
+          "timestamp": {
+            "format": "date-time",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?(?:Z|[+-]\\d{2}:\\d{2})$",
+            "title": "Timestamp",
+            "type": "string"
+          },
+          "type": {
+            "const": "error.created",
+            "title": "Type",
+            "type": "string"
+          },
+          "version": {
+            "const": 1,
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "version",
+          "eventId",
+          "sessionId",
+          "sequence",
+          "timestamp",
+          "actorId",
+          "type",
+          "payload"
+        ],
+        "title": "ErrorCreatedEvent",
+        "type": "object"
+      },
+      "ErrorCreatedPayload": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Code",
+            "type": "string"
+          },
+          "errorId": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Errorid",
+            "type": "string"
+          },
+          "recoverable": {
+            "title": "Recoverable",
+            "type": "boolean"
+          },
+          "relatedId": {
+            "anyOf": [
+              {
+                "maxLength": 160,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Relatedid"
+          },
+          "summary": {
+            "maxLength": 4000,
+            "minLength": 1,
+            "title": "Summary",
+            "type": "string"
+          }
+        },
+        "required": [
+          "errorId",
+          "code",
+          "summary",
+          "recoverable"
+        ],
+        "title": "ErrorCreatedPayload",
+        "type": "object"
+      },
+      "Evidence": {
+        "additionalProperties": false,
+        "properties": {
+          "artifactIds": {
+            "items": {
+              "maxLength": 160,
+              "minLength": 1,
+              "type": "string"
+            },
+            "maxItems": 50,
+            "title": "Artifactids",
+            "type": "array"
+          },
+          "kind": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Kind",
+            "type": "string"
+          },
+          "summary": {
+            "maxLength": 4000,
+            "minLength": 1,
+            "title": "Summary",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "summary"
+        ],
+        "title": "Evidence",
+        "type": "object"
+      },
+      "GateStatusChangedEvent": {
+        "additionalProperties": false,
+        "properties": {
+          "actorId": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Actorid",
+            "type": "string"
+          },
+          "correlationId": {
+            "anyOf": [
+              {
+                "maxLength": 160,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Correlationid"
+          },
+          "eventId": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Eventid",
+            "type": "string"
+          },
+          "payload": {
+            "$ref": "#/components/schemas/GateStatusPayload"
+          },
+          "sequence": {
+            "minimum": 0.0,
+            "title": "Sequence",
+            "type": "integer"
+          },
+          "sessionId": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Sessionid",
+            "type": "string"
+          },
+          "timestamp": {
+            "format": "date-time",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?(?:Z|[+-]\\d{2}:\\d{2})$",
+            "title": "Timestamp",
+            "type": "string"
+          },
+          "type": {
+            "const": "gate.status_changed",
+            "title": "Type",
+            "type": "string"
+          },
+          "version": {
+            "const": 1,
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "version",
+          "eventId",
+          "sessionId",
+          "sequence",
+          "timestamp",
+          "actorId",
+          "type",
+          "payload"
+        ],
+        "title": "GateStatusChangedEvent",
+        "type": "object"
+      },
+      "GateStatusPayload": {
+        "additionalProperties": false,
+        "properties": {
+          "evidence": {
+            "items": {
+              "$ref": "#/components/schemas/Evidence"
+            },
+            "maxItems": 50,
+            "title": "Evidence",
+            "type": "array"
+          },
+          "gateId": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Gateid",
+            "type": "string"
+          },
+          "role": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Role",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "not_applicable",
+              "pending",
+              "satisfied",
+              "failed"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "gateId",
+          "role",
+          "status"
+        ],
+        "title": "GateStatusPayload",
+        "type": "object"
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -12,6 +1674,669 @@
           }
         },
         "title": "HTTPValidationError",
+        "type": "object"
+      },
+      "HandoffCreatedEvent": {
+        "additionalProperties": false,
+        "properties": {
+          "actorId": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Actorid",
+            "type": "string"
+          },
+          "correlationId": {
+            "anyOf": [
+              {
+                "maxLength": 160,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Correlationid"
+          },
+          "eventId": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Eventid",
+            "type": "string"
+          },
+          "payload": {
+            "$ref": "#/components/schemas/HandoffCreatedPayload"
+          },
+          "sequence": {
+            "minimum": 0.0,
+            "title": "Sequence",
+            "type": "integer"
+          },
+          "sessionId": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Sessionid",
+            "type": "string"
+          },
+          "timestamp": {
+            "format": "date-time",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?(?:Z|[+-]\\d{2}:\\d{2})$",
+            "title": "Timestamp",
+            "type": "string"
+          },
+          "type": {
+            "const": "handoff.created",
+            "title": "Type",
+            "type": "string"
+          },
+          "version": {
+            "const": 1,
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "version",
+          "eventId",
+          "sessionId",
+          "sequence",
+          "timestamp",
+          "actorId",
+          "type",
+          "payload"
+        ],
+        "title": "HandoffCreatedEvent",
+        "type": "object"
+      },
+      "HandoffCreatedPayload": {
+        "additionalProperties": false,
+        "properties": {
+          "artifactIds": {
+            "items": {
+              "maxLength": 160,
+              "minLength": 1,
+              "type": "string"
+            },
+            "maxItems": 50,
+            "title": "Artifactids",
+            "type": "array"
+          },
+          "handoffId": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Handoffid",
+            "type": "string"
+          },
+          "sourceAssignmentId": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Sourceassignmentid",
+            "type": "string"
+          },
+          "summary": {
+            "maxLength": 4000,
+            "minLength": 1,
+            "title": "Summary",
+            "type": "string"
+          },
+          "targetAgentId": {
+            "anyOf": [
+              {
+                "maxLength": 160,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Targetagentid"
+          }
+        },
+        "required": [
+          "handoffId",
+          "sourceAssignmentId",
+          "summary"
+        ],
+        "title": "HandoffCreatedPayload",
+        "type": "object"
+      },
+      "LimitPayload": {
+        "additionalProperties": false,
+        "properties": {
+          "counter": {
+            "enum": [
+              "revisions",
+              "assignment_attempts",
+              "model_iterations",
+              "tool_calls",
+              "wall_clock_seconds",
+              "tokens",
+              "cost",
+              "parallel_read_only_assignments"
+            ],
+            "title": "Counter",
+            "type": "string"
+          },
+          "current": {
+            "minimum": 0.0,
+            "title": "Current",
+            "type": "number"
+          },
+          "fingerprint": {
+            "anyOf": [
+              {
+                "maxLength": 160,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fingerprint"
+          },
+          "hard": {
+            "title": "Hard",
+            "type": "boolean"
+          },
+          "occurrenceCount": {
+            "anyOf": [
+              {
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Occurrencecount"
+          },
+          "resolution": {
+            "enum": [
+              "ask_user",
+              "coordinator_decides",
+              "stop"
+            ],
+            "title": "Resolution",
+            "type": "string"
+          },
+          "scopeId": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Scopeid",
+            "type": "string"
+          },
+          "threshold": {
+            "minimum": 0.0,
+            "title": "Threshold",
+            "type": "number"
+          }
+        },
+        "required": [
+          "counter",
+          "scopeId",
+          "current",
+          "threshold",
+          "hard",
+          "resolution"
+        ],
+        "title": "LimitPayload",
+        "type": "object"
+      },
+      "LimitReachedEvent": {
+        "additionalProperties": false,
+        "properties": {
+          "actorId": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Actorid",
+            "type": "string"
+          },
+          "correlationId": {
+            "anyOf": [
+              {
+                "maxLength": 160,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Correlationid"
+          },
+          "eventId": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Eventid",
+            "type": "string"
+          },
+          "payload": {
+            "$ref": "#/components/schemas/LimitPayload"
+          },
+          "sequence": {
+            "minimum": 0.0,
+            "title": "Sequence",
+            "type": "integer"
+          },
+          "sessionId": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Sessionid",
+            "type": "string"
+          },
+          "timestamp": {
+            "format": "date-time",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?(?:Z|[+-]\\d{2}:\\d{2})$",
+            "title": "Timestamp",
+            "type": "string"
+          },
+          "type": {
+            "const": "limit.reached",
+            "title": "Type",
+            "type": "string"
+          },
+          "version": {
+            "const": 1,
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "version",
+          "eventId",
+          "sessionId",
+          "sequence",
+          "timestamp",
+          "actorId",
+          "type",
+          "payload"
+        ],
+        "title": "LimitReachedEvent",
+        "type": "object"
+      },
+      "LimitWarningEvent": {
+        "additionalProperties": false,
+        "properties": {
+          "actorId": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Actorid",
+            "type": "string"
+          },
+          "correlationId": {
+            "anyOf": [
+              {
+                "maxLength": 160,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Correlationid"
+          },
+          "eventId": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Eventid",
+            "type": "string"
+          },
+          "payload": {
+            "$ref": "#/components/schemas/LimitPayload"
+          },
+          "sequence": {
+            "minimum": 0.0,
+            "title": "Sequence",
+            "type": "integer"
+          },
+          "sessionId": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Sessionid",
+            "type": "string"
+          },
+          "timestamp": {
+            "format": "date-time",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?(?:Z|[+-]\\d{2}:\\d{2})$",
+            "title": "Timestamp",
+            "type": "string"
+          },
+          "type": {
+            "const": "limit.warning",
+            "title": "Type",
+            "type": "string"
+          },
+          "version": {
+            "const": 1,
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "version",
+          "eventId",
+          "sessionId",
+          "sequence",
+          "timestamp",
+          "actorId",
+          "type",
+          "payload"
+        ],
+        "title": "LimitWarningEvent",
+        "type": "object"
+      },
+      "MessageCompletedEvent": {
+        "additionalProperties": false,
+        "properties": {
+          "actorId": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Actorid",
+            "type": "string"
+          },
+          "correlationId": {
+            "anyOf": [
+              {
+                "maxLength": 160,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Correlationid"
+          },
+          "eventId": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Eventid",
+            "type": "string"
+          },
+          "payload": {
+            "$ref": "#/components/schemas/MessageCompletedPayload"
+          },
+          "sequence": {
+            "minimum": 0.0,
+            "title": "Sequence",
+            "type": "integer"
+          },
+          "sessionId": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Sessionid",
+            "type": "string"
+          },
+          "timestamp": {
+            "format": "date-time",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?(?:Z|[+-]\\d{2}:\\d{2})$",
+            "title": "Timestamp",
+            "type": "string"
+          },
+          "type": {
+            "const": "message.completed",
+            "title": "Type",
+            "type": "string"
+          },
+          "version": {
+            "const": 1,
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "version",
+          "eventId",
+          "sessionId",
+          "sequence",
+          "timestamp",
+          "actorId",
+          "type",
+          "payload"
+        ],
+        "title": "MessageCompletedEvent",
+        "type": "object"
+      },
+      "MessageCompletedPayload": {
+        "additionalProperties": false,
+        "properties": {
+          "messageId": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Messageid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "messageId"
+        ],
+        "title": "MessageCompletedPayload",
+        "type": "object"
+      },
+      "MessageCreatedEvent": {
+        "additionalProperties": false,
+        "properties": {
+          "actorId": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Actorid",
+            "type": "string"
+          },
+          "correlationId": {
+            "anyOf": [
+              {
+                "maxLength": 160,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Correlationid"
+          },
+          "eventId": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Eventid",
+            "type": "string"
+          },
+          "payload": {
+            "$ref": "#/components/schemas/MessageCreatedPayload"
+          },
+          "sequence": {
+            "minimum": 0.0,
+            "title": "Sequence",
+            "type": "integer"
+          },
+          "sessionId": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Sessionid",
+            "type": "string"
+          },
+          "timestamp": {
+            "format": "date-time",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?(?:Z|[+-]\\d{2}:\\d{2})$",
+            "title": "Timestamp",
+            "type": "string"
+          },
+          "type": {
+            "const": "message.created",
+            "title": "Type",
+            "type": "string"
+          },
+          "version": {
+            "const": 1,
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "version",
+          "eventId",
+          "sessionId",
+          "sequence",
+          "timestamp",
+          "actorId",
+          "type",
+          "payload"
+        ],
+        "title": "MessageCreatedEvent",
+        "type": "object"
+      },
+      "MessageCreatedPayload": {
+        "additionalProperties": false,
+        "properties": {
+          "authorId": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Authorid",
+            "type": "string"
+          },
+          "authorKind": {
+            "enum": [
+              "human",
+              "system",
+              "coordinator",
+              "agent"
+            ],
+            "title": "Authorkind",
+            "type": "string"
+          },
+          "content": {
+            "maxLength": 64000,
+            "minLength": 1,
+            "title": "Content",
+            "type": "string"
+          },
+          "mentionIds": {
+            "items": {
+              "maxLength": 160,
+              "minLength": 1,
+              "type": "string"
+            },
+            "maxItems": 50,
+            "title": "Mentionids",
+            "type": "array"
+          },
+          "messageId": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Messageid",
+            "type": "string"
+          },
+          "streaming": {
+            "default": false,
+            "title": "Streaming",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "messageId",
+          "authorId",
+          "authorKind",
+          "content"
+        ],
+        "title": "MessageCreatedPayload",
+        "type": "object"
+      },
+      "MessageDeltaEvent": {
+        "additionalProperties": false,
+        "properties": {
+          "actorId": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Actorid",
+            "type": "string"
+          },
+          "correlationId": {
+            "anyOf": [
+              {
+                "maxLength": 160,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Correlationid"
+          },
+          "eventId": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Eventid",
+            "type": "string"
+          },
+          "payload": {
+            "$ref": "#/components/schemas/MessageDeltaPayload"
+          },
+          "sequence": {
+            "minimum": 0.0,
+            "title": "Sequence",
+            "type": "integer"
+          },
+          "sessionId": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Sessionid",
+            "type": "string"
+          },
+          "timestamp": {
+            "format": "date-time",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?(?:Z|[+-]\\d{2}:\\d{2})$",
+            "title": "Timestamp",
+            "type": "string"
+          },
+          "type": {
+            "const": "message.delta",
+            "title": "Type",
+            "type": "string"
+          },
+          "version": {
+            "const": 1,
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "version",
+          "eventId",
+          "sessionId",
+          "sequence",
+          "timestamp",
+          "actorId",
+          "type",
+          "payload"
+        ],
+        "title": "MessageDeltaEvent",
+        "type": "object"
+      },
+      "MessageDeltaPayload": {
+        "additionalProperties": false,
+        "properties": {
+          "delta": {
+            "maxLength": 64000,
+            "minLength": 1,
+            "title": "Delta",
+            "type": "string"
+          },
+          "messageId": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Messageid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "messageId",
+          "delta"
+        ],
+        "title": "MessageDeltaPayload",
         "type": "object"
       },
       "ModelsListRequest": {
@@ -41,6 +2366,131 @@
           "api_key"
         ],
         "title": "ModelsListRequest",
+        "type": "object"
+      },
+      "ParticipantStatusChangedEvent": {
+        "additionalProperties": false,
+        "properties": {
+          "actorId": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Actorid",
+            "type": "string"
+          },
+          "correlationId": {
+            "anyOf": [
+              {
+                "maxLength": 160,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Correlationid"
+          },
+          "eventId": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Eventid",
+            "type": "string"
+          },
+          "payload": {
+            "$ref": "#/components/schemas/ParticipantStatusPayload"
+          },
+          "sequence": {
+            "minimum": 0.0,
+            "title": "Sequence",
+            "type": "integer"
+          },
+          "sessionId": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Sessionid",
+            "type": "string"
+          },
+          "timestamp": {
+            "format": "date-time",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?(?:Z|[+-]\\d{2}:\\d{2})$",
+            "title": "Timestamp",
+            "type": "string"
+          },
+          "type": {
+            "const": "participant.status_changed",
+            "title": "Type",
+            "type": "string"
+          },
+          "version": {
+            "const": 1,
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "version",
+          "eventId",
+          "sessionId",
+          "sequence",
+          "timestamp",
+          "actorId",
+          "type",
+          "payload"
+        ],
+        "title": "ParticipantStatusChangedEvent",
+        "type": "object"
+      },
+      "ParticipantStatusPayload": {
+        "additionalProperties": false,
+        "properties": {
+          "actionSummary": {
+            "anyOf": [
+              {
+                "maxLength": 4000,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actionsummary"
+          },
+          "participantId": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Participantid",
+            "type": "string"
+          },
+          "participantKind": {
+            "enum": [
+              "human",
+              "system",
+              "coordinator",
+              "agent"
+            ],
+            "title": "Participantkind",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "idle",
+              "working",
+              "waiting",
+              "paused",
+              "errored",
+              "stopped"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "participantId",
+          "participantKind",
+          "status"
+        ],
+        "title": "ParticipantStatusPayload",
         "type": "object"
       },
       "ProviderTestRequest": {
@@ -157,6 +2607,78 @@
         "title": "RoleConfigSchema",
         "type": "object"
       },
+      "SessionConfigurationUpdatedEvent": {
+        "additionalProperties": false,
+        "properties": {
+          "actorId": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Actorid",
+            "type": "string"
+          },
+          "correlationId": {
+            "anyOf": [
+              {
+                "maxLength": 160,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Correlationid"
+          },
+          "eventId": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Eventid",
+            "type": "string"
+          },
+          "payload": {
+            "$ref": "#/components/schemas/ConfigurationUpdatedPayload"
+          },
+          "sequence": {
+            "minimum": 0.0,
+            "title": "Sequence",
+            "type": "integer"
+          },
+          "sessionId": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Sessionid",
+            "type": "string"
+          },
+          "timestamp": {
+            "format": "date-time",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?(?:Z|[+-]\\d{2}:\\d{2})$",
+            "title": "Timestamp",
+            "type": "string"
+          },
+          "type": {
+            "const": "session.configuration_updated",
+            "title": "Type",
+            "type": "string"
+          },
+          "version": {
+            "const": 1,
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "version",
+          "eventId",
+          "sessionId",
+          "sequence",
+          "timestamp",
+          "actorId",
+          "type",
+          "payload"
+        ],
+        "title": "SessionConfigurationUpdatedEvent",
+        "type": "object"
+      },
       "SessionCreateRequest": {
         "properties": {
           "name": {
@@ -192,6 +2714,823 @@
           "role_configs"
         ],
         "title": "SessionCreateRequest",
+        "type": "object"
+      },
+      "SessionSnapshotEvent": {
+        "additionalProperties": false,
+        "properties": {
+          "actorId": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Actorid",
+            "type": "string"
+          },
+          "correlationId": {
+            "anyOf": [
+              {
+                "maxLength": 160,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Correlationid"
+          },
+          "eventId": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Eventid",
+            "type": "string"
+          },
+          "payload": {
+            "$ref": "#/components/schemas/SessionSnapshotPayload"
+          },
+          "sequence": {
+            "minimum": 0.0,
+            "title": "Sequence",
+            "type": "integer"
+          },
+          "sessionId": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Sessionid",
+            "type": "string"
+          },
+          "timestamp": {
+            "format": "date-time",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?(?:Z|[+-]\\d{2}:\\d{2})$",
+            "title": "Timestamp",
+            "type": "string"
+          },
+          "type": {
+            "const": "session.snapshot",
+            "title": "Type",
+            "type": "string"
+          },
+          "version": {
+            "const": 1,
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "version",
+          "eventId",
+          "sessionId",
+          "sequence",
+          "timestamp",
+          "actorId",
+          "type",
+          "payload"
+        ],
+        "title": "SessionSnapshotEvent",
+        "type": "object"
+      },
+      "SessionSnapshotPayload": {
+        "additionalProperties": false,
+        "properties": {
+          "lastSequence": {
+            "minimum": 0.0,
+            "title": "Lastsequence",
+            "type": "integer"
+          },
+          "status": {
+            "enum": [
+              "created",
+              "preparing",
+              "running",
+              "paused",
+              "waiting_approval",
+              "waiting_decision",
+              "completed",
+              "completed_partial",
+              "cancelled",
+              "failed"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "lastSequence"
+        ],
+        "title": "SessionSnapshotPayload",
+        "type": "object"
+      },
+      "SessionStatusChangedEvent": {
+        "additionalProperties": false,
+        "properties": {
+          "actorId": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Actorid",
+            "type": "string"
+          },
+          "correlationId": {
+            "anyOf": [
+              {
+                "maxLength": 160,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Correlationid"
+          },
+          "eventId": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Eventid",
+            "type": "string"
+          },
+          "payload": {
+            "$ref": "#/components/schemas/SessionStatusPayload"
+          },
+          "sequence": {
+            "minimum": 0.0,
+            "title": "Sequence",
+            "type": "integer"
+          },
+          "sessionId": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Sessionid",
+            "type": "string"
+          },
+          "timestamp": {
+            "format": "date-time",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?(?:Z|[+-]\\d{2}:\\d{2})$",
+            "title": "Timestamp",
+            "type": "string"
+          },
+          "type": {
+            "const": "session.status_changed",
+            "title": "Type",
+            "type": "string"
+          },
+          "version": {
+            "const": 1,
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "version",
+          "eventId",
+          "sessionId",
+          "sequence",
+          "timestamp",
+          "actorId",
+          "type",
+          "payload"
+        ],
+        "title": "SessionStatusChangedEvent",
+        "type": "object"
+      },
+      "SessionStatusPayload": {
+        "additionalProperties": false,
+        "properties": {
+          "reasonSummary": {
+            "anyOf": [
+              {
+                "maxLength": 4000,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reasonsummary"
+          },
+          "status": {
+            "enum": [
+              "created",
+              "preparing",
+              "running",
+              "paused",
+              "waiting_approval",
+              "waiting_decision",
+              "completed",
+              "completed_partial",
+              "cancelled",
+              "failed"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "title": "SessionStatusPayload",
+        "type": "object"
+      },
+      "TimelinePageResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "events": {
+            "items": {
+              "discriminator": {
+                "mapping": {
+                  "approval.requested": "#/components/schemas/ApprovalRequestedEvent",
+                  "approval.resolved": "#/components/schemas/ApprovalResolvedEvent",
+                  "artifact.diff_updated": "#/components/schemas/ArtifactDiffUpdatedEvent",
+                  "assignment.cancelled": "#/components/schemas/AssignmentCancelledEvent",
+                  "assignment.completed": "#/components/schemas/AssignmentCompletedEvent",
+                  "assignment.created": "#/components/schemas/AssignmentCreatedEvent",
+                  "assignment.failed": "#/components/schemas/AssignmentFailedEvent",
+                  "assignment.proposed": "#/components/schemas/AssignmentProposedEvent",
+                  "assignment.started": "#/components/schemas/AssignmentStartedEvent",
+                  "decision.recorded": "#/components/schemas/DecisionRecordedEvent",
+                  "decision.requested": "#/components/schemas/DecisionRequestedEvent",
+                  "error.created": "#/components/schemas/ErrorCreatedEvent",
+                  "gate.status_changed": "#/components/schemas/GateStatusChangedEvent",
+                  "handoff.created": "#/components/schemas/HandoffCreatedEvent",
+                  "limit.reached": "#/components/schemas/LimitReachedEvent",
+                  "limit.warning": "#/components/schemas/LimitWarningEvent",
+                  "message.completed": "#/components/schemas/MessageCompletedEvent",
+                  "message.created": "#/components/schemas/MessageCreatedEvent",
+                  "message.delta": "#/components/schemas/MessageDeltaEvent",
+                  "participant.status_changed": "#/components/schemas/ParticipantStatusChangedEvent",
+                  "session.configuration_updated": "#/components/schemas/SessionConfigurationUpdatedEvent",
+                  "session.snapshot": "#/components/schemas/SessionSnapshotEvent",
+                  "session.status_changed": "#/components/schemas/SessionStatusChangedEvent",
+                  "tool.completed": "#/components/schemas/ToolCompletedEvent",
+                  "tool.requested": "#/components/schemas/ToolRequestedEvent",
+                  "tool.started": "#/components/schemas/ToolStartedEvent",
+                  "usage.updated": "#/components/schemas/UsageUpdatedEvent"
+                },
+                "propertyName": "type"
+              },
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/SessionSnapshotEvent"
+                },
+                {
+                  "$ref": "#/components/schemas/SessionStatusChangedEvent"
+                },
+                {
+                  "$ref": "#/components/schemas/ParticipantStatusChangedEvent"
+                },
+                {
+                  "$ref": "#/components/schemas/MessageCreatedEvent"
+                },
+                {
+                  "$ref": "#/components/schemas/MessageDeltaEvent"
+                },
+                {
+                  "$ref": "#/components/schemas/MessageCompletedEvent"
+                },
+                {
+                  "$ref": "#/components/schemas/SessionConfigurationUpdatedEvent"
+                },
+                {
+                  "$ref": "#/components/schemas/AssignmentProposedEvent"
+                },
+                {
+                  "$ref": "#/components/schemas/AssignmentCreatedEvent"
+                },
+                {
+                  "$ref": "#/components/schemas/AssignmentStartedEvent"
+                },
+                {
+                  "$ref": "#/components/schemas/AssignmentCompletedEvent"
+                },
+                {
+                  "$ref": "#/components/schemas/AssignmentFailedEvent"
+                },
+                {
+                  "$ref": "#/components/schemas/AssignmentCancelledEvent"
+                },
+                {
+                  "$ref": "#/components/schemas/HandoffCreatedEvent"
+                },
+                {
+                  "$ref": "#/components/schemas/ToolRequestedEvent"
+                },
+                {
+                  "$ref": "#/components/schemas/ToolStartedEvent"
+                },
+                {
+                  "$ref": "#/components/schemas/ToolCompletedEvent"
+                },
+                {
+                  "$ref": "#/components/schemas/ApprovalRequestedEvent"
+                },
+                {
+                  "$ref": "#/components/schemas/ApprovalResolvedEvent"
+                },
+                {
+                  "$ref": "#/components/schemas/LimitWarningEvent"
+                },
+                {
+                  "$ref": "#/components/schemas/LimitReachedEvent"
+                },
+                {
+                  "$ref": "#/components/schemas/DecisionRequestedEvent"
+                },
+                {
+                  "$ref": "#/components/schemas/DecisionRecordedEvent"
+                },
+                {
+                  "$ref": "#/components/schemas/GateStatusChangedEvent"
+                },
+                {
+                  "$ref": "#/components/schemas/ArtifactDiffUpdatedEvent"
+                },
+                {
+                  "$ref": "#/components/schemas/UsageUpdatedEvent"
+                },
+                {
+                  "$ref": "#/components/schemas/ErrorCreatedEvent"
+                }
+              ]
+            },
+            "title": "Events",
+            "type": "array"
+          },
+          "nextAfterSequence": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nextaftersequence"
+          }
+        },
+        "required": [
+          "events"
+        ],
+        "title": "TimelinePageResponse",
+        "type": "object"
+      },
+      "ToolCompletedEvent": {
+        "additionalProperties": false,
+        "properties": {
+          "actorId": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Actorid",
+            "type": "string"
+          },
+          "correlationId": {
+            "anyOf": [
+              {
+                "maxLength": 160,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Correlationid"
+          },
+          "eventId": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Eventid",
+            "type": "string"
+          },
+          "payload": {
+            "$ref": "#/components/schemas/ToolCompletedPayload"
+          },
+          "sequence": {
+            "minimum": 0.0,
+            "title": "Sequence",
+            "type": "integer"
+          },
+          "sessionId": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Sessionid",
+            "type": "string"
+          },
+          "timestamp": {
+            "format": "date-time",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?(?:Z|[+-]\\d{2}:\\d{2})$",
+            "title": "Timestamp",
+            "type": "string"
+          },
+          "type": {
+            "const": "tool.completed",
+            "title": "Type",
+            "type": "string"
+          },
+          "version": {
+            "const": 1,
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "version",
+          "eventId",
+          "sessionId",
+          "sequence",
+          "timestamp",
+          "actorId",
+          "type",
+          "payload"
+        ],
+        "title": "ToolCompletedEvent",
+        "type": "object"
+      },
+      "ToolCompletedPayload": {
+        "additionalProperties": false,
+        "properties": {
+          "artifactIds": {
+            "items": {
+              "maxLength": 160,
+              "minLength": 1,
+              "type": "string"
+            },
+            "maxItems": 50,
+            "title": "Artifactids",
+            "type": "array"
+          },
+          "assignmentId": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Assignmentid",
+            "type": "string"
+          },
+          "durationMs": {
+            "minimum": 0.0,
+            "title": "Durationms",
+            "type": "integer"
+          },
+          "resultSummary": {
+            "maxLength": 4000,
+            "minLength": 1,
+            "title": "Resultsummary",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "succeeded",
+              "failed",
+              "cancelled"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "toolExecutionId": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Toolexecutionid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "toolExecutionId",
+          "assignmentId",
+          "status",
+          "resultSummary",
+          "durationMs"
+        ],
+        "title": "ToolCompletedPayload",
+        "type": "object"
+      },
+      "ToolRequestedEvent": {
+        "additionalProperties": false,
+        "properties": {
+          "actorId": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Actorid",
+            "type": "string"
+          },
+          "correlationId": {
+            "anyOf": [
+              {
+                "maxLength": 160,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Correlationid"
+          },
+          "eventId": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Eventid",
+            "type": "string"
+          },
+          "payload": {
+            "$ref": "#/components/schemas/ToolRequestedPayload"
+          },
+          "sequence": {
+            "minimum": 0.0,
+            "title": "Sequence",
+            "type": "integer"
+          },
+          "sessionId": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Sessionid",
+            "type": "string"
+          },
+          "timestamp": {
+            "format": "date-time",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?(?:Z|[+-]\\d{2}:\\d{2})$",
+            "title": "Timestamp",
+            "type": "string"
+          },
+          "type": {
+            "const": "tool.requested",
+            "title": "Type",
+            "type": "string"
+          },
+          "version": {
+            "const": 1,
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "version",
+          "eventId",
+          "sessionId",
+          "sequence",
+          "timestamp",
+          "actorId",
+          "type",
+          "payload"
+        ],
+        "title": "ToolRequestedEvent",
+        "type": "object"
+      },
+      "ToolRequestedPayload": {
+        "additionalProperties": false,
+        "properties": {
+          "assignmentId": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Assignmentid",
+            "type": "string"
+          },
+          "operationClass": {
+            "enum": [
+              "read_only",
+              "mutating"
+            ],
+            "title": "Operationclass",
+            "type": "string"
+          },
+          "requestSummary": {
+            "maxLength": 4000,
+            "minLength": 1,
+            "title": "Requestsummary",
+            "type": "string"
+          },
+          "toolExecutionId": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Toolexecutionid",
+            "type": "string"
+          },
+          "toolName": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Toolname",
+            "type": "string"
+          }
+        },
+        "required": [
+          "toolExecutionId",
+          "assignmentId",
+          "toolName",
+          "operationClass",
+          "requestSummary"
+        ],
+        "title": "ToolRequestedPayload",
+        "type": "object"
+      },
+      "ToolStartedEvent": {
+        "additionalProperties": false,
+        "properties": {
+          "actorId": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Actorid",
+            "type": "string"
+          },
+          "correlationId": {
+            "anyOf": [
+              {
+                "maxLength": 160,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Correlationid"
+          },
+          "eventId": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Eventid",
+            "type": "string"
+          },
+          "payload": {
+            "$ref": "#/components/schemas/ToolStartedPayload"
+          },
+          "sequence": {
+            "minimum": 0.0,
+            "title": "Sequence",
+            "type": "integer"
+          },
+          "sessionId": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Sessionid",
+            "type": "string"
+          },
+          "timestamp": {
+            "format": "date-time",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?(?:Z|[+-]\\d{2}:\\d{2})$",
+            "title": "Timestamp",
+            "type": "string"
+          },
+          "type": {
+            "const": "tool.started",
+            "title": "Type",
+            "type": "string"
+          },
+          "version": {
+            "const": 1,
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "version",
+          "eventId",
+          "sessionId",
+          "sequence",
+          "timestamp",
+          "actorId",
+          "type",
+          "payload"
+        ],
+        "title": "ToolStartedEvent",
+        "type": "object"
+      },
+      "ToolStartedPayload": {
+        "additionalProperties": false,
+        "properties": {
+          "assignmentId": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Assignmentid",
+            "type": "string"
+          },
+          "toolExecutionId": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Toolexecutionid",
+            "type": "string"
+          },
+          "toolName": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Toolname",
+            "type": "string"
+          }
+        },
+        "required": [
+          "toolExecutionId",
+          "assignmentId",
+          "toolName"
+        ],
+        "title": "ToolStartedPayload",
+        "type": "object"
+      },
+      "UsageUpdatedEvent": {
+        "additionalProperties": false,
+        "properties": {
+          "actorId": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Actorid",
+            "type": "string"
+          },
+          "correlationId": {
+            "anyOf": [
+              {
+                "maxLength": 160,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Correlationid"
+          },
+          "eventId": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Eventid",
+            "type": "string"
+          },
+          "payload": {
+            "$ref": "#/components/schemas/UsageUpdatedPayload"
+          },
+          "sequence": {
+            "minimum": 0.0,
+            "title": "Sequence",
+            "type": "integer"
+          },
+          "sessionId": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Sessionid",
+            "type": "string"
+          },
+          "timestamp": {
+            "format": "date-time",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?(?:Z|[+-]\\d{2}:\\d{2})$",
+            "title": "Timestamp",
+            "type": "string"
+          },
+          "type": {
+            "const": "usage.updated",
+            "title": "Type",
+            "type": "string"
+          },
+          "version": {
+            "const": 1,
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "version",
+          "eventId",
+          "sessionId",
+          "sequence",
+          "timestamp",
+          "actorId",
+          "type",
+          "payload"
+        ],
+        "title": "UsageUpdatedEvent",
+        "type": "object"
+      },
+      "UsageUpdatedPayload": {
+        "additionalProperties": false,
+        "properties": {
+          "durationMs": {
+            "minimum": 0.0,
+            "title": "Durationms",
+            "type": "integer"
+          },
+          "inputTokens": {
+            "minimum": 0.0,
+            "title": "Inputtokens",
+            "type": "integer"
+          },
+          "normalizedCost": {
+            "minimum": 0.0,
+            "title": "Normalizedcost",
+            "type": "number"
+          },
+          "outputTokens": {
+            "minimum": 0.0,
+            "title": "Outputtokens",
+            "type": "integer"
+          },
+          "scopeId": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Scopeid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "scopeId",
+          "inputTokens",
+          "outputTokens",
+          "normalizedCost",
+          "durationMs"
+        ],
+        "title": "UsageUpdatedPayload",
         "type": "object"
       },
       "ValidationError": {
@@ -540,6 +3879,143 @@
           }
         },
         "summary": "Get Session",
+        "tags": [
+          "sessions"
+        ]
+      }
+    },
+    "/sessions/{session_id}/artifacts": {
+      "get": {
+        "description": "Return bounded artifact metadata using a stable created-at/id cursor.",
+        "operationId": "get_artifact_summaries_sessions__session_id__artifacts_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "title": "Session Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ArtifactPageResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Artifact Summaries",
+        "tags": [
+          "sessions"
+        ]
+      }
+    },
+    "/sessions/{session_id}/timeline": {
+      "get": {
+        "description": "Return one indexed timeline page; never hydrate the full event log.",
+        "operationId": "get_timeline_page_sessions__session_id__timeline_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "title": "Session Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "after_sequence",
+            "required": false,
+            "schema": {
+              "default": -1,
+              "minimum": -1,
+              "title": "After Sequence",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 100,
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TimelinePageResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Timeline Page",
         "tags": [
           "sessions"
         ]
