@@ -8,7 +8,7 @@ from app.tools.shell_tools import shell_exec
 from app.tools.search_tools import search_files
 from app.tools.git_tools import git_status, git_diff, git_commit
 from app.db.database import get_db
-from app.schemas.events import WSEvent, WSEventType
+from app.db.repositories import SessionRepository
 
 router = APIRouter()
 
@@ -21,18 +21,20 @@ async def session_websocket(websocket: WebSocket, session_id: str):
 
     try:
         # Load session config from DB
-        async with await get_db() as db:
-            async with db.execute("SELECT * FROM sessions WHERE id = ?", (session_id,)) as cursor:
-                row = await cursor.fetchone()
+        db = await get_db()
+        try:
+            row = await SessionRepository(db).get_runtime_session(session_id)
+        finally:
+            await db.close()
 
         if not row:
             await websocket.send_json({"type": "error", "data": {"message": "Session not found"}})
             await websocket.close(1008)
             return
 
-        role_configs_raw = json.loads(row["role_configs"])
-        project_path = row["project_path"]
-        task = row["task"]
+        role_configs_raw = json.loads(row.role_configs_json)
+        project_path = row.project_path
+        task = row.task
 
         # Compile graph
         graph = await compile_graph(session_id, role_configs_raw, tools=ALL_TOOLS)
@@ -132,9 +134,11 @@ async def session_websocket(websocket: WebSocket, session_id: str):
         await send({"type": "session_complete", "session_id": session_id, "timestamp": time.time()})
 
         # Update session status in DB
-        async with await get_db() as db:
-            await db.execute("UPDATE sessions SET status = 'completed' WHERE id = ?", (session_id,))
-            await db.commit()
+        db = await get_db()
+        try:
+            await SessionRepository(db).set_status(session_id, "completed")
+        finally:
+            await db.close()
 
     except WebSocketDisconnect:
         print(f"[WS] Client disconnected from session {session_id}")

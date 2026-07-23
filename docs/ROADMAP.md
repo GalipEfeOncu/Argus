@@ -329,7 +329,7 @@ using typed simulation, with no dependency on a live provider.
 
 ## Phase 2 — Durable control plane and isolated workspace
 
-### 2.1 SQLite schema and migrations
+### 2.1 SQLite schema and migrations (✅ Completed)
 
 Deliverables:
 
@@ -347,6 +347,21 @@ Tests:
 
 - Fresh database, upgrade from current schema, interrupted migration rollback,
   uniqueness, event sequence concurrency, projection rebuild, and secret scan.
+
+Current status (2026-07-23):
+
+- ✅ SQLite now upgrades through recorded, checksummed, transactional migrations.
+  The pre-migration prototype schema remains readable while the durable control
+  plane adds every Phase 2 persistence table, foreign-key relationships,
+  uniqueness constraints, and bounded-read indexes.
+- ✅ Backend HTTP/WebSocket handlers use repositories for session persistence;
+  orchestration SQL and transaction boundaries live below the API layer.
+- ✅ Event writes allocate a unique per-session sequence in one transaction;
+  immutable event projection rebuild and rejection of recognizable credentials
+  or private-reasoning fields are covered by backend tests.
+- ✅ The Phase 2.1 acceptance tests cover fresh initialization, prototype
+  upgrade, simulated interrupted migration rollback, concurrent sequencing,
+  projection rebuild equivalence, and persistence secret scanning.
 
 ### 2.2 Event store and command processor
 
