@@ -5,19 +5,16 @@ from datetime import datetime
 import uuid
 from fastapi import APIRouter, Query, WebSocket, WebSocketDisconnect
 from app.agents.graph import compile_graph
-from app.tools.file_tools import read_file, write_file, edit_file, list_dir
-from app.tools.shell_tools import shell_exec
-from app.tools.search_tools import search_files
-from app.tools.git_tools import git_status, git_diff, git_commit
 from app.db.database import get_db
 from app.db.repositories import EventRepository, SessionRepository
 from app.schemas.session_commands import parse_session_command
 from app.services.command_processor import CommandProcessor, CommandRejected, event_wire_value
+from app.services.workspace_service import ProjectWorkspaceService, WorkspaceError
+from app.tools.scoped_tools import create_scoped_tools
+from pathlib import Path
+from app.config import settings
 
 router = APIRouter()
-
-ALL_TOOLS = [read_file, write_file, edit_file, list_dir, shell_exec, search_files, git_status, git_diff, git_commit]
-
 
 class SessionConnectionHub:
     """In-process shared-room fan-out with bounded slow-client delivery."""
@@ -130,8 +127,20 @@ async def session_websocket(websocket: WebSocket, session_id: str):
         project_path = row.project_path
         task = row.task
 
-        # Compile graph
-        graph = await compile_graph(session_id, role_configs_raw, tools=ALL_TOOLS)
+        # A model cannot choose a filesystem root: tools capture the workspace
+        # prepared for this session. Legacy sessions without that durable
+        # boundary are intentionally unable to invoke project tools.
+        db = await get_db()
+        try:
+            managed_root = Path(settings.db_path).expanduser().resolve().parent / "workspaces"
+            workspace = await ProjectWorkspaceService(db, managed_root=managed_root).workspace_for_session(session_id)
+        except WorkspaceError:
+            await websocket.send_json({"type": "error", "data": {"message": "Session workspace is not prepared"}})
+            await websocket.close(1008)
+            return
+        finally:
+            await db.close()
+        graph = await compile_graph(session_id, role_configs_raw, tools=create_scoped_tools(workspace))
         config = {"configurable": {"thread_id": session_id}}
 
         # Initial state

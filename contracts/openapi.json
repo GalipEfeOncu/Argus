@@ -1663,6 +1663,64 @@
         "title": "GateStatusPayload",
         "type": "object"
       },
+      "GitMetadataResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "caseSensitive": {
+            "title": "Casesensitive",
+            "type": "boolean"
+          },
+          "containsSymlinks": {
+            "default": false,
+            "title": "Containssymlinks",
+            "type": "boolean"
+          },
+          "dirty": {
+            "default": false,
+            "title": "Dirty",
+            "type": "boolean"
+          },
+          "head": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Head"
+          },
+          "isGit": {
+            "title": "Isgit",
+            "type": "boolean"
+          },
+          "nestedRepositoryPaths": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Nestedrepositorypaths",
+            "type": "array"
+          },
+          "rootPath": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rootpath"
+          }
+        },
+        "required": [
+          "isGit",
+          "caseSensitive"
+        ],
+        "title": "GitMetadataResponse",
+        "type": "object"
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -2493,6 +2551,75 @@
         "title": "ParticipantStatusPayload",
         "type": "object"
       },
+      "ProjectRegisterRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "displayName": {
+            "anyOf": [
+              {
+                "maxLength": 256,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Displayname"
+          },
+          "path": {
+            "maxLength": 4096,
+            "minLength": 1,
+            "title": "Path",
+            "type": "string"
+          }
+        },
+        "required": [
+          "path"
+        ],
+        "title": "ProjectRegisterRequest",
+        "type": "object"
+      },
+      "ProjectResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "canonicalPath": {
+            "title": "Canonicalpath",
+            "type": "string"
+          },
+          "createdAtMs": {
+            "title": "Createdatms",
+            "type": "integer"
+          },
+          "displayName": {
+            "title": "Displayname",
+            "type": "string"
+          },
+          "gitMetadata": {
+            "$ref": "#/components/schemas/GitMetadataResponse"
+          },
+          "id": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Id",
+            "type": "string"
+          },
+          "updatedAtMs": {
+            "title": "Updatedatms",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "canonicalPath",
+          "displayName",
+          "gitMetadata",
+          "createdAtMs",
+          "updatedAtMs"
+        ],
+        "title": "ProjectResponse",
+        "type": "object"
+      },
       "ProviderTestRequest": {
         "properties": {
           "api_key": {
@@ -2681,6 +2808,11 @@
       },
       "SessionCreateRequest": {
         "properties": {
+          "acknowledge_direct_write": {
+            "default": false,
+            "title": "Acknowledge Direct Write",
+            "type": "boolean"
+          },
           "name": {
             "anyOf": [
               {
@@ -2706,6 +2838,16 @@
           "task": {
             "title": "Task",
             "type": "string"
+          },
+          "workspace_mode": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/WorkspaceMode"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "required": [
@@ -3572,6 +3714,15 @@
         ],
         "title": "ValidationError",
         "type": "object"
+      },
+      "WorkspaceMode": {
+        "enum": [
+          "worktree",
+          "snapshot",
+          "direct_write"
+        ],
+        "title": "WorkspaceMode",
+        "type": "string"
       }
     }
   },
@@ -3662,6 +3813,70 @@
         "summary": "List Available Models",
         "tags": [
           "models"
+        ]
+      }
+    },
+    "/projects/": {
+      "get": {
+        "operationId": "list_projects_projects__get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ProjectResponse"
+                  },
+                  "title": "Response List Projects Projects  Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Projects",
+        "tags": [
+          "projects"
+        ]
+      },
+      "post": {
+        "operationId": "register_project_projects__post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProjectRegisterRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Register Project",
+        "tags": [
+          "projects"
         ]
       }
     },

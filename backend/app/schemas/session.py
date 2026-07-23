@@ -1,6 +1,7 @@
 from pydantic import BaseModel
 from typing import Optional
 from enum import Enum
+from app.schemas.project import WorkspaceMode
 
 
 class SessionStatus(str, Enum):
@@ -25,6 +26,8 @@ class SessionCreateRequest(BaseModel):
     task: str
     role_configs: list[RoleConfigSchema]
     name: Optional[str] = None
+    workspace_mode: WorkspaceMode | None = None
+    acknowledge_direct_write: bool = False
 
 
 class SessionResponse(BaseModel):

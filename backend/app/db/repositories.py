@@ -78,7 +78,8 @@ class SessionRepository:
         self._db = db
 
     async def create_legacy_session(
-        self, *, session_id: str, name: str, project_path: str, task: str, role_configs: list[dict[str, Any]]
+        self, *, session_id: str, name: str, project_path: str, task: str, role_configs: list[dict[str, Any]],
+        project_id: str | None = None,
     ) -> None:
         now_ms = _now_ms()
         safe_name = _safe_text(name)
@@ -88,13 +89,25 @@ class SessionRepository:
             await self._db.execute(
                 """INSERT INTO sessions (
                     id, name, project_path, task, status, role_configs, started_at,
-                    goal, created_at_ms, updated_at_ms
-                ) VALUES (?, ?, ?, ?, 'setup', ?, ?, ?, ?, ?)""",
+                    goal, created_at_ms, updated_at_ms, project_id
+                ) VALUES (?, ?, ?, ?, 'setup', ?, ?, ?, ?, ?, ?)""",
                 (
                     session_id, safe_name, safe_project_path, safe_task, _safe_json(role_configs),
-                    now_ms, safe_task, now_ms, now_ms,
+                    now_ms, safe_task, now_ms, now_ms, project_id,
                 ),
             )
+
+    async def set_workspace_path(self, session_id: str, workspace_path: str) -> None:
+        async with transaction(self._db):
+            await self._db.execute(
+                "UPDATE sessions SET project_path = ?, updated_at_ms = ? WHERE id = ?",
+                (_safe_text(workspace_path), _now_ms(), session_id),
+            )
+
+    async def discard_unstarted_session(self, session_id: str) -> None:
+        """Remove a session only when initial workspace provisioning failed."""
+        async with transaction(self._db):
+            await self._db.execute("DELETE FROM sessions WHERE id = ? AND status = 'setup'", (session_id,))
 
     async def list_legacy_sessions(self, *, limit: int = 50) -> list[dict[str, Any]]:
         async with self._db.execute(

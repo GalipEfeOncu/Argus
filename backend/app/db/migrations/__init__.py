@@ -15,7 +15,14 @@ import time
 
 import aiosqlite
 
-from app.db.migrations import v0001_legacy, v0002_control_plane, v0003_integrity_hardening, v0004_event_store
+from app.db.migrations import (
+    v0001_legacy,
+    v0002_control_plane,
+    v0003_integrity_hardening,
+    v0004_event_store,
+    v0005_workspace_service,
+    v0006_writer_lease_history,
+)
 
 
 MigrationFunction = Callable[[aiosqlite.Connection], Awaitable[None]]
@@ -42,6 +49,8 @@ MIGRATIONS: tuple[Migration, ...] = (
     Migration(2, "durable_control_plane", v0002_control_plane.apply),
     Migration(3, "persistence_integrity_hardening", v0003_integrity_hardening.apply),
     Migration(4, "event_store_and_command_receipts", v0004_event_store.apply),
+    Migration(5, "project_workspace_service", v0005_workspace_service.apply),
+    Migration(6, "writer_lease_history", v0006_writer_lease_history.apply),
 )
 
 

@@ -317,6 +317,30 @@ hydrates artifact bodies or the complete event log.
 
 REST schemas are generated from FastAPI OpenAPI. Clients must not hand-maintain duplicate request/response interfaces.
 
+### Project registration
+
+`POST /projects` registers an existing local directory before it can be used by
+a session. The request is `{ "path": "…", "displayName": "optional" }`.
+The backend resolves and persists the canonical path, rather than preserving a
+user-supplied spelling. The response includes a stable project ID and git
+inspection metadata: repository root and head, dirty state, nested repository
+paths, symbolic-link presence, and filesystem case-sensitivity.
+
+Registration rejects non-directories, filesystem roots, paths that cannot be
+inspected safely, and a subdirectory of a git repository. `GET /projects`
+returns those durable registrations. Project registration never copies or
+modifies project files except for an immediately removed case-sensitivity probe.
+
+Workspace creation is owned by the session service. `POST /sessions` accepts an
+optional `workspace_mode` (`worktree`, `snapshot`, or `direct_write`) and
+`acknowledge_direct_write: true`; omitting the mode selects worktree for git
+projects and snapshot otherwise. `worktree` creates an
+`argus/{sessionId}` branch below the managed Argus workspace root; non-git
+projects use a managed copy-on-write `snapshot`. The backend rejects
+`direct_write` without that separate, explicit acknowledgement and records the
+choice in workspace audit history. Each accepted mutation records a content
+checksum and a bounded diff-summary artifact.
+
 ## Generated contract artifacts
 
 `npm run generate:contracts` is the only regeneration command. It exports the

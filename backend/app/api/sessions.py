@@ -6,6 +6,10 @@ from app.db.database import get_db
 from app.db.repositories import EventRepository, SessionRepository
 from app.schemas.session_store import ArtifactPageResponse, TimelinePageResponse
 from app.services.command_processor import event_wire_value
+from app.services.workspace_service import ProjectWorkspaceService, WorkspaceError
+from app.schemas.project import WorkspaceMode
+from app.config import settings
+from pathlib import Path
 
 router = APIRouter()
 
@@ -17,10 +21,27 @@ async def create_session(req: SessionCreateRequest):
 
     db = await get_db()
     try:
-        await SessionRepository(db).create_legacy_session(
-            session_id=session_id, name=name, project_path=req.project_path, task=req.task,
-            role_configs=[role_config.model_dump() for role_config in req.role_configs],
+        workspace_service = ProjectWorkspaceService(
+            db, managed_root=Path(settings.db_path).expanduser().resolve().parent / "workspaces"
         )
+        project = await workspace_service.register_project(req.project_path)
+        await SessionRepository(db).create_legacy_session(
+            session_id=session_id, name=name, project_path=project["canonicalPath"], task=req.task,
+            role_configs=[role_config.model_dump() for role_config in req.role_configs],
+            project_id=str(project["id"]),
+        )
+        mode = req.workspace_mode or (WorkspaceMode.worktree if project["gitMetadata"]["isGit"] else WorkspaceMode.snapshot)
+        try:
+            workspace = await workspace_service.prepare_workspace(
+                session_id=session_id, project_id=str(project["id"]), mode=mode,
+                acknowledged_direct_write=req.acknowledge_direct_write,
+            )
+        except BaseException:
+            await SessionRepository(db).discard_unstarted_session(session_id)
+            raise
+        await SessionRepository(db).set_workspace_path(session_id, str(workspace.root_path))
+    except (WorkspaceError, OSError) as error:
+        raise HTTPException(422, {"code": "workspace_setup_failed", "message": str(error)}) from error
     finally:
         await db.close()
 

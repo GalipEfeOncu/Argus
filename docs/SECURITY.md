@@ -68,6 +68,16 @@ The backend, not an agent prompt, enforces agent-pool membership, required-role
 eligibility, workspace bounds, command policy, approval state, budgets,
 timeouts, and cancellation. Prompts must not be treated as a security boundary.
 
+Workspace paths are canonicalized before registration and every tool target is
+resolved relative to the selected session workspace. Parent traversal and
+symbolic-link paths are denied. Shell execution accepts an argument vector, not
+a shell expression; destructive commands and shell interpreters are denied and
+credential-like environment variables are not forwarded. Commands that can run
+project-controlled code (tests, package scripts, build tools) require an
+OS-level workspace sandbox; when that sandbox is unavailable they are denied
+rather than run unsandboxed. Lease acquisition, renewal, expiry recovery, and
+release are durable audit records.
+
 ## Reporting
 
 Until a dedicated security contact is published, report vulnerabilities privately to the repository owner and do not include exploitable details in public issues.

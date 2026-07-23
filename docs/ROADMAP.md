@@ -393,7 +393,7 @@ Current status (2026-07-23):
   pages, and artifact-summary cursor pages are persisted and covered by query
   plan and 10,000-event bounded-page tests.
 
-### 2.3 Project and workspace service
+### 2.3 Project and workspace service (✅ Completed)
 
 Deliverables:
 
@@ -411,6 +411,21 @@ Security tests:
 - `..` escape, symlink escape/race, shell injection, environment secret
   redaction, destructive command denial, lock contention, stale lease recovery,
   original-directory protection, and cleanup after crash.
+
+Current status (2026-07-24):
+
+- ✅ Local projects are canonicalized and registered with git, dirty-tree,
+  nested-repository, symbolic-link, and case-sensitivity inspection. Sessions
+  provision a managed git worktree by default or a non-git snapshot; direct
+  writes require an explicit acknowledged request.
+- ✅ Session-bound tools use descriptor-relative path checks, no-follow snapshot
+  copying, argv-only execution, constrained read commands, and an OS sandbox
+  requirement for project-controlled test/build commands. Mutations acquire a
+  writer lease, create a checksummed diff artifact, and leave an audit record.
+- ✅ Durable project locks and writer leases support renewal, stale recovery,
+  release/reacquisition, startup orphan cleanup, and focused security coverage
+  for escapes, symlink races, command denial, secret forwarding, isolation, and
+  crash recovery.
 
 ### 2.4 Session configuration service
 

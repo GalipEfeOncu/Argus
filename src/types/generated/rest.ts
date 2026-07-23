@@ -79,6 +79,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/projects/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Projects */
+        get: operations["list_projects_projects__get"];
+        put?: never;
+        /** Register Project */
+        post: operations["register_project_projects__post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/providers/models": {
         parameters: {
             query?: never;
@@ -791,6 +809,29 @@ export interface components {
              */
             status: "not_applicable" | "pending" | "satisfied" | "failed";
         };
+        /** GitMetadataResponse */
+        GitMetadataResponse: {
+            /** Casesensitive */
+            caseSensitive: boolean;
+            /**
+             * Containssymlinks
+             * @default false
+             */
+            containsSymlinks: boolean;
+            /**
+             * Dirty
+             * @default false
+             */
+            dirty: boolean;
+            /** Head */
+            head?: string | null;
+            /** Isgit */
+            isGit: boolean;
+            /** Nestedrepositorypaths */
+            nestedRepositoryPaths?: string[];
+            /** Rootpath */
+            rootPath?: string | null;
+        };
         /** HandoffCreatedEvent */
         HandoffCreatedEvent: {
             /** Actorid */
@@ -1096,6 +1137,27 @@ export interface components {
              */
             status: "idle" | "working" | "waiting" | "paused" | "errored" | "stopped";
         };
+        /** ProjectRegisterRequest */
+        ProjectRegisterRequest: {
+            /** Displayname */
+            displayName?: string | null;
+            /** Path */
+            path: string;
+        };
+        /** ProjectResponse */
+        ProjectResponse: {
+            /** Canonicalpath */
+            canonicalPath: string;
+            /** Createdatms */
+            createdAtMs: number;
+            /** Displayname */
+            displayName: string;
+            gitMetadata: components["schemas"]["GitMetadataResponse"];
+            /** Id */
+            id: string;
+            /** Updatedatms */
+            updatedAtMs: number;
+        };
         /** ProviderTestRequest */
         ProviderTestRequest: {
             /** Api Key */
@@ -1163,6 +1225,11 @@ export interface components {
         };
         /** SessionCreateRequest */
         SessionCreateRequest: {
+            /**
+             * Acknowledge Direct Write
+             * @default false
+             */
+            acknowledge_direct_write: boolean;
             /** Name */
             name?: string | null;
             /** Project Path */
@@ -1171,6 +1238,7 @@ export interface components {
             role_configs: components["schemas"]["RoleConfigSchema"][];
             /** Task */
             task: string;
+            workspace_mode?: components["schemas"]["WorkspaceMode"] | null;
         };
         /** SessionSnapshotEvent */
         SessionSnapshotEvent: {
@@ -1442,6 +1510,11 @@ export interface components {
             /** Error Type */
             type: string;
         };
+        /**
+         * WorkspaceMode
+         * @enum {string}
+         */
+        WorkspaceMode: "worktree" | "snapshot" | "direct_write";
     };
     responses: never;
     parameters: never;
@@ -1531,6 +1604,59 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
+                };
+            };
+        };
+    };
+    list_projects_projects__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProjectResponse"][];
+                };
+            };
+        };
+    };
+    register_project_projects__post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProjectRegisterRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProjectResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
