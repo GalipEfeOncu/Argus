@@ -486,7 +486,7 @@ Current status (2026-07-24):
   lazy extras. A minimal sidecar import verifies that unused provider and
   LangGraph modules are absent; worker execution uses bounded in-process tasks.
 
-### 3.2 Structured Coordinator cycle
+### 3.2 Structured Coordinator cycle (✅ Completed)
 
 Deliverables:
 
@@ -504,6 +504,21 @@ Tests:
 - Builder-only pool, irrelevant role skipped, excluded role attempted, missing
   capability, malformed action correction, repeated invalid action, user
   supersede while streaming, and final claim with unmet gate.
+
+Current status (2026-07-24):
+
+- ✅ Coordinator responses use a strict action union for assignment proposals,
+  wait, ask-user, final, partial, and stop outcomes. The deterministic cycle
+  allows exactly one correction and enforces the configured resolution after a
+  second invalid response.
+- ✅ Human messages now create durable scheduler-visible participant
+  instructions: unmentioned messages target Coordinator and explicit mentions
+  target one immutable session participant. Streaming Coordinator work can be
+  superseded by newer human input.
+- ✅ Coordinator routing validates the available pool and declared
+  capabilities, while final delivery rejects unmet required gates. Its action
+  contract has no authority to grant permissions, change configuration, or
+  satisfy gates.
 
 ### 3.3 Assignment scheduler
 

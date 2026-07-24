@@ -12,6 +12,7 @@ from app.db.database import transaction
 from app.db.repositories import EventRepository, StoredEvent, _now_ms, _safe_json
 from app.schemas.session_commands import ArgusSessionCommand
 from app.services.session_configuration_service import ConfigurationError, SessionConfigurationService
+from app.services.participant_instruction_service import ParticipantInstructionService
 
 
 class CommandRejected(ValueError):
@@ -51,6 +52,7 @@ class CommandProcessor:
     async def process(self, session_id: str, command: ArgusSessionCommand) -> CommandOutcome:
         """Persist the accepted outcome atomically; duplicates return the original event."""
 
+        supersede_coordinator = False
         async with transaction(self._db):
             duplicate = await self._events.events_for_command(session_id, command.command_id)
             if duplicate:
@@ -71,6 +73,14 @@ class CommandProcessor:
                     command_id=command.command_id if index == 0 else None,
                 )
                 persisted.append(event)
+            if command.type == "message.send":
+                try:
+                    instructions = await ParticipantInstructionService(self._db).record_message(
+                        session_id, persisted[0].event_id, command.payload.mention_ids,
+                    )
+                except ConfigurationError as error:
+                    raise CommandRejected(error.code) from error
+                supersede_coordinator = any(instruction.delivery_kind == "coordinator" for instruction in instructions)
             if interrupted_assignments:
                 await self._db.executemany(
                     "UPDATE assignments SET state = 'interrupted', updated_at_ms = ? WHERE id = ? AND session_id = ?",
@@ -87,7 +97,14 @@ class CommandProcessor:
                     _safe_json([event.event_id for event in persisted]), _now_ms(),
                 ),
             )
-            return CommandOutcome(tuple(persisted), False)
+            outcome = CommandOutcome(tuple(persisted), False)
+        if supersede_coordinator:
+            # Never cancel a worker before the instruction that supersedes it
+            # has committed. External provider I/O is deliberately outside the
+            # SQLite transaction boundary.
+            from app.services.coordinator_cycle import CoordinatorCycle
+            await CoordinatorCycle.supersede_active(session_id)
+        return outcome
 
     async def _current_status(self, session_id: str) -> str:
         async with self._db.execute("SELECT status FROM sessions WHERE id = ?", (session_id,)) as cursor:

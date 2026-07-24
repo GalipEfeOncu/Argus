@@ -14,6 +14,7 @@ REQUIRED_TABLES = {
     "gate_evidence", "limit_counters", "approvals", "tool_executions",
     "artifacts", "provider_profiles", "command_receipts", "event_snapshots", "schema_migrations",
     "workspaces", "writer_leases", "workspace_audit",
+    "participant_instructions",
 }
 
 
@@ -41,7 +42,7 @@ async def test_fresh_database_has_every_phase_2_1_table_and_migration_metadata(t
         await database.close()
 
     assert REQUIRED_TABLES <= tables
-    assert versions == [1, 2, 3, 4, 5, 6, 7, 8]
+    assert versions == [1, 2, 3, 4, 5, 6, 7, 8, 9]
     assert "idx_events_session_sequence" in event_indexes
 
 

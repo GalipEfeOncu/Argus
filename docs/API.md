@@ -264,6 +264,35 @@ completed evidence remains auditable. Confirming a consequence preview is a
 new command and therefore uses a new `commandId`; retransmitting either the
 preview request or the confirmation keeps that command's original ID.
 
+## Coordinator action contract
+
+The Coordinator worker returns exactly one strict, structured action for each
+accepted human goal or specialist result. This is an internal runtime contract,
+not a client command: the deterministic runtime validates it before it creates
+any scheduler work.
+
+| Action | Required visible fields | Runtime effect |
+| --- | --- | --- |
+| `assignments` | concise `routingSummary`, one or more proposals with ID, optional parent, objective, criteria, operation class, requested budget/capabilities, and reason | Proposes dynamic specialist work; every assignee and requested capability is validated against the current available pool. |
+| `wait` | concise `routingSummary` | Leaves the session waiting for relevant work or evidence. |
+| `ask_user` | concise `routingSummary` and `question` | Requests a visible human decision. |
+| `final` | concise `finalSummary` and non-empty `evidenceReferences` | May finish only after deterministic required-gate validation. |
+| `partial` | concise `finalSummary`, unmet requirements, optional evidence references | Describes a bounded partial outcome; it does not claim success. |
+| `stop` | concise `finalSummary` and reason | Ends this Coordinator cycle using the configured decision policy. |
+
+Unknown fields and every other action type are rejected. In particular, a
+Coordinator action cannot grant permissions, alter session configuration,
+modify limits or pool membership, create gate evidence, or mark a gate
+satisfied. A malformed or unauthorized response receives one correction
+request; a second invalid response stops the cycle and follows the configured
+limit-resolution policy.
+
+An unmentioned `message.send` is persisted as a pending instruction for the
+mandatory Coordinator. Explicit mention IDs resolve to exactly one immutable
+session participant and are persisted as pending participant instructions for
+the scheduler. The visible human message remains the shared-room record, while
+the instruction queue avoids hidden or in-memory-only routing.
+
 ## Assignment contract
 
 An assignment proposal contains `proposalId`, `assigneeAgentId`, `parentId`,
