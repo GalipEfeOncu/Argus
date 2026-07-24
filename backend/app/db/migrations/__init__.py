@@ -23,6 +23,7 @@ from app.db.migrations import (
     v0005_workspace_service,
     v0006_writer_lease_history,
     v0007_configuration_versions,
+    v0008_assignment_context_metadata,
 )
 
 
@@ -53,6 +54,7 @@ MIGRATIONS: tuple[Migration, ...] = (
     Migration(5, "project_workspace_service", v0005_workspace_service.apply),
     Migration(6, "writer_lease_history", v0006_writer_lease_history.apply),
     Migration(7, "configuration_versions", v0007_configuration_versions.apply),
+    Migration(8, "assignment_context_metadata", v0008_assignment_context_metadata.apply),
 )
 
 

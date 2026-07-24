@@ -424,3 +424,21 @@ class EventRepository:
                 (projection["status"], _now_ms(), session_id),
             )
             return projection
+
+
+class AssignmentAttemptRepository:
+    """Durable, content-free metadata recorded for one worker invocation."""
+
+    def __init__(self, db: aiosqlite.Connection) -> None:
+        self._db = db
+
+    async def record_context_selection(self, attempt_id: str, selection: dict[str, object]) -> None:
+        """Attach safe context-selection metadata without overwriting worker checkpoints."""
+
+        encoded = _safe_json(selection)
+        async with transaction(self._db):
+            cursor = await self._db.execute(
+                "UPDATE assignment_attempts SET context_selection_json = ? WHERE id = ?", (encoded, attempt_id)
+            )
+            if cursor.rowcount != 1:
+                raise KeyError(f"Unknown assignment attempt '{attempt_id}'")

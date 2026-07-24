@@ -4,13 +4,11 @@ import asyncio
 from datetime import datetime
 import uuid
 from fastapi import APIRouter, Query, WebSocket, WebSocketDisconnect
-from app.agents.graph import compile_graph
 from app.db.database import get_db
 from app.db.repositories import EventRepository, SessionRepository
 from app.schemas.session_commands import parse_session_command
 from app.services.command_processor import CommandProcessor, CommandRejected, event_wire_value
 from app.services.workspace_service import ProjectWorkspaceService, WorkspaceError
-from app.tools.scoped_tools import create_scoped_tools
 from pathlib import Path
 from app.config import settings
 
@@ -108,6 +106,12 @@ async def canonical_session_websocket(
 
 @router.websocket("/ws/session/{session_id}")
 async def session_websocket(websocket: WebSocket, session_id: str):
+    # The transitional static graph remains available only for legacy sessions.
+    # Keep its optional LangGraph/provider imports out of the normal sidecar
+    # startup and canonical transport path.
+    from app.agents.graph import compile_graph
+    from app.tools.scoped_tools import create_scoped_tools
+
     await websocket.accept()
 
     try:

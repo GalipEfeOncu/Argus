@@ -449,7 +449,7 @@ diffs survive process restart and pass workspace escape and idempotency tests.
 
 ## Phase 3 — Dynamic Coordinator and assignment runtime
 
-### 3.1 Provider-neutral worker protocol
+### 3.1 Provider-neutral worker protocol (✅ Completed)
 
 Deliverables:
 
@@ -471,6 +471,20 @@ Performance acceptance:
 - Import tracing proves unused provider and LangGraph modules are absent from a
   minimal execution path.
 - If an individual worker does not use LangGraph, production packaging omits it.
+
+Current status (2026-07-24):
+
+- ✅ The backend exposes a provider-neutral stream contract for text, structured
+  output, tool calls, usage, completion, cancellation, retryable failures, and
+  terminal failures.
+- ✅ A deterministic, credential-free scripted provider covers malformed output,
+  disconnects, tool requests, slow streams, cancellation, and exact usage.
+- ✅ Assignment context is ordered and bounded; selection metadata is logged and
+  stored with each assignment attempt using IDs and a fingerprint rather than
+  prompt content.
+- ✅ Production provider and optional agent-loop dependencies are split into
+  lazy extras. A minimal sidecar import verifies that unused provider and
+  LangGraph modules are absent; worker execution uses bounded in-process tasks.
 
 ### 3.2 Structured Coordinator cycle
 

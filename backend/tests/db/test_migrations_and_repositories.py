@@ -5,7 +5,7 @@ import pytest
 
 from app.db.database import get_db
 from app.db.migrations import MIGRATIONS, Migration, apply_migrations
-from app.db.repositories import EventRepository, SessionRepository, UnsafePersistencePayload
+from app.db.repositories import AssignmentAttemptRepository, EventRepository, SessionRepository, UnsafePersistencePayload
 
 
 REQUIRED_TABLES = {
@@ -41,7 +41,7 @@ async def test_fresh_database_has_every_phase_2_1_table_and_migration_metadata(t
         await database.close()
 
     assert REQUIRED_TABLES <= tables
-    assert versions == [1, 2, 3, 4, 5, 6, 7]
+    assert versions == [1, 2, 3, 4, 5, 6, 7, 8]
     assert "idx_events_session_sequence" in event_indexes
 
 
@@ -106,6 +106,38 @@ async def test_configuration_version_migration_preserves_rows_and_allows_policy_
         await database.close()
 
     assert [dict(row) for row in preserved] == [{"id": "config_1", "policy_hash": "same_policy"}]
+
+
+@pytest.mark.asyncio
+async def test_assignment_attempt_context_selection_is_durably_recorded_without_prompt_content(temporary_sqlite_db) -> None:
+    database = await get_db()
+    try:
+        await database.execute("PRAGMA foreign_keys = OFF")
+        await database.execute(
+            """INSERT INTO assignment_attempts (id, assignment_id, attempt_number, configuration_version, started_at_ms)
+               VALUES ('attempt_1', 'assignment_1', 1, 1, 1)"""
+        )
+        await database.commit()
+        await AssignmentAttemptRepository(database).record_context_selection("attempt_1", {
+            "selectedEventIds": ["event_1"],
+            "selectedArtifactIds": ["artifact_1"],
+            "includedSections": ["goal"],
+            "truncatedSections": [],
+            "characterCount": 42,
+            "selectionFingerprint": "a" * 64,
+        })
+        async with database.execute(
+            "SELECT context_selection_json FROM assignment_attempts WHERE id = 'attempt_1'"
+        ) as cursor:
+            row = await cursor.fetchone()
+    finally:
+        await database.close()
+
+    assert row is not None
+    assert row["context_selection_json"] == (
+        '{"characterCount":42,"includedSections":["goal"],"selectedArtifactIds":["artifact_1"],'
+        '"selectedEventIds":["event_1"],"selectionFingerprint":"' + "a" * 64 + '","truncatedSections":[]}'
+    )
 
 
 @pytest.mark.asyncio
