@@ -207,6 +207,132 @@
       "title": "EmptyPayload",
       "type": "object"
     },
+    "ExecutionLimitsPatch": {
+      "additionalProperties": false,
+      "description": "Partial limit change; omitted fields retain their current ceiling.",
+      "properties": {
+        "maxAssignmentAttempts": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Maxassignmentattempts"
+        },
+        "maxModelIterationsPerAssignment": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Maxmodeliterationsperassignment"
+        },
+        "maxParallelReadOnlyAssignments": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Maxparallelreadonlyassignments"
+        },
+        "maxRevisionsPerFinding": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Maxrevisionsperfinding"
+        },
+        "maxSessionCost": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Maxsessioncost"
+        },
+        "maxSessionTokens": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Maxsessiontokens"
+        },
+        "maxToolCallsPerAssignment": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Maxtoolcallsperassignment"
+        },
+        "maxWallClockSeconds": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Maxwallclockseconds"
+        },
+        "softWarningRatio": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "maximum": 1,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Softwarningratio"
+        }
+      },
+      "title": "ExecutionLimitsPatch",
+      "type": "object"
+    },
     "MessageSendCommand": {
       "additionalProperties": false,
       "properties": {
@@ -454,6 +580,17 @@
           "default": null,
           "title": "Availableagentids"
         },
+        "executionLimits": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ExecutionLimitsPatch"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
         "limitResolution": {
           "anyOf": [
             {
@@ -470,6 +607,42 @@
           ],
           "default": null,
           "title": "Limitresolution"
+        },
+        "permissionProfile": {
+          "anyOf": [
+            {
+              "enum": [
+                "strict",
+                "balanced",
+                "autonomous",
+                "expert_unrestricted"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Permissionprofile"
+        },
+        "preauthorizedCapabilities": {
+          "anyOf": [
+            {
+              "items": {
+                "maxLength": 160,
+                "minLength": 1,
+                "type": "string"
+              },
+              "maxItems": 50,
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Preauthorizedcapabilities"
         },
         "requiredRoleRules": {
           "anyOf": [

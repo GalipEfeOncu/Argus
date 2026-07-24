@@ -261,6 +261,7 @@ export type Changedfields =
     ];
 export type Configurationversion = number;
 export type Policyhash = string;
+export type Previouspolicyhash = string;
 export type Sequence6 = number;
 export type Sessionid6 = string;
 export type Timestamp6 = string;
@@ -679,6 +680,7 @@ export interface ConfigurationUpdatedPayload {
   changedFields: Changedfields;
   configurationVersion: Configurationversion;
   policyHash: Policyhash;
+  previousPolicyHash: Previouspolicyhash;
 }
 export interface AssignmentProposedEvent {
   actorId: Actorid7;

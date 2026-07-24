@@ -1,6 +1,55 @@
 {
   "components": {
     "schemas": {
+      "ApprovalPolicy": {
+        "additionalProperties": false,
+        "properties": {
+          "behavior": {
+            "default": "ask_by_policy",
+            "enum": [
+              "ask_each_time",
+              "ask_by_policy",
+              "preauthorize_session",
+              "deny_interactive"
+            ],
+            "title": "Behavior",
+            "type": "string"
+          },
+          "limitResolution": {
+            "default": "coordinator_decides",
+            "enum": [
+              "ask_user",
+              "coordinator_decides",
+              "stop"
+            ],
+            "title": "Limitresolution",
+            "type": "string"
+          },
+          "permissionProfile": {
+            "default": "balanced",
+            "enum": [
+              "strict",
+              "balanced",
+              "autonomous",
+              "expert_unrestricted"
+            ],
+            "title": "Permissionprofile",
+            "type": "string"
+          },
+          "preauthorizedCapabilities": {
+            "items": {
+              "maxLength": 160,
+              "minLength": 1,
+              "type": "string"
+            },
+            "maxItems": 50,
+            "title": "Preauthorizedcapabilities",
+            "type": "array"
+          }
+        },
+        "title": "ApprovalPolicy",
+        "type": "object"
+      },
       "ApprovalRequestedEvent": {
         "additionalProperties": false,
         "properties": {
@@ -1162,10 +1211,17 @@
             "minLength": 1,
             "title": "Policyhash",
             "type": "string"
+          },
+          "previousPolicyHash": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Previouspolicyhash",
+            "type": "string"
           }
         },
         "required": [
           "configurationVersion",
+          "previousPolicyHash",
           "policyHash",
           "changedFields"
         ],
@@ -1547,6 +1603,123 @@
           "summary"
         ],
         "title": "Evidence",
+        "type": "object"
+      },
+      "ExecutionLimits": {
+        "additionalProperties": false,
+        "properties": {
+          "maxAssignmentAttempts": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": 8,
+            "title": "Maxassignmentattempts"
+          },
+          "maxModelIterationsPerAssignment": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": 20,
+            "title": "Maxmodeliterationsperassignment"
+          },
+          "maxParallelReadOnlyAssignments": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": 3,
+            "title": "Maxparallelreadonlyassignments"
+          },
+          "maxRevisionsPerFinding": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": 3,
+            "title": "Maxrevisionsperfinding"
+          },
+          "maxSessionCost": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Maxsessioncost"
+          },
+          "maxSessionTokens": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": 500000,
+            "title": "Maxsessiontokens"
+          },
+          "maxToolCallsPerAssignment": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": 100,
+            "title": "Maxtoolcallsperassignment"
+          },
+          "maxWallClockSeconds": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": 14400,
+            "title": "Maxwallclockseconds"
+          },
+          "softWarningRatio": {
+            "default": 0.8,
+            "exclusiveMinimum": 0.0,
+            "maximum": 1.0,
+            "title": "Softwarningratio",
+            "type": "number"
+          }
+        },
+        "title": "ExecutionLimits",
         "type": "object"
       },
       "GateStatusChangedEvent": {
@@ -2695,9 +2868,70 @@
         "title": "ProviderTestResponse",
         "type": "object"
       },
-      "RoleConfigSchema": {
+      "RequiredRoleRule": {
+        "additionalProperties": false,
         "properties": {
-          "custom_system_prompt": {
+          "applicability": {
+            "enum": [
+              "always",
+              "when_changes",
+              "when_capability_used"
+            ],
+            "title": "Applicability",
+            "type": "string"
+          },
+          "capability": {
+            "anyOf": [
+              {
+                "maxLength": 160,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Capability"
+          },
+          "id": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Id",
+            "type": "string"
+          },
+          "minimumCompletions": {
+            "default": 1,
+            "minimum": 1.0,
+            "title": "Minimumcompletions",
+            "type": "integer"
+          },
+          "role": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Role",
+            "type": "string"
+          },
+          "successEvidence": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Successevidence",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "role",
+          "applicability",
+          "successEvidence"
+        ],
+        "title": "RequiredRoleRule",
+        "type": "object"
+      },
+      "RoleConfigSchema": {
+        "additionalProperties": false,
+        "description": "Compatibility input for the prototype session launcher.",
+        "properties": {
+          "customSystemPrompt": {
             "anyOf": [
               {
                 "type": "string"
@@ -2706,20 +2940,34 @@
                 "type": "null"
               }
             ],
-            "title": "Custom System Prompt"
+            "title": "Customsystemprompt"
           },
           "enabled": {
             "default": true,
             "title": "Enabled",
             "type": "boolean"
           },
-          "model_id": {
-            "title": "Model Id",
-            "type": "string"
+          "modelId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Modelid"
           },
-          "provider_id": {
-            "title": "Provider Id",
-            "type": "string"
+          "providerId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Providerid"
           },
           "role": {
             "title": "Role",
@@ -2727,11 +2975,227 @@
           }
         },
         "required": [
-          "role",
-          "provider_id",
-          "model_id"
+          "role"
         ],
         "title": "RoleConfigSchema",
+        "type": "object"
+      },
+      "SessionAgentInput": {
+        "additionalProperties": false,
+        "properties": {
+          "agentDefinitionId": {
+            "anyOf": [
+              {
+                "maxLength": 160,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Agentdefinitionid"
+          },
+          "capabilities": {
+            "items": {
+              "maxLength": 160,
+              "minLength": 1,
+              "type": "string"
+            },
+            "maxItems": 50,
+            "title": "Capabilities",
+            "type": "array"
+          },
+          "id": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Id",
+            "type": "string"
+          },
+          "modelSnapshot": {
+            "additionalProperties": true,
+            "title": "Modelsnapshot",
+            "type": "object"
+          },
+          "role": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Role",
+            "type": "string"
+          },
+          "skillSnapshot": {
+            "items": {},
+            "maxItems": 50,
+            "title": "Skillsnapshot",
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "role"
+        ],
+        "title": "SessionAgentInput",
+        "type": "object"
+      },
+      "SessionAgentSnapshotResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "capabilities": {
+            "items": {
+              "maxLength": 160,
+              "minLength": 1,
+              "type": "string"
+            },
+            "title": "Capabilities",
+            "type": "array"
+          },
+          "id": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Id",
+            "type": "string"
+          },
+          "role": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Role",
+            "type": "string"
+          },
+          "sourceAgentId": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Sourceagentid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "sourceAgentId",
+          "role",
+          "capabilities"
+        ],
+        "title": "SessionAgentSnapshotResponse",
+        "type": "object"
+      },
+      "SessionConfigurationInput": {
+        "additionalProperties": false,
+        "properties": {
+          "acknowledgements": {
+            "items": {
+              "maxLength": 160,
+              "minLength": 1,
+              "type": "string"
+            },
+            "maxItems": 20,
+            "title": "Acknowledgements",
+            "type": "array"
+          },
+          "approvalPolicy": {
+            "$ref": "#/components/schemas/ApprovalPolicy"
+          },
+          "availableAgentIds": {
+            "anyOf": [
+              {
+                "items": {
+                  "maxLength": 160,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "maxItems": 100,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Availableagentids"
+          },
+          "executionLimits": {
+            "$ref": "#/components/schemas/ExecutionLimits"
+          },
+          "requiredRoleRules": {
+            "items": {
+              "$ref": "#/components/schemas/RequiredRoleRule"
+            },
+            "maxItems": 50,
+            "title": "Requiredrolerules",
+            "type": "array"
+          },
+          "workspacePolicy": {
+            "$ref": "#/components/schemas/WorkspacePolicy"
+          }
+        },
+        "title": "SessionConfigurationInput",
+        "type": "object"
+      },
+      "SessionConfigurationResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "acknowledgements": {
+            "items": {
+              "maxLength": 160,
+              "minLength": 1,
+              "type": "string"
+            },
+            "title": "Acknowledgements",
+            "type": "array"
+          },
+          "agentSnapshots": {
+            "items": {
+              "$ref": "#/components/schemas/SessionAgentSnapshotResponse"
+            },
+            "title": "Agentsnapshots",
+            "type": "array"
+          },
+          "approvalPolicy": {
+            "$ref": "#/components/schemas/ApprovalPolicy"
+          },
+          "availableAgentIds": {
+            "items": {
+              "maxLength": 160,
+              "minLength": 1,
+              "type": "string"
+            },
+            "title": "Availableagentids",
+            "type": "array"
+          },
+          "configurationVersion": {
+            "minimum": 1.0,
+            "title": "Configurationversion",
+            "type": "integer"
+          },
+          "executionLimits": {
+            "$ref": "#/components/schemas/ExecutionLimits"
+          },
+          "policyHash": {
+            "maxLength": 64,
+            "minLength": 64,
+            "title": "Policyhash",
+            "type": "string"
+          },
+          "requiredRoleRules": {
+            "items": {
+              "$ref": "#/components/schemas/RequiredRoleRule"
+            },
+            "title": "Requiredrolerules",
+            "type": "array"
+          },
+          "workspacePolicy": {
+            "$ref": "#/components/schemas/WorkspacePolicy"
+          }
+        },
+        "required": [
+          "configurationVersion",
+          "availableAgentIds",
+          "requiredRoleRules",
+          "executionLimits",
+          "approvalPolicy",
+          "workspacePolicy",
+          "acknowledgements",
+          "policyHash",
+          "agentSnapshots"
+        ],
+        "title": "SessionConfigurationResponse",
         "type": "object"
       },
       "SessionConfigurationUpdatedEvent": {
@@ -2807,15 +3271,55 @@
         "type": "object"
       },
       "SessionCreateRequest": {
+        "additionalProperties": false,
         "properties": {
-          "acknowledge_direct_write": {
+          "acknowledgeDirectWrite": {
             "default": false,
-            "title": "Acknowledge Direct Write",
+            "title": "Acknowledgedirectwrite",
             "type": "boolean"
+          },
+          "agents": {
+            "items": {
+              "$ref": "#/components/schemas/SessionAgentInput"
+            },
+            "maxItems": 100,
+            "title": "Agents",
+            "type": "array"
+          },
+          "configuration": {
+            "$ref": "#/components/schemas/SessionConfigurationInput"
+          },
+          "coordinatorAgentId": {
+            "anyOf": [
+              {
+                "maxLength": 160,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Coordinatoragentid"
+          },
+          "goal": {
+            "anyOf": [
+              {
+                "maxLength": 4000,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Goal"
           },
           "name": {
             "anyOf": [
               {
+                "maxLength": 256,
+                "minLength": 1,
                 "type": "string"
               },
               {
@@ -2824,22 +3328,54 @@
             ],
             "title": "Name"
           },
-          "project_path": {
-            "title": "Project Path",
-            "type": "string"
+          "projectId": {
+            "anyOf": [
+              {
+                "maxLength": 160,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Projectid"
           },
-          "role_configs": {
+          "projectPath": {
+            "anyOf": [
+              {
+                "maxLength": 4096,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Projectpath"
+          },
+          "roleConfigs": {
             "items": {
               "$ref": "#/components/schemas/RoleConfigSchema"
             },
-            "title": "Role Configs",
+            "maxItems": 100,
+            "title": "Roleconfigs",
             "type": "array"
           },
           "task": {
-            "title": "Task",
-            "type": "string"
+            "anyOf": [
+              {
+                "maxLength": 4000,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Task"
           },
-          "workspace_mode": {
+          "workspaceMode": {
             "anyOf": [
               {
                 "$ref": "#/components/schemas/WorkspaceMode"
@@ -2850,12 +3386,103 @@
             ]
           }
         },
-        "required": [
-          "project_path",
-          "task",
-          "role_configs"
-        ],
         "title": "SessionCreateRequest",
+        "type": "object"
+      },
+      "SessionCreateResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "acknowledgements": {
+            "items": {
+              "maxLength": 160,
+              "minLength": 1,
+              "type": "string"
+            },
+            "title": "Acknowledgements",
+            "type": "array"
+          },
+          "agentSnapshots": {
+            "items": {
+              "$ref": "#/components/schemas/SessionAgentSnapshotResponse"
+            },
+            "title": "Agentsnapshots",
+            "type": "array"
+          },
+          "approvalPolicy": {
+            "$ref": "#/components/schemas/ApprovalPolicy"
+          },
+          "availableAgentIds": {
+            "items": {
+              "maxLength": 160,
+              "minLength": 1,
+              "type": "string"
+            },
+            "title": "Availableagentids",
+            "type": "array"
+          },
+          "configurationVersion": {
+            "minimum": 1.0,
+            "title": "Configurationversion",
+            "type": "integer"
+          },
+          "executionLimits": {
+            "$ref": "#/components/schemas/ExecutionLimits"
+          },
+          "goal": {
+            "maxLength": 4000,
+            "minLength": 1,
+            "title": "Goal",
+            "type": "string"
+          },
+          "id": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "policyHash": {
+            "maxLength": 64,
+            "minLength": 64,
+            "title": "Policyhash",
+            "type": "string"
+          },
+          "projectId": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Projectid",
+            "type": "string"
+          },
+          "requiredRoleRules": {
+            "items": {
+              "$ref": "#/components/schemas/RequiredRoleRule"
+            },
+            "title": "Requiredrolerules",
+            "type": "array"
+          },
+          "workspacePolicy": {
+            "$ref": "#/components/schemas/WorkspacePolicy"
+          }
+        },
+        "required": [
+          "configurationVersion",
+          "availableAgentIds",
+          "requiredRoleRules",
+          "executionLimits",
+          "approvalPolicy",
+          "workspacePolicy",
+          "acknowledgements",
+          "policyHash",
+          "agentSnapshots",
+          "id",
+          "name",
+          "projectId",
+          "goal"
+        ],
+        "title": "SessionCreateResponse",
         "type": "object"
       },
       "SessionSnapshotEvent": {
@@ -3723,6 +4350,23 @@
         ],
         "title": "WorkspaceMode",
         "type": "string"
+      },
+      "WorkspacePolicy": {
+        "additionalProperties": false,
+        "properties": {
+          "mode": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/WorkspaceMode"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "title": "WorkspacePolicy",
+        "type": "object"
       }
     }
   },
@@ -3996,9 +4640,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Create Session Sessions  Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/SessionCreateResponse"
                 }
               }
             },
@@ -4165,6 +4807,49 @@
           }
         },
         "summary": "Get Artifact Summaries",
+        "tags": [
+          "sessions"
+        ]
+      }
+    },
+    "/sessions/{session_id}/configuration": {
+      "get": {
+        "description": "Return the latest immutable normalized configuration snapshot.",
+        "operationId": "get_session_configuration_sessions__session_id__configuration_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "title": "Session Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionConfigurationResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Session Configuration",
         "tags": [
           "sessions"
         ]

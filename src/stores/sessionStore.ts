@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { Session, SessionConfig, SessionConfiguration, SessionStatus } from '@/types/session';
+import type { ExecutionLimits, Session, SessionConfig, SessionConfiguration, SessionStatus } from '@/types/session';
 import type { SessionConfigurationPatch } from '@/types/generated/session-commands';
 
 interface SessionStoreState {
@@ -8,7 +8,7 @@ interface SessionStoreState {
   activeSessionId: string | null;
   
   getActiveSession: () => Session | undefined;
-  createSession: (config: SessionConfig) => string;
+  createSession: (config: SessionConfig, id?: string) => string;
   updateSessionStatus: (id: string, status: SessionStatus) => void;
   patchSessionConfiguration: (id: string, patch: SessionConfigurationPatch) => void;
   setActiveSession: (id: string | null) => void;
@@ -27,8 +27,7 @@ export const useSessionStore = create<SessionStoreState>()(
         return sessions.find((s) => s.id === activeSessionId);
       },
 
-      createSession: (config) => {
-        const id = crypto.randomUUID();
+      createSession: (config, id = crypto.randomUUID()) => {
         const session: Session = {
           id,
           name: config.name ?? `Session #${Date.now()}`,
@@ -69,9 +68,14 @@ export const useSessionStore = create<SessionStoreState>()(
               }) }),
               approvalPolicy: {
                 ...session.configuration.approvalPolicy,
-                ...(patch.approvalBehavior === undefined || patch.approvalBehavior === null || patch.approvalBehavior === 'ask_each_time' ? {} : { behavior: patch.approvalBehavior }),
+                ...(patch.approvalBehavior === undefined || patch.approvalBehavior === null ? {} : { behavior: patch.approvalBehavior }),
+                ...(patch.permissionProfile === undefined || patch.permissionProfile === null ? {} : { permissionProfile: patch.permissionProfile }),
+                ...(patch.preauthorizedCapabilities === undefined || patch.preauthorizedCapabilities === null ? {} : { preauthorizedCapabilities: patch.preauthorizedCapabilities }),
                 ...(patch.limitResolution === undefined || patch.limitResolution === null ? {} : { limitResolution: patch.limitResolution }),
               },
+              ...(patch.executionLimits === undefined || patch.executionLimits === null ? {} : {
+                executionLimits: patchExecutionLimits(session.configuration.executionLimits, patch.executionLimits),
+              }),
             } as SessionConfiguration,
           };
         }),
@@ -96,3 +100,10 @@ export const useSessionStore = create<SessionStoreState>()(
     }
   )
 );
+
+function patchExecutionLimits(
+  current: ExecutionLimits,
+  patch: NonNullable<SessionConfigurationPatch['executionLimits']>,
+): ExecutionLimits {
+  return { ...current, ...patch, softWarningRatio: patch.softWarningRatio ?? current.softWarningRatio };
+}

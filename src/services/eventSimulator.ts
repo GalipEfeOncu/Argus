@@ -255,6 +255,7 @@ export class EventSimulator {
     }
     this.schedule(sessionId, 25, () => this.emit(sessionId, 'session.configuration_updated', 'human', {
       configurationVersion: version + 1,
+      previousPolicyHash: 'demo-policy',
       policyHash: 'demo-policy-v2',
       changedFields: Object.keys(patch),
     }, commandId), true);

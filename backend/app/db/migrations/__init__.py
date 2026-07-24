@@ -22,6 +22,7 @@ from app.db.migrations import (
     v0004_event_store,
     v0005_workspace_service,
     v0006_writer_lease_history,
+    v0007_configuration_versions,
 )
 
 
@@ -51,6 +52,7 @@ MIGRATIONS: tuple[Migration, ...] = (
     Migration(4, "event_store_and_command_receipts", v0004_event_store.apply),
     Migration(5, "project_workspace_service", v0005_workspace_service.apply),
     Migration(6, "writer_lease_history", v0006_writer_lease_history.apply),
+    Migration(7, "configuration_versions", v0007_configuration_versions.apply),
 )
 
 

@@ -1096,10 +1096,17 @@
           "minLength": 1,
           "title": "Policyhash",
           "type": "string"
+        },
+        "previousPolicyHash": {
+          "maxLength": 160,
+          "minLength": 1,
+          "title": "Previouspolicyhash",
+          "type": "string"
         }
       },
       "required": [
         "configurationVersion",
+        "previousPolicyHash",
         "policyHash",
         "changedFields"
       ],

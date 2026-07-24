@@ -46,8 +46,8 @@ export type SessionPreset = 'quick' | 'balanced' | 'thorough' | 'custom';
 export type WorkspaceMode = 'worktree' | 'snapshot' | 'direct_write';
 export type OutputLanguage = 'en' | 'tr';
 export type RequiredRoleApplicability = 'always' | 'when_changes' | 'when_capability_used';
-export type PermissionProfile = 'strict' | 'balanced' | 'autonomous';
-export type ApprovalBehavior = 'ask_by_policy' | 'preauthorize_session' | 'deny_interactive';
+export type PermissionProfile = 'strict' | 'balanced' | 'autonomous' | 'expert_unrestricted';
+export type ApprovalBehavior = 'ask_each_time' | 'ask_by_policy' | 'preauthorize_session' | 'deny_interactive';
 export type LimitResolution = 'ask_user' | 'coordinator_decides' | 'stop';
 
 export interface AgentInstance {

@@ -192,6 +192,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/sessions/{session_id}/configuration": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Session Configuration
+         * @description Return the latest immutable normalized configuration snapshot.
+         */
+        get: operations["get_session_configuration_sessions__session_id__configuration_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/sessions/{session_id}/timeline": {
         parameters: {
             query?: never;
@@ -216,6 +236,29 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** ApprovalPolicy */
+        ApprovalPolicy: {
+            /**
+             * Behavior
+             * @default ask_by_policy
+             * @enum {string}
+             */
+            behavior: "ask_each_time" | "ask_by_policy" | "preauthorize_session" | "deny_interactive";
+            /**
+             * Limitresolution
+             * @default coordinator_decides
+             * @enum {string}
+             */
+            limitResolution: "ask_user" | "coordinator_decides" | "stop";
+            /**
+             * Permissionprofile
+             * @default balanced
+             * @enum {string}
+             */
+            permissionProfile: "strict" | "balanced" | "autonomous" | "expert_unrestricted";
+            /** Preauthorizedcapabilities */
+            preauthorizedCapabilities?: string[];
+        };
         /** ApprovalRequestedEvent */
         ApprovalRequestedEvent: {
             /** Actorid */
@@ -633,6 +676,8 @@ export interface components {
             configurationVersion: number;
             /** Policyhash */
             policyHash: string;
+            /** Previouspolicyhash */
+            previousPolicyHash: string;
         };
         /** DecisionRecordedEvent */
         DecisionRecordedEvent: {
@@ -765,6 +810,51 @@ export interface components {
             kind: string;
             /** Summary */
             summary: string;
+        };
+        /** ExecutionLimits */
+        ExecutionLimits: {
+            /**
+             * Maxassignmentattempts
+             * @default 8
+             */
+            maxAssignmentAttempts: number | null;
+            /**
+             * Maxmodeliterationsperassignment
+             * @default 20
+             */
+            maxModelIterationsPerAssignment: number | null;
+            /**
+             * Maxparallelreadonlyassignments
+             * @default 3
+             */
+            maxParallelReadOnlyAssignments: number | null;
+            /**
+             * Maxrevisionsperfinding
+             * @default 3
+             */
+            maxRevisionsPerFinding: number | null;
+            /** Maxsessioncost */
+            maxSessionCost?: number | null;
+            /**
+             * Maxsessiontokens
+             * @default 500000
+             */
+            maxSessionTokens: number | null;
+            /**
+             * Maxtoolcallsperassignment
+             * @default 100
+             */
+            maxToolCallsPerAssignment: number | null;
+            /**
+             * Maxwallclockseconds
+             * @default 14400
+             */
+            maxWallClockSeconds: number | null;
+            /**
+             * Softwarningratio
+             * @default 0.8
+             */
+            softWarningRatio: number;
         };
         /** GateStatusChangedEvent */
         GateStatusChangedEvent: {
@@ -1178,21 +1268,103 @@ export interface components {
             /** Valid */
             valid: boolean;
         };
-        /** RoleConfigSchema */
+        /** RequiredRoleRule */
+        RequiredRoleRule: {
+            /**
+             * Applicability
+             * @enum {string}
+             */
+            applicability: "always" | "when_changes" | "when_capability_used";
+            /** Capability */
+            capability?: string | null;
+            /** Id */
+            id: string;
+            /**
+             * Minimumcompletions
+             * @default 1
+             */
+            minimumCompletions: number;
+            /** Role */
+            role: string;
+            /** Successevidence */
+            successEvidence: string;
+        };
+        /**
+         * RoleConfigSchema
+         * @description Compatibility input for the prototype session launcher.
+         */
         RoleConfigSchema: {
-            /** Custom System Prompt */
-            custom_system_prompt?: string | null;
+            /** Customsystemprompt */
+            customSystemPrompt?: string | null;
             /**
              * Enabled
              * @default true
              */
             enabled: boolean;
-            /** Model Id */
-            model_id: string;
-            /** Provider Id */
-            provider_id: string;
+            /** Modelid */
+            modelId?: string | null;
+            /** Providerid */
+            providerId?: string | null;
             /** Role */
             role: string;
+        };
+        /** SessionAgentInput */
+        SessionAgentInput: {
+            /** Agentdefinitionid */
+            agentDefinitionId?: string | null;
+            /** Capabilities */
+            capabilities?: string[];
+            /** Id */
+            id: string;
+            /** Modelsnapshot */
+            modelSnapshot?: {
+                [key: string]: unknown;
+            };
+            /** Role */
+            role: string;
+            /** Skillsnapshot */
+            skillSnapshot?: unknown[];
+        };
+        /** SessionAgentSnapshotResponse */
+        SessionAgentSnapshotResponse: {
+            /** Capabilities */
+            capabilities: string[];
+            /** Id */
+            id: string;
+            /** Role */
+            role: string;
+            /** Sourceagentid */
+            sourceAgentId: string;
+        };
+        /** SessionConfigurationInput */
+        SessionConfigurationInput: {
+            /** Acknowledgements */
+            acknowledgements?: string[];
+            approvalPolicy?: components["schemas"]["ApprovalPolicy"];
+            /** Availableagentids */
+            availableAgentIds?: string[] | null;
+            executionLimits?: components["schemas"]["ExecutionLimits"];
+            /** Requiredrolerules */
+            requiredRoleRules?: components["schemas"]["RequiredRoleRule"][];
+            workspacePolicy?: components["schemas"]["WorkspacePolicy"];
+        };
+        /** SessionConfigurationResponse */
+        SessionConfigurationResponse: {
+            /** Acknowledgements */
+            acknowledgements: string[];
+            /** Agentsnapshots */
+            agentSnapshots: components["schemas"]["SessionAgentSnapshotResponse"][];
+            approvalPolicy: components["schemas"]["ApprovalPolicy"];
+            /** Availableagentids */
+            availableAgentIds: string[];
+            /** Configurationversion */
+            configurationVersion: number;
+            executionLimits: components["schemas"]["ExecutionLimits"];
+            /** Policyhash */
+            policyHash: string;
+            /** Requiredrolerules */
+            requiredRoleRules: components["schemas"]["RequiredRoleRule"][];
+            workspacePolicy: components["schemas"]["WorkspacePolicy"];
         };
         /** SessionConfigurationUpdatedEvent */
         SessionConfigurationUpdatedEvent: {
@@ -1226,19 +1398,54 @@ export interface components {
         /** SessionCreateRequest */
         SessionCreateRequest: {
             /**
-             * Acknowledge Direct Write
+             * Acknowledgedirectwrite
              * @default false
              */
-            acknowledge_direct_write: boolean;
+            acknowledgeDirectWrite: boolean;
+            /** Agents */
+            agents?: components["schemas"]["SessionAgentInput"][];
+            configuration?: components["schemas"]["SessionConfigurationInput"];
+            /** Coordinatoragentid */
+            coordinatorAgentId?: string | null;
+            /** Goal */
+            goal?: string | null;
             /** Name */
             name?: string | null;
-            /** Project Path */
-            project_path: string;
-            /** Role Configs */
-            role_configs: components["schemas"]["RoleConfigSchema"][];
+            /** Projectid */
+            projectId?: string | null;
+            /** Projectpath */
+            projectPath?: string | null;
+            /** Roleconfigs */
+            roleConfigs?: components["schemas"]["RoleConfigSchema"][];
             /** Task */
-            task: string;
-            workspace_mode?: components["schemas"]["WorkspaceMode"] | null;
+            task?: string | null;
+            workspaceMode?: components["schemas"]["WorkspaceMode"] | null;
+        };
+        /** SessionCreateResponse */
+        SessionCreateResponse: {
+            /** Acknowledgements */
+            acknowledgements: string[];
+            /** Agentsnapshots */
+            agentSnapshots: components["schemas"]["SessionAgentSnapshotResponse"][];
+            approvalPolicy: components["schemas"]["ApprovalPolicy"];
+            /** Availableagentids */
+            availableAgentIds: string[];
+            /** Configurationversion */
+            configurationVersion: number;
+            executionLimits: components["schemas"]["ExecutionLimits"];
+            /** Goal */
+            goal: string;
+            /** Id */
+            id: string;
+            /** Name */
+            name: string;
+            /** Policyhash */
+            policyHash: string;
+            /** Projectid */
+            projectId: string;
+            /** Requiredrolerules */
+            requiredRoleRules: components["schemas"]["RequiredRoleRule"][];
+            workspacePolicy: components["schemas"]["WorkspacePolicy"];
         };
         /** SessionSnapshotEvent */
         SessionSnapshotEvent: {
@@ -1515,6 +1722,10 @@ export interface components {
          * @enum {string}
          */
         WorkspaceMode: "worktree" | "snapshot" | "direct_write";
+        /** WorkspacePolicy */
+        WorkspacePolicy: {
+            mode?: components["schemas"]["WorkspaceMode"] | null;
+        };
     };
     responses: never;
     parameters: never;
@@ -1766,9 +1977,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["SessionCreateResponse"];
                 };
             };
             /** @description Validation Error */
@@ -1865,6 +2074,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ArtifactPageResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_session_configuration_sessions__session_id__configuration_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionConfigurationResponse"];
                 };
             };
             /** @description Validation Error */

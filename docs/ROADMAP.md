@@ -427,20 +427,20 @@ Current status (2026-07-24):
   for escapes, symlink races, command denial, secret forwarding, isolation, and
   crash recovery.
 
-### 2.4 Session configuration service
+### 2.4 Session configuration service (✅ Completed)
 
 Deliverables:
 
-- Implement `POST /sessions`, normalized defaults, validation error codes,
+- ✅ Implemented `POST /sessions`, normalized defaults, validation error codes,
   acknowledgement flow, immutable agent snapshots, and policy hashes.
-- Implement optimistic `session.configuration.update` with consequence preview.
-- Apply reductions immediately to future dispatch and interrupt invalid active
+- ✅ Implemented optimistic `session.configuration.update` with consequence preview.
+- ✅ Reductions apply immediately to future dispatch and interrupt invalid active
   work after explicit consequence confirmation.
-- Never decrease consumed counters or silently invalidate historical evidence.
+- ✅ Consumed counters are never decreased and historical evidence is retained.
 
 Tests:
 
-- Pool/gate validation, duplicate IDs, stale version, add/remove agent, reduce
+- ✅ Pool/gate validation, duplicate IDs, stale version, add/remove agent, reduce
   limit below consumed value, permission increase/decrease, restart persistence,
   and idempotent update.
 

@@ -131,6 +131,7 @@ class MessageCompletedEvent(EventEnvelope):
 
 class ConfigurationUpdatedPayload(CamelModel):
     configuration_version: int = Field(ge=0)
+    previous_policy_hash: Identifier
     policy_hash: Identifier
     changed_fields: list[Identifier] = Field(min_length=1, max_length=20)
 

@@ -4,7 +4,7 @@ import aiosqlite
 import pytest
 
 from app.db.database import get_db
-from app.db.migrations import Migration, apply_migrations
+from app.db.migrations import MIGRATIONS, Migration, apply_migrations
 from app.db.repositories import EventRepository, SessionRepository, UnsafePersistencePayload
 
 
@@ -41,7 +41,7 @@ async def test_fresh_database_has_every_phase_2_1_table_and_migration_metadata(t
         await database.close()
 
     assert REQUIRED_TABLES <= tables
-    assert versions == [1, 2, 3, 4, 5, 6]
+    assert versions == [1, 2, 3, 4, 5, 6, 7]
     assert "idx_events_session_sequence" in event_indexes
 
 
@@ -73,6 +73,39 @@ async def test_pre_migration_prototype_database_upgrades_without_losing_session_
             row = await cursor.fetchone()
 
     assert dict(row) == {"task": "old task", "goal": "old task", "created_at_ms": 1000}
+
+
+@pytest.mark.asyncio
+async def test_configuration_version_migration_preserves_rows_and_allows_policy_restoration(tmp_path, monkeypatch) -> None:
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "db_path", str(tmp_path / "configuration-v7.db"))
+    database = await get_db()
+    try:
+        await apply_migrations(database, MIGRATIONS[:6])
+        await create_session(database)
+        await database.execute(
+            """INSERT INTO session_configurations (id, session_id, version, available_agent_ids_json,
+               required_role_rules_json, execution_limits_json, approval_behavior_json, acknowledgements_json,
+               policy_hash, created_at_ms)
+               VALUES ('config_1', 'session_1', 1, '[]', '[]', '{}', '{}', '[]', 'same_policy', 1)"""
+        )
+        await database.commit()
+        await apply_migrations(database)
+        async with database.execute("SELECT id, policy_hash FROM session_configurations") as cursor:
+            preserved = await cursor.fetchall()
+        await database.execute(
+            """INSERT INTO session_configurations (id, session_id, version, available_agent_ids_json,
+               required_role_rules_json, execution_limits_json, approval_behavior_json, acknowledgements_json,
+               policy_hash, created_at_ms)
+               VALUES ('config_2', 'session_1', 2, '[]', '[]', '{}', '{}', '[]', 'same_policy', 2)"""
+        )
+        with pytest.raises(aiosqlite.IntegrityError, match="session configurations are immutable"):
+            await database.execute("UPDATE session_configurations SET policy_hash = 'changed' WHERE id = 'config_1'")
+    finally:
+        await database.close()
+
+    assert [dict(row) for row in preserved] == [{"id": "config_1", "policy_hash": "same_policy"}]
 
 
 @pytest.mark.asyncio

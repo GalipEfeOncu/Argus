@@ -134,7 +134,7 @@ be omitted or set to `null` where the schema allows.
 | `message.created` | `messageId`, `authorId`, `authorKind`, `content` | `mentionIds`, `streaming` |
 | `message.delta` | `messageId`, `delta` | — |
 | `message.completed` | `messageId` | — |
-| `session.configuration_updated` | `configurationVersion`, `policyHash`, `changedFields` | — |
+| `session.configuration_updated` | `configurationVersion`, `previousPolicyHash`, `policyHash`, `changedFields` | — |
 | `assignment.proposed` | `proposalId`, `assigneeAgentId`, `objective`, `acceptanceCriteria`, `operationClass`, `reasonSummary` | `parentId`, `requestedCapabilities` |
 | `assignment.created` | `assignmentId`, `proposalId`, `assigneeAgentId`, `configurationVersion`, `policyHash`, `operationClass` | — |
 | `assignment.started` | `assignmentId`, `assigneeAgentId` | — |
@@ -176,8 +176,9 @@ For `approval.resolve`, `resolution` is `approve`, `reject`, or `grant`; a
 grant requires non-empty bounded `grantCapabilities` and a non-empty
 human-readable `scopeSummary`. `approve` and `reject` must not carry
 `grantCapabilities`, so ignored capabilities cannot widen a permission. A
-configuration `patch` may set `availableAgentIds`, `requiredRoleRules`,
-`approvalBehavior`, or `limitResolution`; a capability-based required-role rule
+configuration `patch` may set `availableAgentIds`, `requiredRoleRules`, any
+`executionLimits` field, `approvalBehavior`, `permissionProfile`,
+`preauthorizedCapabilities`, or `limitResolution`; a capability-based required-role rule
 includes `capability`, while other rule applicability values must omit it.
 Decision choices are `reassign`, `change_approach`, `deliver_partial`, or
 `stop`. Limit resolution is `ask_user`, `coordinator_decides`, or `stop`.
@@ -186,44 +187,41 @@ Decision choices are `reassign`, `change_approach`, `deliver_partial`, or
 
 `POST /sessions` accepts durable configuration. IDs below reference existing
 project and agent-definition resources; secrets are never accepted here.
+The backend stores a fresh immutable session-agent snapshot for every supplied
+agent and returns those session-snapshot IDs in normalized `availableAgentIds`.
 
 ```json
 {
   "projectId": "prj_01...",
   "goal": "Add rate limiting and verify it",
   "coordinatorAgentId": "agd_coordinator",
-  "availableAgentIds": ["agd_builder", "agd_reviewer", "agd_tester"],
-  "requiredRoleRules": [
-    {
-      "id": "gate_review",
-      "role": "reviewer",
-      "applicability": "when_changes",
-      "successEvidence": "approved_review",
-      "minimumCompletions": 1
-    }
+  "agents": [
+    { "id": "agd_coordinator", "role": "coordinator" },
+    { "id": "agd_builder", "role": "builder", "capabilities": ["workspace.write"] },
+    { "id": "agd_reviewer", "role": "reviewer", "capabilities": ["workspace.read"] },
+    { "id": "agd_tester", "role": "tester", "capabilities": ["test.run"] }
   ],
-  "executionLimits": {
-    "maxRevisionsPerFinding": 3,
-    "maxAssignmentAttempts": 8,
-    "maxModelIterationsPerAssignment": 20,
-    "maxToolCallsPerAssignment": 100,
-    "maxSessionTokens": 500000,
-    "maxSessionCost": null,
-    "maxWallClockSeconds": 14400,
-    "maxParallelReadOnlyAssignments": 3,
-    "softWarningRatio": 0.8
-  },
-  "approvalPolicy": {
-    "permissionProfile": "autonomous",
-    "behavior": "preauthorize_session",
-    "preauthorizedCapabilities": [
-      "workspace.read",
-      "workspace.write",
-      "test.run"
+  "configuration": {
+    "availableAgentIds": ["agd_builder", "agd_reviewer", "agd_tester"],
+    "requiredRoleRules": [
+      {
+        "id": "gate_review",
+        "role": "reviewer",
+        "applicability": "when_changes",
+        "successEvidence": "approved_review",
+        "minimumCompletions": 1
+      }
     ],
-    "limitResolution": "coordinator_decides"
-  },
-  "workspacePolicy": { "mode": "worktree" }
+    "executionLimits": { "maxSessionTokens": 500000 },
+    "approvalPolicy": {
+      "permissionProfile": "autonomous",
+      "behavior": "preauthorize_session",
+      "preauthorizedCapabilities": ["workspace.read", "workspace.write", "test.run"],
+      "limitResolution": "coordinator_decides"
+    },
+    "workspacePolicy": { "mode": "worktree" },
+    "acknowledgements": ["autonomous_permissions"]
+  }
 }
 ```
 
@@ -232,13 +230,17 @@ equal to zero or `null`; `maxSessionCost` is a non-negative decimal amount or
 `null`. `0` prohibits the counted action; `null` removes the user ceiling but remains
 subject to runtime resource and safety guards. `softWarningRatio` is greater
 than zero and at most one. The server returns a normalized snapshot,
-`configurationVersion`, policy hash, defaults resolved by the backend, and any
-required acknowledgement descriptors.
+`configurationVersion`, policy hash, defaults resolved by the backend, and
+acknowledgement descriptors. `direct_write` requires the limited-rollback
+acknowledgement; Autonomous and Expert unrestricted profiles require their
+respective permission acknowledgements before creation.
 
 Validation rejects duplicate agents, a Coordinator in `availableAgentIds`, a
 required rule with no eligible available agent, unsupported evidence types,
 unsafe preauthorizations, and limits that contradict the selected workspace or
-permission profile. Rejections use stable machine-readable error codes.
+permission profile. Rejections use stable `detail.code` values such as
+`duplicate_agent_id`, `required_role_unavailable`, `unsafe_preauthorization`,
+and `acknowledgement_required`.
 
 ### Required-role rule
 
@@ -252,12 +254,15 @@ evidence.
 ### Configuration updates
 
 `session.configuration.update` contains `expectedConfigurationVersion` and a
-partial patch. The command is rejected on version conflict. Accepted changes
-increment the version and apply only to future dispatches. Removing an active
-agent or reducing a permission returns a `consequences` preview unless
-`confirmConsequences` is true; once confirmed, the scheduler interrupts work
-that is no longer valid. Counters never decrease and completed evidence remains
-auditable.
+partial patch. The command is rejected with `stale_configuration_version` on a
+version conflict. Accepted changes append an immutable version and apply only
+to future dispatches. Removing an active agent or reducing a permission emits
+a recoverable `configuration_preview_required` consequence preview unless
+`confirmConsequences` is true; confirmation interrupts affected active
+assignments in the same durable command outcome. Counters never decrease and
+completed evidence remains auditable. Confirming a consequence preview is a
+new command and therefore uses a new `commandId`; retransmitting either the
+preview request or the confirmation keeps that command's original ID.
 
 ## Assignment contract
 
@@ -314,6 +319,9 @@ most 200 canonical events and exposes `nextAfterSequence` when more rows exist.
 returns at most 100 artifact summaries and exposes `nextCursor`. Both queries
 use their session cursor indexes and return metadata only; neither endpoint
 hydrates artifact bodies or the complete event log.
+
+`GET /sessions/{sessionId}/configuration` returns the latest normalized,
+immutable configuration snapshot after process restart.
 
 REST schemas are generated from FastAPI OpenAPI. Clients must not hand-maintain duplicate request/response interfaces.
 

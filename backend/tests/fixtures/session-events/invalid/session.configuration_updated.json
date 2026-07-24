@@ -8,6 +8,7 @@
   "type": "session.configuration_updated",
   "payload": {
     "configurationVersion": 2,
+    "previousPolicyHash": "policy_hash_00",
     "policyHash": "policy_hash_01",
     "changedFields": [
       "availableAgentIds"

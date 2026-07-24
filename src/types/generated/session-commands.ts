@@ -54,7 +54,18 @@ export type Confirmconsequences = boolean;
 export type Expectedconfigurationversion = number;
 export type Approvalbehavior = ("ask_each_time" | "ask_by_policy" | "preauthorize_session" | "deny_interactive") | null;
 export type Availableagentids = string[] | null;
+export type Maxassignmentattempts = number | null;
+export type Maxmodeliterationsperassignment = number | null;
+export type Maxparallelreadonlyassignments = number | null;
+export type Maxrevisionsperfinding = number | null;
+export type Maxsessioncost = number | null;
+export type Maxsessiontokens = number | null;
+export type Maxtoolcallsperassignment = number | null;
+export type Maxwallclockseconds = number | null;
+export type Softwarningratio = number | null;
 export type Limitresolution = ("ask_user" | "coordinator_decides" | "stop") | null;
+export type Permissionprofile = ("strict" | "balanced" | "autonomous" | "expert_unrestricted") | null;
+export type Preauthorizedcapabilities = string[] | null;
 export type Requiredrolerules = RequiredRoleRulePatch[] | null;
 export type Applicability = "always" | "when_changes" | "when_capability_used";
 export type Capability = string | null;
@@ -152,8 +163,25 @@ export interface SessionConfigurationUpdatePayload {
 export interface SessionConfigurationPatch {
   approvalBehavior?: Approvalbehavior;
   availableAgentIds?: Availableagentids;
+  executionLimits?: ExecutionLimitsPatch | null;
   limitResolution?: Limitresolution;
+  permissionProfile?: Permissionprofile;
+  preauthorizedCapabilities?: Preauthorizedcapabilities;
   requiredRoleRules?: Requiredrolerules;
+}
+/**
+ * Partial limit change; omitted fields retain their current ceiling.
+ */
+export interface ExecutionLimitsPatch {
+  maxAssignmentAttempts?: Maxassignmentattempts;
+  maxModelIterationsPerAssignment?: Maxmodeliterationsperassignment;
+  maxParallelReadOnlyAssignments?: Maxparallelreadonlyassignments;
+  maxRevisionsPerFinding?: Maxrevisionsperfinding;
+  maxSessionCost?: Maxsessioncost;
+  maxSessionTokens?: Maxsessiontokens;
+  maxToolCallsPerAssignment?: Maxtoolcallsperassignment;
+  maxWallClockSeconds?: Maxwallclockseconds;
+  softWarningRatio?: Softwarningratio;
 }
 export interface RequiredRoleRulePatch {
   applicability: Applicability;

@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 from fastapi import APIRouter, HTTPException, Query
-from app.schemas.session import SessionCreateRequest
+from app.schemas.session import SessionCreateRequest, SessionCreateResponse, SessionConfigurationResponse
 from app.db.database import get_db
 from app.db.repositories import EventRepository, SessionRepository
 from app.schemas.session_store import ArtifactPageResponse, TimelinePageResponse
@@ -10,27 +10,54 @@ from app.services.workspace_service import ProjectWorkspaceService, WorkspaceErr
 from app.schemas.project import WorkspaceMode
 from app.config import settings
 from pathlib import Path
+from app.db.database import transaction
+from app.services.session_configuration_service import ConfigurationError, SessionConfigurationService
+from app.schemas.session import SessionAgentInput
 
 router = APIRouter()
 
 
-@router.post("/", response_model=dict)
+@router.post("/", response_model=SessionCreateResponse)
 async def create_session(req: SessionCreateRequest):
     session_id = str(uuid.uuid4())
     name = req.name or f"Session {datetime.now().strftime('%m/%d %H:%M')}"
+    goal = req.goal or req.task
+    assert goal is not None
 
     db = await get_db()
     try:
         workspace_service = ProjectWorkspaceService(
             db, managed_root=Path(settings.db_path).expanduser().resolve().parent / "workspaces"
         )
-        project = await workspace_service.register_project(req.project_path)
+        if req.project_id is not None:
+            projects = [project for project in await workspace_service.list_projects() if project["id"] == req.project_id]
+            if not projects:
+                raise ConfigurationError("project_not_found", "The selected project is not registered.")
+            project = projects[0]
+        else:
+            assert req.project_path is not None
+            project = await workspace_service.register_project(req.project_path)
+        configured_mode = req.configuration.workspace_policy.mode
+        if req.workspace_mode is not None and configured_mode is not None and req.workspace_mode != configured_mode:
+            raise ConfigurationError("workspace_mode_conflict", "workspaceMode must match configuration.workspacePolicy.mode.")
+        mode = configured_mode or req.workspace_mode or (WorkspaceMode.worktree if project["gitMetadata"]["isGit"] else WorkspaceMode.snapshot)
+        agents = list(req.agents) or SessionConfigurationService.legacy_agents(
+            [role_config.model_dump(by_alias=True) for role_config in req.role_configs]
+        )
+        coordinator_id = req.coordinator_agent_id or next((agent.id for agent in agents if agent.role == "coordinator"), "coordinator")
+        if not any(agent.id == coordinator_id for agent in agents):
+            agents.append(SessionAgentInput(id=coordinator_id, role="coordinator"))
+        # Validate before provisioning an isolated workspace so invalid input
+        # never leaves a worktree/snapshot behind.
+        SessionConfigurationService._validate(
+            agents, coordinator_id, req.configuration, mode.value,
+            acknowledged_direct_write=req.acknowledge_direct_write,
+        )
         await SessionRepository(db).create_legacy_session(
-            session_id=session_id, name=name, project_path=project["canonicalPath"], task=req.task,
+            session_id=session_id, name=name, project_path=project["canonicalPath"], task=goal,
             role_configs=[role_config.model_dump() for role_config in req.role_configs],
             project_id=str(project["id"]),
         )
-        mode = req.workspace_mode or (WorkspaceMode.worktree if project["gitMetadata"]["isGit"] else WorkspaceMode.snapshot)
         try:
             workspace = await workspace_service.prepare_workspace(
                 session_id=session_id, project_id=str(project["id"]), mode=mode,
@@ -40,12 +67,30 @@ async def create_session(req: SessionCreateRequest):
             await SessionRepository(db).discard_unstarted_session(session_id)
             raise
         await SessionRepository(db).set_workspace_path(session_id, str(workspace.root_path))
+        try:
+            async with transaction(db):
+                snapshot = await SessionConfigurationService(db).create_initial(
+                    session_id=session_id, agents=agents, coordinator_id=coordinator_id,
+                    configuration=req.configuration, workspace_mode=mode.value,
+                    acknowledged_direct_write=req.acknowledge_direct_write,
+                )
+        except BaseException:
+            # Provisioning is all-or-nothing: a failed immutable snapshot must
+            # not strand a managed workspace or worktree.
+            try:
+                await workspace_service.cleanup_workspace(session_id)
+            finally:
+                await SessionRepository(db).discard_unstarted_session(session_id)
+            raise
+    except ConfigurationError as error:
+        await SessionRepository(db).discard_unstarted_session(session_id)
+        raise HTTPException(422, {"code": error.code, "message": str(error)}) from error
     except (WorkspaceError, OSError) as error:
         raise HTTPException(422, {"code": "workspace_setup_failed", "message": str(error)}) from error
     finally:
         await db.close()
 
-    return {"id": session_id, "name": name}
+    return {"id": session_id, "name": name, "projectId": project["id"], "goal": goal, **snapshot.wire_value()}
 
 
 @router.get("/")
@@ -67,6 +112,22 @@ async def get_session(session_id: str):
     if not row:
         raise HTTPException(404, "Session not found")
     return dict(row)
+
+
+@router.get("/{session_id}/configuration", response_model=SessionConfigurationResponse)
+async def get_session_configuration(session_id: str):
+    """Return the latest immutable normalized configuration snapshot."""
+
+    db = await get_db()
+    try:
+        if await SessionRepository(db).get_legacy_session(session_id) is None:
+            raise HTTPException(404, "Session not found")
+        snapshot = await SessionConfigurationService(db).current(session_id)
+        return snapshot.wire_value()
+    except ConfigurationError as error:
+        raise HTTPException(404, {"code": error.code, "message": str(error)}) from error
+    finally:
+        await db.close()
 
 
 @router.get("/{session_id}/timeline", response_model=TimelinePageResponse)

@@ -105,8 +105,16 @@ class SessionRepository:
             )
 
     async def discard_unstarted_session(self, session_id: str) -> None:
-        """Remove a session only when initial workspace provisioning failed."""
+        """Remove an aborted setup session and its setup-only workspace records."""
         async with transaction(self._db):
+            await self._db.execute(
+                "DELETE FROM workspace_audit WHERE session_id = ? AND EXISTS (SELECT 1 FROM sessions WHERE id = ? AND status = 'setup')",
+                (session_id, session_id),
+            )
+            await self._db.execute(
+                "DELETE FROM workspaces WHERE session_id = ? AND EXISTS (SELECT 1 FROM sessions WHERE id = ? AND status = 'setup')",
+                (session_id, session_id),
+            )
             await self._db.execute("DELETE FROM sessions WHERE id = ? AND status = 'setup'", (session_id,))
 
     async def list_legacy_sessions(self, *, limit: int = 50) -> list[dict[str, Any]]:

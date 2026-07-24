@@ -11,6 +11,7 @@ import aiosqlite
 from app.db.database import transaction
 from app.db.repositories import EventRepository, StoredEvent, _now_ms, _safe_json
 from app.schemas.session_commands import ArgusSessionCommand
+from app.services.session_configuration_service import ConfigurationError, SessionConfigurationService
 
 
 class CommandRejected(ValueError):
@@ -56,7 +57,11 @@ class CommandProcessor:
                 return CommandOutcome(duplicate, True)
 
             status = await self._current_status(session_id)
-            specs = self._outcome_specs(session_id, command, status)
+            if command.type == "session.configuration.update":
+                specs, interrupted_assignments = await self._configuration_outcome_specs(session_id, command)
+            else:
+                specs = self._outcome_specs(session_id, command, status)
+                interrupted_assignments = ()
             persisted: list[StoredEvent] = []
             for index, (event_type, actor_id, payload) in enumerate(specs):
                 event = await self._events._append_in_transaction(
@@ -66,6 +71,11 @@ class CommandProcessor:
                     command_id=command.command_id if index == 0 else None,
                 )
                 persisted.append(event)
+            if interrupted_assignments:
+                await self._db.executemany(
+                    "UPDATE assignments SET state = 'interrupted', updated_at_ms = ? WHERE id = ? AND session_id = ?",
+                    [(_now_ms(), assignment_id, session_id) for assignment_id in interrupted_assignments],
+                )
             await self._db.execute(
                 """INSERT INTO command_receipts
                    (session_id, command_id, command_type, command_json, outcome_event_id,
@@ -139,13 +149,49 @@ class CommandProcessor:
                 }),
                 ("session.status_changed", "system", {"status": target, "reasonSummary": "Decision applied."}),
             ]
-        if command.type == "session.configuration.update":
-            changed = list(command.payload.patch.model_fields_set)
-            return [("session.configuration_updated", "human", {
-                "configurationVersion": command.payload.expected_configuration_version + 1,
-                "policyHash": f"pending_{command.command_id}", "changedFields": changed,
-            })]
         raise CommandRejected(f"unsupported_command:{command.type}")
+
+    async def _configuration_outcome_specs(
+        self, session_id: str, command: ArgusSessionCommand,
+    ) -> tuple[list[tuple[str, str, dict[str, Any]]], tuple[str, ...]]:
+        """Preview authority reductions before committing an immutable version."""
+
+        # The union is narrowed by process(), but retain a defensive guard so
+        # future callers cannot bypass the discriminated command contract.
+        if command.type != "session.configuration.update":
+            raise CommandRejected("unsupported_configuration_command")
+        service = SessionConfigurationService(self._db)
+        try:
+            current = await service.current(session_id)
+            if current.version != command.payload.expected_configuration_version:
+                raise ConfigurationError("stale_configuration_version", "Configuration version is stale; refresh and retry.")
+            consequences = await service.consequences(session_id, current, command.payload.patch)
+            if consequences.requires_confirmation and not command.payload.confirm_consequences:
+                return [(
+                    "error.created", "system", {
+                        "errorId": f"configuration_preview_{command.command_id}",
+                        "code": "configuration_preview_required", "summary": consequences.summary,
+                        "recoverable": True,
+                    },
+                )], ()
+            snapshot, consequences = await service.update(
+                session_id, command.payload.expected_configuration_version, command.payload.patch,
+            )
+        except ConfigurationError as error:
+            raise CommandRejected(error.code) from error
+        changed = [field for field in command.payload.patch.model_fields_set]
+        specs: list[tuple[str, str, dict[str, Any]]] = [(
+            "session.configuration_updated", "human", {
+                "configurationVersion": snapshot.version, "previousPolicyHash": current.policy_hash,
+                "policyHash": snapshot.policy_hash, "changedFields": changed,
+            },
+        )]
+        for assignment_id in consequences.invalid_assignment_ids:
+            specs.append(("assignment.cancelled", "system", {
+                "assignmentId": assignment_id,
+                "reasonSummary": "Interrupted because the confirmed session configuration no longer permits this work.",
+            }))
+        return specs, consequences.invalid_assignment_ids
 
     def _status_spec(self, current: str, target: str, reason: str) -> tuple[str, str, dict[str, Any]]:
         self._require_transition(current, target)

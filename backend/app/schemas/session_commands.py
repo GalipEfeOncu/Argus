@@ -2,8 +2,9 @@
 
 from typing import Annotated, Any, Literal, Union
 
-from pydantic import Field, TypeAdapter, model_validator
+from pydantic import Field, TypeAdapter, field_validator, model_validator
 
+from app.schemas.session import ExecutionLimitsPatch
 from app.schemas.session_events import CamelModel, Content, Identifier, Summary
 
 
@@ -117,6 +118,9 @@ class SessionConfigurationPatch(CamelModel):
     approval_behavior: Literal[
         "ask_each_time", "ask_by_policy", "preauthorize_session", "deny_interactive"
     ] | None = None
+    permission_profile: Literal["strict", "balanced", "autonomous", "expert_unrestricted"] | None = None
+    preauthorized_capabilities: list[Identifier] | None = Field(default=None, max_length=50)
+    execution_limits: ExecutionLimitsPatch | None = None
     limit_resolution: Literal["ask_user", "coordinator_decides", "stop"] | None = None
 
     @model_validator(mode="after")
@@ -124,6 +128,13 @@ class SessionConfigurationPatch(CamelModel):
         if not self.model_fields_set:
             raise ValueError("patch must change at least one field")
         return self
+
+    @field_validator("execution_limits")
+    @classmethod
+    def require_limits_object_when_present(cls, value: ExecutionLimitsPatch | None) -> ExecutionLimitsPatch | None:
+        if value is None:
+            raise ValueError("executionLimits must be an object when supplied")
+        return value
 
 
 class SessionConfigurationUpdatePayload(CamelModel):
