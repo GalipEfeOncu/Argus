@@ -132,6 +132,23 @@ test('pending commands retry with the same idempotency key and resolve only from
   expect(client.getProjection().status).toBe('paused');
 });
 
+test('a canonical rejected-command error clears its pending command without forcing a resync', () => {
+  const transport = new InMemorySessionTransport();
+  const client = new SessionStreamClient(transport, sessionId);
+  client.connect();
+  transport.emit(snapshot());
+  const command = { commandId: 'cmd_terminal_start', type: 'session.start' as const, payload: {} };
+
+  client.send(command);
+  transport.emit(event(1, 'error.created', {
+    errorId: 'err_terminal_start', code: 'command_rejected', summary: 'This session is already complete.', recoverable: true,
+  }, { correlationId: command.commandId }));
+
+  expect(client.getProjection().pendingCommands[command.commandId]).toBeUndefined();
+  expect(client.getProjection().lastError).toMatchObject({ summary: 'This session is already complete.', recoverable: true });
+  expect(client.getProjection().resyncReason).toBeNull();
+});
+
 test('stale snapshots cannot overwrite newer projected state', () => {
   let state = reduceSessionEvent(createSessionProjection(sessionId), snapshot()).state;
   state = reduceSessionEvent(state, event(1, 'session.status_changed', { status: 'paused' })).state;

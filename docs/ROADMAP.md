@@ -556,7 +556,7 @@ Current status (2026-07-26):
   pipeline have been removed; canonical shared-room transport remains at
   `/ws/sessions/{session_id}`.
 
-### 3.4 First real vertical task
+### 3.4 First real vertical task (✅ Completed)
 
 Deliverables:
 
@@ -571,6 +571,21 @@ End-to-end acceptance:
 - Every visible operation has a persisted event and correlation.
 - Cancel prevents additional provider/tool output from mutating state.
 - The resulting diff is reviewable and the original project is unchanged.
+
+Current status (2026-07-26):
+
+- ✅ New sessions are created by the local runtime and load through the canonical
+  replayable WebSocket reducer rather than launching simulator data. A created
+  live session starts once its canonical snapshot arrives; reconnect replays
+  the same persisted room events.
+- ✅ The provider-neutral reference task now runs from live session commands:
+  Coordinator routes an isolated Builder assignment, the user grants the
+  bounded `workspace.write` capability, and the Builder records tool activity,
+  a reviewable diff artifact, evidence, and terminal status without modifying
+  the selected project.
+- ✅ Pause, resume, cancel, human correction, and reconnect are covered on the
+  live transport. Cancellation and participant interruption serialize with an
+  in-flight workspace mutation, so accepted cancellation fences later output.
 
 Phase 3 exit: the static fixed pipeline is no longer session orchestration and a
 Coordinator dynamically completes one provider-neutral isolated coding task.

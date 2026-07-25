@@ -105,8 +105,10 @@ Commands use `{ "commandId", "type", "payload" }`; `commandId` is the idempotenc
 The target Pydantic unions in `backend/app/schemas/session_events.py` and
 `backend/app/schemas/session_commands.py` are the normative machine-readable
 definitions. They reject unknown fields at every modeled level, serialize using
-camelCase, and use `type` as their discriminator. The existing live WebSocket
-handler is transitional and does not yet emit or consume these shapes.
+camelCase, and use `type` as their discriminator. The live WebSocket handler
+at `/ws/sessions/{sessionId}` validates and emits these canonical shapes; the
+client applies both replayed and live events through the same reducer used by
+the event simulator.
 
 All server-event branches share the envelope shown above. `eventId`,
 `sessionId`, `actorId`, and optional `correlationId` are non-empty opaque IDs;
@@ -180,6 +182,19 @@ configuration `patch` may set `availableAgentIds`, `requiredRoleRules`, any
 includes `capability`, while other rule applicability values must omit it.
 Decision choices are `reassign`, `change_approach`, `deliver_partial`, or
 `stop`. Limit resolution is `ask_user`, `coordinator_decides`, or `stop`.
+
+### First isolated vertical task
+
+For the current provider-neutral reference task, `session.start` persists the
+Coordinator handoff and then requests one bounded `workspace.write` grant.
+After a human `approval.resolve` command with `resolution: "grant"`, the
+Builder writes only inside the session worktree or snapshot, records the tool
+lifecycle and diff artifact, and completes with evidence. These worker events
+are appended before live fan-out, so reconnect uses the same ordered replay.
+Pause, resume, cancel, and human messages remain normal canonical commands;
+an accepted cancellation is serialized with an in-flight workspace mutation.
+Rejected commands are emitted as correlated `error.created` events rather than
+an out-of-band WebSocket payload, allowing clients to clear pending state.
 
 ## Session configuration contract
 
@@ -383,8 +398,7 @@ canonical Pydantic adapters to `contracts/session-events.schema.json` and
 `contracts/session-commands.schema.json`, exports the FastAPI application to
 `contracts/openapi.json`, and generates the corresponding TypeScript files in
 `src/types/generated/`. Generated files carry a provenance marker and must not
-be edited by hand. The legacy WebSocket transport types remain separate and
-transitional until the runtime migration consumes the canonical envelope.
+be edited by hand.
 
 ## Compatibility rule
 

@@ -1,14 +1,16 @@
 import React, { useMemo, useState } from 'react';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useSessionStore } from '@/stores/sessionStore';
+import { useAgentStore } from '@/stores/agentStore';
 import { useUIStore } from '@/stores/uiStore';
 import { useTauri } from '@/hooks/useTauri';
-import { eventSimulator } from '@/services/eventSimulator';
+import { api } from '@/services/api';
 import {
   applyPreset, authoritySummary, createConfiguration, limitDefinitions, markCustom,
   roleEvidence, validateConfiguration,
 } from '@/services/sessionConfiguration';
 import type { AgentInstance, ApprovalBehavior, ApprovalPolicy, ExecutionLimits, RequiredRoleRule, SessionConfiguration, SessionPreset, WorkspaceMode } from '@/types/session';
+import type { AgentInfo, AgentRole, ModelRef } from '@/types/agent';
 import './SessionSetup.css';
 
 const capabilityOptions = ['workspace.read', 'workspace.write', 'test.run'];
@@ -17,14 +19,76 @@ function visibleAgentNames(configuration: SessionConfiguration): string {
   return configuration.availableAgents.filter((agent) => configuration.availableAgentIds.includes(agent.id)).map((agent) => agent.label).join(', ') || 'No specialists';
 }
 
+function toSessionCreateRequest(
+  projectPath: string,
+  goal: string,
+  configuration: SessionConfiguration,
+): Parameters<typeof api.sessions.create>[0] {
+  const acknowledgements: string[] = [];
+  if (configuration.workspaceMode === 'direct_write' && configuration.directWriteAcknowledged) {
+    acknowledgements.push('direct_write_limited_rollback');
+  }
+  if (configuration.approvalPolicy.permissionProfile === 'autonomous' && configuration.preauthorizationAcknowledged) {
+    acknowledgements.push('autonomous_permissions');
+  }
+  return {
+    projectPath,
+    goal,
+    coordinatorAgentId: 'coordinator',
+    agents: [
+      { id: 'coordinator', role: 'coordinator' },
+      ...configuration.availableAgents.map((agent) => ({ id: agent.id, role: agent.role, capabilities: agent.capabilities })),
+    ],
+    configuration: {
+      availableAgentIds: configuration.availableAgentIds,
+      requiredRoleRules: configuration.requiredRoleRules.map((rule) => ({
+        id: rule.id,
+        role: rule.role,
+        applicability: rule.applicability,
+        successEvidence: rule.successEvidence,
+        minimumCompletions: rule.minimumCompletions,
+        ...(rule.capability === undefined ? {} : { capability: rule.capability }),
+      })),
+      executionLimits: configuration.executionLimits,
+      approvalPolicy: configuration.approvalPolicy,
+      workspacePolicy: { mode: configuration.workspaceMode },
+      acknowledgements,
+    },
+    workspaceMode: configuration.workspaceMode,
+    acknowledgeDirectWrite: configuration.directWriteAcknowledged,
+  };
+}
+
+function liveAgentInfos(
+  configuration: SessionConfiguration,
+  snapshots: Array<{ id: string; sourceAgentId: string; role: string }>,
+): AgentInfo[] {
+  const fallbackModel: ModelRef = { providerId: 'local', modelId: 'provider-neutral', displayName: 'Provider-neutral task' };
+  return snapshots.map((snapshot) => {
+    const source = configuration.availableAgents.find((agent) => agent.id === snapshot.sourceAgentId);
+    const modelRef = source?.modelRef ?? configuration.coordinatorModel ?? fallbackModel;
+    return {
+      instanceId: snapshot.id,
+      label: source?.label ?? (snapshot.role === 'coordinator' ? 'Coordinator' : snapshot.role),
+      role: snapshot.role as AgentRole,
+      status: 'idle',
+      modelRef,
+      tokenCount: 0,
+    };
+  });
+}
+
 export const SessionSetup: React.FC = () => {
   const { defaultRoleModels } = useSettingsStore();
   const { createSession } = useSessionStore();
+  const { initAgents } = useAgentStore();
   const { setActivePage } = useUIStore();
   const { openDirectoryDialog } = useTauri();
   const [projectPath, setProjectPath] = useState('');
   const [goal, setGoal] = useState('');
   const [configuration, setConfiguration] = useState(() => createConfiguration(defaultRoleModels));
+  const [startError, setStartError] = useState<string | null>(null);
+  const [isStarting, setIsStarting] = useState(false);
 
   const validation = useMemo(() => validateConfiguration(configuration), [configuration]);
   const canStart = projectPath.trim().length > 0 && goal.trim().length > 0 && validation.length === 0;
@@ -101,13 +165,24 @@ export const SessionSetup: React.FC = () => {
     };
   });
 
-  const handleStart = () => {
+  const handleStart = async () => {
     if (!canStart) return;
+    setStartError(null);
+    setIsStarting(true);
     const roleConfigs = [{ instanceId: 'coordinator', role: 'coordinator' as const, enabled: true, modelRef: configuration.coordinatorModel!, customSystemPrompt: configuration.coordinatorPromptOverride || undefined },
       ...configuration.availableAgents.filter((agent) => configuration.availableAgentIds.includes(agent.id)).map((agent) => ({ instanceId: agent.id, role: agent.role, enabled: true, modelRef: agent.modelRef!, }))];
-    const sessionId = createSession({ projectPath, task: goal.trim(), roleConfigs, configuration });
-    eventSimulator.start(sessionId, configuration);
-    setActivePage('session');
+    try {
+      const created = await api.sessions.create(toSessionCreateRequest(projectPath, goal.trim(), configuration));
+      // The local store only retains render metadata.  The canonical snapshot
+      // and every timeline entry arrive through the live transport.
+      initAgents(liveAgentInfos(configuration, created.agentSnapshots));
+      createSession({ projectPath, task: goal.trim(), roleConfigs, configuration }, created.id);
+      setActivePage('session');
+    } catch {
+      setStartError('The local runtime could not create this isolated session. Check that the backend is running and try again.');
+    } finally {
+      setIsStarting(false);
+    }
   };
 
   return (
@@ -177,7 +252,8 @@ export const SessionSetup: React.FC = () => {
             <ul className="review-summary">{authoritySummary(configuration).map((item) => <li key={item}>{item}</li>)}</ul>
             {validation.length > 0 && <div className="setup-validation" role="alert"><strong>Resolve before starting</strong><ul>{validation.map((error) => <li key={error}>{error}</li>)}</ul></div>}
             {!projectPath && <p className="setup-muted">Select a workspace to start.</p>}{!goal.trim() && <p className="setup-muted">Describe the goal to start.</p>}
-            <button className="setup-init-btn" type="button" onClick={handleStart} disabled={!canStart}>Start Coordinator session</button>
+            {startError !== null && <p className="setup-validation" role="alert">{startError}</p>}
+            <button className="setup-init-btn" type="button" onClick={() => void handleStart()} disabled={!canStart || isStarting}>{isStarting ? 'Creating isolated session…' : 'Start Coordinator session'}</button>
           </section>
         </div>
       </div>

@@ -17,13 +17,17 @@ export class WebSocketSessionTransport implements SessionTransport {
   private socket: WebSocket | null = null;
   private intentionalClose = false;
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+  private readonly pendingWireCommands: ArgusSessionCommand[] = [];
 
   connect(sessionId: string, afterSequence: number, handlers: TransportHandlers): void {
     this.disconnect();
     this.intentionalClose = false;
     const socket = new WebSocket(`${WS_BASE}/ws/sessions/${encodeURIComponent(sessionId)}?after_sequence=${afterSequence}`);
     this.socket = socket;
-    socket.onopen = () => handlers.onConnectionState('connected');
+    socket.onopen = () => {
+      handlers.onConnectionState('connected');
+      this.flushPendingCommands(socket);
+    };
     socket.onmessage = (message) => {
       try {
         handlers.onEvent(JSON.parse(String(message.data)) as unknown);
@@ -53,9 +57,20 @@ export class WebSocketSessionTransport implements SessionTransport {
   }
 
   send(command: ArgusSessionCommand): boolean {
-    if (this.socket?.readyState !== WebSocket.OPEN) return false;
+    if (this.socket === null || this.socket.readyState === WebSocket.CLOSING || this.socket.readyState === WebSocket.CLOSED) return false;
+    if (this.socket.readyState !== WebSocket.OPEN) {
+      this.pendingWireCommands.push(command);
+      return true;
+    }
     this.socket.send(JSON.stringify(command));
     return true;
+  }
+
+  private flushPendingCommands(socket: WebSocket): void {
+    while (this.pendingWireCommands.length > 0 && socket.readyState === WebSocket.OPEN) {
+      const command = this.pendingWireCommands.shift();
+      if (command !== undefined) socket.send(JSON.stringify(command));
+    }
   }
 }
 
@@ -63,17 +78,29 @@ class WebSocketManager {
   private client: SessionStreamClient | null = null;
   private sessionId: string | null = null;
   private unsubscribeProjection: (() => void) | null = null;
+  private connectionConsumers = 0;
 
   connect(sessionId: string): void {
+    if (this.sessionId === sessionId) {
+      this.connectionConsumers += 1;
+      return;
+    }
+    this.teardown();
     this.sessionId = sessionId;
+    this.connectionConsumers = 1;
     if (eventSimulator.isActive(sessionId)) return;
-    this.disconnect();
-    this.client = new SessionStreamClient(new WebSocketSessionTransport(), sessionId);
-    this.unsubscribeProjection = this.client.subscribe((projection, update) => {
+    const client = new SessionStreamClient(new WebSocketSessionTransport(), sessionId);
+    let startRequested = false;
+    this.client = client;
+    this.unsubscribeProjection = client.subscribe((projection, update) => {
       useSessionRoomStore.getState().publishProjection(sessionId, projection, update.isStreamingUpdate);
       syncLegacyProjection(sessionId, projection);
+      if (!startRequested && projection.snapshot !== null && projection.status === 'created') {
+        startRequested = true;
+        client.send({ commandId: crypto.randomUUID(), type: 'session.start', payload: {} });
+      }
     });
-    this.client.connect();
+    client.connect();
   }
 
   sendMessage(content: string, mentionIds: string[] = []): void {
@@ -146,11 +173,20 @@ class WebSocketManager {
     return this.client?.getProjection().connection ?? null;
   }
 
-  disconnect(): void {
+  disconnect(sessionId: string): void {
+    if (this.sessionId !== sessionId) return;
+    this.connectionConsumers = Math.max(0, this.connectionConsumers - 1);
+    if (this.connectionConsumers > 0) return;
+    this.teardown();
+  }
+
+  private teardown(): void {
     this.unsubscribeProjection?.();
     this.unsubscribeProjection = null;
     this.client?.disconnect();
     this.client = null;
+    this.sessionId = null;
+    this.connectionConsumers = 0;
   }
 
   private send(command: ArgusSessionCommand): void {

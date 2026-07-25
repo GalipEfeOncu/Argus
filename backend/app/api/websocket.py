@@ -6,6 +6,9 @@ from app.db.database import get_db
 from app.db.repositories import EventRepository, SessionRepository
 from app.schemas.session_commands import parse_session_command
 from app.services.command_processor import CommandProcessor, CommandRejected, event_wire_value
+from app.services.first_vertical_task import FirstVerticalTaskRunner
+from app.config import settings
+from pathlib import Path
 
 router = APIRouter()
 
@@ -50,6 +53,39 @@ class SessionConnectionHub:
 connection_hub = SessionConnectionHub()
 
 
+async def _run_first_vertical_step(session_id: str, *, after_grant: bool) -> None:
+    """Run the provider-neutral Phase 3.4 worker and fan out its committed events."""
+
+    db = await get_db()
+    try:
+        events = EventRepository(db)
+        before = await events.last_sequence(session_id)
+        runner = FirstVerticalTaskRunner(
+            db, managed_root=Path(settings.db_path).expanduser().resolve().parent / "workspaces",
+        )
+        if after_grant:
+            await runner.run_after_grant(session_id)
+        else:
+            await runner.request_scoped_write_grant(session_id)
+        committed = await events.page_after(session_id, after_sequence=before, limit=200)
+        await connection_hub.publish(session_id, [event_wire_value(event) for event in committed.events])
+    except (RuntimeError, ValueError) as error:
+        # A cancellation may deliberately race the queued continuation; it is
+        # already visible in the timeline and must not become a false failure.
+        session = await SessionRepository(db).get_runtime_session(session_id)
+        if session is not None and session.status != "cancelled":
+            error_event = await EventRepository(db).append(
+                event_id=f"vertical_error_{uuid.uuid4().hex}", session_id=session_id,
+                event_type="error.created", actor_id="system",
+                payload={"errorId": f"vertical_error_{uuid.uuid4().hex}", "code": "vertical_task_failed",
+                         "summary": str(error), "recoverable": True},
+                timestamp_ms=int(datetime.now().timestamp() * 1000),
+            )
+            await connection_hub.publish(session_id, [event_wire_value(error_event)])
+    finally:
+        await db.close()
+
+
 @router.websocket("/ws/sessions/{session_id}")
 async def canonical_session_websocket(
     websocket: WebSocket, session_id: str, after_sequence: int = Query(default=0, ge=-1),
@@ -77,6 +113,13 @@ async def canonical_session_websocket(
             await websocket.send_json(event_wire_value(event))
 
         await connection_hub.add(session_id, websocket)
+        # Events can commit while the initial replay is being sent.  Register
+        # first, then close that cursor gap; any duplicate fan-out is safe
+        # because the client reducer deduplicates immutable event IDs.
+        replay_cursor = page.events[-1].sequence if page.events else after_sequence
+        catchup = await events.page_after(session_id, after_sequence=replay_cursor)
+        for event in catchup.events:
+            await websocket.send_json(event_wire_value(event))
 
         processor = CommandProcessor(db)
         while True:
@@ -87,13 +130,32 @@ async def canonical_session_websocket(
                 # The transaction completed inside process before any send, so a
                 # disconnect leaves a reconnectable original correlated result.
                 await connection_hub.publish(session_id, [event_wire_value(event) for event in outcome.events])
+                if not outcome.duplicate and command.type == "session.start":
+                    asyncio.create_task(_run_first_vertical_step(session_id, after_grant=False))
+                elif not outcome.duplicate and command.type == "approval.resolve" and command.payload.resolution == "grant":
+                    asyncio.create_task(_run_first_vertical_step(session_id, after_grant=True))
             except WebSocketDisconnect:
                 return
             except CommandRejected as error:
-                await websocket.send_json({"error": str(error), "code": "command_rejected"})
+                rejected = await EventRepository(db).append(
+                    event_id=f"command_error_{uuid.uuid4().hex}", session_id=session_id,
+                    event_type="error.created", actor_id="system",
+                    payload={"errorId": f"command_error_{uuid.uuid4().hex}", "code": "command_rejected",
+                             "summary": str(error), "recoverable": True},
+                    timestamp_ms=int(datetime.now().timestamp() * 1000), correlation_id=command.command_id,
+                )
+                await connection_hub.publish(session_id, [event_wire_value(rejected)])
             except Exception:
-                # Invalid input is not persisted and exposes no internal detail.
-                await websocket.send_json({"error": "Invalid command.", "code": "invalid_command"})
+                # Invalid input receives a canonical, redacted room error. It
+                # never exposes parser or persistence details.
+                invalid = await EventRepository(db).append(
+                    event_id=f"invalid_command_{uuid.uuid4().hex}", session_id=session_id,
+                    event_type="error.created", actor_id="system",
+                    payload={"errorId": f"invalid_command_{uuid.uuid4().hex}", "code": "invalid_command",
+                             "summary": "Invalid command.", "recoverable": True},
+                    timestamp_ms=int(datetime.now().timestamp() * 1000),
+                )
+                await connection_hub.publish(session_id, [event_wire_value(invalid)])
     finally:
         await connection_hub.remove(session_id, websocket)
         await db.close()

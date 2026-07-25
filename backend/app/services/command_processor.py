@@ -27,8 +27,8 @@ LIFECYCLE_TRANSITIONS: dict[str, frozenset[str]] = {
         "completed_partial", "cancelled", "failed",
     }),
     "paused": frozenset({"running", "cancelled", "failed"}),
-    "waiting_approval": frozenset({"running", "cancelled", "failed"}),
-    "waiting_decision": frozenset({"running", "completed_partial", "cancelled", "failed"}),
+    "waiting_approval": frozenset({"running", "paused", "cancelled", "failed"}),
+    "waiting_decision": frozenset({"running", "paused", "completed_partial", "cancelled", "failed"}),
     "completed": frozenset(),
     "completed_partial": frozenset(),
     "cancelled": frozenset(),
@@ -53,6 +53,12 @@ class CommandProcessor:
         """Persist the accepted outcome atomically; duplicates return the original event."""
 
         supersede_coordinator = False
+        if command.type in {"session.cancel", "participant.interrupt"}:
+            # A cancellation is committed only after an already-authorized
+            # workspace mutation leaves its short critical section.  This
+            # closes the check-to-write gap for the live worker runtime.
+            from app.services.worker_fence import session_mutation_fence
+            await session_mutation_fence.wait_for_mutations(session_id)
         async with transaction(self._db):
             duplicate = await self._events.events_for_command(session_id, command.command_id)
             if duplicate:

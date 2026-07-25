@@ -7,7 +7,7 @@ export function useWebSocket(sessionId: string | null) {
     if (!sessionId) return;
     
     wsManager.connect(sessionId);
-    return () => { wsManager.disconnect(); };
+    return () => { wsManager.disconnect(sessionId); };
   }, [sessionId]);
 
   return {

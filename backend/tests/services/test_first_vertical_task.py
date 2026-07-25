@@ -1,0 +1,134 @@
+"""End-to-end acceptance coverage for Roadmap Phase 3.4."""
+
+from __future__ import annotations
+
+import asyncio
+from pathlib import Path
+
+from fastapi.testclient import TestClient
+
+from app.config import settings
+from app.db.database import get_db
+from app.db.repositories import EventRepository
+from app.main import app
+
+
+def _receive_type(socket, event_type: str) -> dict[str, object]:
+    for _ in range(20):
+        value = socket.receive_json()
+        if value["type"] == event_type:
+            return value
+    raise AssertionError(f"Did not receive {event_type}")
+
+
+def _receive_status(socket, status: str) -> dict[str, object]:
+    for _ in range(20):
+        value = _receive_type(socket, "session.status_changed")
+        if value["payload"]["status"] == status:
+            return value
+    raise AssertionError(f"Did not receive status {status}")
+
+
+def _create_request(project: Path) -> dict[str, object]:
+    return {
+        "projectPath": str(project), "goal": "Create a reviewable isolated file.",
+        "coordinatorAgentId": "coordinator",
+        "agents": [
+            {"id": "coordinator", "role": "coordinator"},
+            {"id": "builder", "role": "builder", "capabilities": ["workspace.write"]},
+        ],
+        "configuration": {
+            "availableAgentIds": ["builder"],
+            "approvalPolicy": {"permissionProfile": "balanced", "behavior": "ask_by_policy"},
+            "workspacePolicy": {"mode": "snapshot"},
+        },
+        "workspaceMode": "snapshot", "acknowledgeDirectWrite": False,
+    }
+
+
+async def _events(session_id: str) -> list[object]:
+    database = await get_db()
+    try:
+        return await EventRepository(database).list_for_session(session_id)
+    finally:
+        await database.close()
+
+
+def test_first_vertical_task_is_replayable_isolated_and_reviewable(temporary_sqlite_db, tmp_path: Path) -> None:
+    project = tmp_path / "fake-project"
+    project.mkdir()
+    original = project / "original.txt"
+    original.write_text("The selected project must not change.\n", encoding="utf-8")
+
+    with TestClient(app) as client:
+        created = client.post("/sessions/", json=_create_request(project))
+        assert created.status_code == 200
+        session_id = created.json()["id"]
+        with client.websocket_connect(f"/ws/sessions/{session_id}?after_sequence=0") as socket:
+            assert socket.receive_json()["type"] == "session.snapshot"
+            socket.send_json({"commandId": "start", "type": "session.start", "payload": {}})
+            assert socket.receive_json()["payload"]["status"] == "preparing"
+
+        # A human correction is durable even while the session is waiting for a
+        # scoped grant, and its WebSocket outcome is correlated to the command.
+        with client.websocket_connect(f"/ws/sessions/{session_id}?after_sequence=1") as socket:
+            assert socket.receive_json()["type"] == "session.snapshot"
+            replayed = socket.receive_json()
+            assert replayed["type"] == "approval.requested"
+            approval_id = replayed["payload"]["approvalId"]
+            socket.send_json({"commandId": "correction", "type": "message.send", "payload": {"content": "Keep the original project unchanged."}})
+            correction = _receive_type(socket, "message.created")
+            assert correction["type"] == "message.created"
+            assert correction["correlationId"] == "correction"
+            socket.send_json({
+                "commandId": "grant-write", "type": "approval.resolve",
+                "payload": {"approvalId": approval_id, "resolution": "grant", "grantCapabilities": ["workspace.write"],
+                            "scopeSummary": "Only the isolated session workspace."},
+            })
+            assert _receive_type(socket, "approval.resolved")["type"] == "approval.resolved"
+            assert _receive_type(socket, "session.status_changed")["payload"]["status"] == "running"
+            completed = _receive_type(socket, "session.status_changed")
+            while completed["payload"]["status"] != "completed":
+                completed = _receive_type(socket, "session.status_changed")
+
+        events = asyncio.run(_events(session_id))
+        artifact_id = next(event.payload["artifactId"] for event in events if event.event_type == "artifact.diff_updated")
+        assert original.read_text(encoding="utf-8") == "The selected project must not change.\n"
+        assert {event.event_type for event in events} >= {
+            "approval.requested", "approval.resolved", "assignment.proposed", "assignment.created",
+            "assignment.started", "tool.requested", "tool.completed", "artifact.diff_updated",
+            "assignment.completed", "session.status_changed",
+        }
+        assert any(event.event_type == "artifact.diff_updated" and event.payload["artifactId"] == artifact_id for event in events)
+
+        last_sequence = events[-1].sequence
+        with client.websocket_connect(f"/ws/sessions/{session_id}?after_sequence={last_sequence - 2}") as socket:
+            snapshot = socket.receive_json()
+            assert snapshot["type"] == "session.snapshot"
+            replay = [socket.receive_json(), socket.receive_json()]
+
+    assert [event["sequence"] for event in replay] == [last_sequence - 1, last_sequence]
+    assert replay[-1]["payload"]["status"] == "completed"
+
+
+def test_live_pause_resume_and_cancel_fence_future_vertical_output(temporary_sqlite_db, tmp_path: Path) -> None:
+    project = tmp_path / "cancel-project"
+    project.mkdir()
+
+    with TestClient(app) as client:
+        created = client.post("/sessions/", json=_create_request(project))
+        session_id = created.json()["id"]
+        with client.websocket_connect(f"/ws/sessions/{session_id}?after_sequence=0") as socket:
+            socket.receive_json()
+            socket.send_json({"commandId": "start", "type": "session.start", "payload": {}})
+            socket.receive_json()
+            approval = _receive_type(socket, "approval.requested")
+            socket.send_json({"commandId": "pause", "type": "session.pause", "payload": {}})
+            assert _receive_status(socket, "paused")["payload"]["status"] == "paused"
+            socket.send_json({"commandId": "resume", "type": "session.resume", "payload": {}})
+            assert _receive_status(socket, "running")["payload"]["status"] == "running"
+            socket.send_json({"commandId": "cancel", "type": "session.cancel", "payload": {"reasonSummary": "Stop before work starts."}})
+            assert _receive_status(socket, "cancelled")["payload"]["status"] == "cancelled"
+
+    assert approval["payload"]["approvalId"]
+    assert not (Path(settings.db_path).parent / "workspaces" / session_id / "workspace" / "argus-vertical-task.txt").exists()

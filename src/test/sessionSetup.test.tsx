@@ -1,4 +1,4 @@
-import { afterEach, expect, test, vi } from 'vitest';
+import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { SessionSetup } from '@/components/pages/SessionSetup';
 import { useSettingsStore } from '@/stores/settingsStore';
@@ -6,19 +6,25 @@ import { useSessionStore } from '@/stores/sessionStore';
 import { useUIStore } from '@/stores/uiStore';
 
 const openDirectoryDialog = vi.fn();
+const createSessionRequest = vi.fn();
 
 vi.mock('@/hooks/useTauri', () => ({ useTauri: () => ({ openDirectoryDialog }) }));
-vi.mock('@/services/eventSimulator', () => ({ eventSimulator: { start: vi.fn() } }));
+vi.mock('@/services/api', () => ({ api: { sessions: { create: (...args: unknown[]) => createSessionRequest(...args) } } }));
 
-afterEach(() => {
-  cleanup();
+beforeEach(() => {
   openDirectoryDialog.mockReset();
+  createSessionRequest.mockReset();
+  createSessionRequest.mockResolvedValue({ id: 'ses_live', agentSnapshots: [] });
   useSettingsStore.setState({ defaultRoleModels: {} });
   useSessionStore.setState({ sessions: [], activeSessionId: null });
   useUIStore.setState({ activePage: 'dashboard' });
 });
 
-test('all seven setup sections are keyboard-focusable and a selected preset keeps resolved values visible', async () => {
+afterEach(() => {
+  cleanup();
+});
+
+test('all seven setup sections are keyboard-focusable and a selected preset creates a live isolated session', async () => {
   openDirectoryDialog.mockResolvedValue('/project');
   render(<SessionSetup />);
   expect(screen.getByRole('heading', { name: /1 — Goal and workspace/i })).toBeInTheDocument();
@@ -37,6 +43,11 @@ test('all seven setup sections are keyboard-focusable and a selected preset keep
   expect(document.activeElement).toBe(start);
   expect(start).toBeEnabled();
   fireEvent.click(start);
+  await waitFor(() => expect(createSessionRequest).toHaveBeenCalledOnce());
+  expect(createSessionRequest).toHaveBeenCalledWith(expect.objectContaining({
+    projectPath: '/project', goal: 'Verify keyboard access', workspaceMode: 'worktree',
+  }));
+  await waitFor(() => expect(useSessionStore.getState().sessions[0]?.id).toBe('ses_live'));
   expect(useSessionStore.getState().sessions[0]?.configuration.preset).toBe('quick');
   expect(useSessionStore.getState().sessions[0]?.configuration.availableAgentIds).toEqual(['builtin-builder']);
 });
@@ -61,4 +72,17 @@ test('direct write and Autonomous no-interruption require their visible acknowle
   fireEvent.click(screen.getByRole('button', { name: 'Browse' }));
   await waitFor(() => expect(screen.getByDisplayValue('/next-project')).toBeInTheDocument());
   expect(screen.getByLabelText('I explicitly acknowledge these capabilities for this workspace.')).not.toBeChecked();
+});
+
+test('a failed live session creation keeps the simulator inactive and explains the recovery step', async () => {
+  createSessionRequest.mockRejectedValueOnce(new Error('backend unavailable'));
+  openDirectoryDialog.mockResolvedValue('/project');
+  render(<SessionSetup />);
+  fireEvent.click(screen.getByRole('button', { name: 'Browse' }));
+  await waitFor(() => expect(screen.getByDisplayValue('/project')).toBeInTheDocument());
+  fireEvent.change(screen.getByLabelText('Goal'), { target: { value: 'Create a live session' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Start Coordinator session' }));
+
+  expect(await screen.findByRole('alert')).toHaveTextContent('could not create this isolated session');
+  expect(useSessionStore.getState().sessions).toEqual([]);
 });
