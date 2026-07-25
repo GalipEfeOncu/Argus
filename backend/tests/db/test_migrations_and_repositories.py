@@ -15,6 +15,7 @@ REQUIRED_TABLES = {
     "artifacts", "provider_profiles", "command_receipts", "event_snapshots", "schema_migrations",
     "workspaces", "writer_leases", "workspace_audit",
     "participant_instructions",
+    "assignment_proposals", "assignment_handoffs",
 }
 
 
@@ -42,7 +43,7 @@ async def test_fresh_database_has_every_phase_2_1_table_and_migration_metadata(t
         await database.close()
 
     assert REQUIRED_TABLES <= tables
-    assert versions == [1, 2, 3, 4, 5, 6, 7, 8, 9]
+    assert versions == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
     assert "idx_events_session_sequence" in event_indexes
 
 
@@ -107,6 +108,29 @@ async def test_configuration_version_migration_preserves_rows_and_allows_policy_
         await database.close()
 
     assert [dict(row) for row in preserved] == [{"id": "config_1", "policy_hash": "same_policy"}]
+
+
+@pytest.mark.asyncio
+async def test_scheduler_migration_does_not_recover_completed_legacy_attempts(tmp_path, monkeypatch) -> None:
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "db_path", str(tmp_path / "scheduler-v10.db"))
+    database = await get_db()
+    try:
+        await apply_migrations(database, MIGRATIONS[:9])
+        await database.execute("PRAGMA foreign_keys = OFF")
+        await database.execute(
+            """INSERT INTO assignment_attempts (id, assignment_id, attempt_number, configuration_version,
+               started_at_ms, completed_at_ms) VALUES ('legacy_complete', 'missing_assignment', 1, 1, 1, 2)"""
+        )
+        await database.commit()
+        await apply_migrations(database)
+        async with database.execute("SELECT state FROM assignment_attempts WHERE id = 'legacy_complete'") as cursor:
+            state = (await cursor.fetchone())["state"]
+    finally:
+        await database.close()
+
+    assert state == "completed"
 
 
 @pytest.mark.asyncio

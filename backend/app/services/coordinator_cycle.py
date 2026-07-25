@@ -25,6 +25,7 @@ from app.schemas.coordinator_actions import (
     FinalAction,
     parse_coordinator_action,
 )
+from app.services.assignment_scheduler import AssignmentScheduler
 from app.services.session_configuration_service import ConfigurationSnapshot, SessionConfigurationService
 
 
@@ -98,6 +99,24 @@ class CoordinatorCycle:
             await self._validate_final(session_id, snapshot)
         return action
 
+    async def persist_assignments(self, session_id: str, action: AssignmentsAction | Any) -> tuple[str, ...]:
+        """Turn an already validated Coordinator action into durable scheduler work.
+
+        Keeping this explicit makes provider execution unable to create an
+        assignment by accident: validation completes before the scheduler owns
+        the proposal-to-assignment transition.
+        """
+
+        raw_action = action.model_dump(by_alias=True, mode="json") if isinstance(action, AssignmentsAction) else action
+        validated = await self.validate(session_id, raw_action)
+        if not isinstance(validated, AssignmentsAction):
+            raise CoordinatorActionRejected("not_assignment_action", "Only assignment actions can be scheduled.")
+        scheduler = AssignmentScheduler(self._db)
+        return tuple([
+            await scheduler.accept_coordinator_proposal(session_id, proposal, parent_id=proposal.parent_id)
+            for proposal in validated.assignments
+        ])
+
     async def resolve_actions(self, session_id: str, actions: list[Any]) -> CoordinatorCycleResult:
         """Validate a response and at most one deterministic correction response."""
 
@@ -151,6 +170,9 @@ class CoordinatorCycle:
                 action_values.append(value)
                 result = await self.resolve_actions(session_id, action_values)
                 if result.action is not None or result.stopped:
+                    if isinstance(result.action, AssignmentsAction):
+                        await self.persist_assignments(session_id, result.action)
+                        await AssignmentScheduler(self._db).dispatch_ready(session_id)
                     return result
             return await self.resolve_actions(session_id, action_values)
         finally:

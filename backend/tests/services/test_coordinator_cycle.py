@@ -40,7 +40,10 @@ async def coordinator_session(
             coordinator_id="coordinator",
             configuration=SessionConfigurationInput(
                 availableAgentIds=available, requiredRoleRules=rules,
-                approvalPolicy=ApprovalPolicy(limitResolution="ask_user"),
+                approvalPolicy=ApprovalPolicy(
+                    permissionProfile="autonomous", behavior="preauthorize_session",
+                    preauthorizedCapabilities=["workspace.read", "workspace.write"], limitResolution="ask_user",
+                ), acknowledgements=["autonomous_permissions"],
             ),
             workspace_mode="snapshot", acknowledged_direct_write=False,
         )
@@ -53,7 +56,7 @@ def assignment(agent_id: str, *, capabilities: list[str] | None = None) -> dict[
             "proposalId": "proposal-builder", "assigneeAgentId": agent_id,
             "objective": "Inspect and implement the focused change.",
             "acceptanceCriteria": ["Record a concise result."], "operationClass": "mutating",
-            "requestedBudget": {}, "requestedCapabilities": capabilities or [],
+            "requestedBudget": {}, "requestedCapabilities": capabilities if capabilities is not None else ["workspace.write"],
             "reasonSummary": "This available specialist has the needed capability.",
         }],
     }
@@ -72,6 +75,23 @@ async def test_builder_only_pool_accepts_dynamic_routing_and_skips_irrelevant_ro
 
     assert result.action is not None and result.action.type == "assignments"
     assert result.visible_summary == "Builder is the only relevant available specialist."
+
+
+@pytest.mark.asyncio
+async def test_execute_persists_a_validated_assignment_action_before_returning(temporary_sqlite_db) -> None:
+    database = await get_db()
+    try:
+        snapshot = await coordinator_session(database)
+        result = await CoordinatorCycle(database).execute(
+            "coordinator_cycle", ScriptedProvider(((StructuredOutput(assignment(snapshot.available_agent_ids[0])),),)),
+            ProviderRequest("persist-action", "fake", ({"role": "user", "content": "Route work"},)),
+        )
+        async with database.execute("SELECT COUNT(*) AS total FROM assignments WHERE session_id = 'coordinator_cycle'") as cursor:
+            persisted = int((await cursor.fetchone())["total"])
+    finally:
+        await database.close()
+
+    assert result.action is not None and persisted == 1
 
 
 @pytest.mark.asyncio

@@ -127,7 +127,9 @@ persistence, and recovery.
 
 The collaboration plane contains the visible Coordinator and agents. They receive a bounded projection of the shared timeline, can create messages, request tools, assign work, hand off tasks, and produce artifacts. Model output never bypasses the control plane.
 
-LangGraph may be used for an individual agent's tool loop and checkpointing. It is not the source of truth for session topology; the current static `Planner → Builder → Reviewer → Tester` graph will be replaced by the event-driven session runtime.
+LangGraph may be used for an individual agent's tool loop and checkpointing. It
+is not the source of truth for session topology; session orchestration is the
+event-driven scheduler and persisted assignment tree.
 
 ### Assignment topology
 

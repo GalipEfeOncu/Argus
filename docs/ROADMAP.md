@@ -52,14 +52,14 @@ log, scheduler, assignments, gates, and counters own orchestration.
 
 ## Current baseline and migration target
 
-The current repository contains a React shared-room prototype and simulator,
+The initial baseline contained a React shared-room prototype and simulator,
 transitional FastAPI endpoints, SQLite scaffolding, individual role workers, and
 a static in-memory `Planner → Builder → Reviewer ⇄ Builder → Tester` LangGraph.
-Coordinator behavior, durable scheduling, generated REST clients, worktree
-enforcement, configurable limits, approval grants, provider execution, replay,
-and release hardening are not yet complete unless proven by current tests.
+Phase 3.3 removes that graph in favour of durable scheduling; remaining phases
+continue the generated-client, provider-execution, replay, and release-hardening
+work under the current tests.
 
-The migration must preserve a usable simulator while replacing the static graph
+The migration preserves a usable simulator while replacing the static graph
 with this target:
 
 ```text
@@ -520,7 +520,7 @@ Current status (2026-07-24):
   contract has no authority to grant permissions, change configuration, or
   satisfy gates.
 
-### 3.3 Assignment scheduler
+### 3.3 Assignment scheduler (✅ Completed)
 
 Deliverables:
 
@@ -540,6 +540,21 @@ Tests:
 - Assignment tree, parent cancellation, parallel read ordering, mutating
   serialization, lease loss, worker crash/recovery, direct handoff policy,
   duplicate proposal, and static graph removal regression.
+
+Current status (2026-07-26):
+
+- ✅ The durable scheduler records every Coordinator proposal, validation
+  decision, assignment tree edge, attempt checkpoint/outcome, handoff, and
+  terminal result in SQLite. Duplicate proposal IDs return their original
+  assignment rather than creating work twice.
+- ✅ Read-only assignments start up to the configured parallel limit. Mutating
+  assignments obtain the session/project writer lease and remain serialized;
+  cancellation, participant interruption, bounded retry, checkpointing, and
+  orphaned-attempt recovery all leave durable, safe state for a restart.
+- ✅ Specialist follow-ups are recorded as Coordinator-routed handoffs. The
+  singular static agent-graph WebSocket endpoint and its fixed LangGraph role
+  pipeline have been removed; canonical shared-room transport remains at
+  `/ws/sessions/{session_id}`.
 
 ### 3.4 First real vertical task
 

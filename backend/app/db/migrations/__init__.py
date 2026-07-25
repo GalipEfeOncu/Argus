@@ -25,6 +25,7 @@ from app.db.migrations import (
     v0007_configuration_versions,
     v0008_assignment_context_metadata,
     v0009_participant_instructions,
+    v0010_assignment_scheduler,
 )
 
 
@@ -57,6 +58,7 @@ MIGRATIONS: tuple[Migration, ...] = (
     Migration(7, "configuration_versions", v0007_configuration_versions.apply),
     Migration(8, "assignment_context_metadata", v0008_assignment_context_metadata.apply),
     Migration(9, "participant_instructions", v0009_participant_instructions.apply),
+    Migration(10, "assignment_scheduler", v0010_assignment_scheduler.apply),
 )
 
 

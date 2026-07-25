@@ -4,9 +4,7 @@
 
 The canonical shared-room transport is available at
 `/ws/sessions/{session_id}`. It validates v1 commands, commits an accepted
-outcome before sending it, and replays ordered events after reconnect. The
-older singular `/ws/session/{session_id}` agent-graph stream remains
-transitional until the scheduler is migrated to the durable control plane.
+outcome before sending it, and replays ordered events after reconnect.
 Accepted canonical events are broadcast to every currently connected client in
 the session; a slow client is disconnected and can safely reconnect from its
 last confirmed sequence.

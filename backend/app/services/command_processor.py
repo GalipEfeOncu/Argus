@@ -81,6 +81,25 @@ class CommandProcessor:
                 except ConfigurationError as error:
                     raise CommandRejected(error.code) from error
                 supersede_coordinator = any(instruction.delivery_kind == "coordinator" for instruction in instructions)
+            if command.type == "approval.resolve" and command.payload.resolution == "grant":
+                now = _now_ms()
+                for capability in command.payload.grant_capabilities:
+                    await self._db.execute(
+                        """INSERT INTO approvals (id, session_id, capability, scope_json, decision, resolver_id,
+                           requested_at_ms, resolved_at_ms, request_event_id, resolution_event_id)
+                           VALUES (?, ?, ?, ?, 'granted', 'human', ?, ?, ?, ?)""",
+                        (f"grant_{command.command_id}_{capability}", session_id, capability,
+                         _safe_json({"summary": command.payload.scope_summary}), now, now,
+                         persisted[0].event_id, persisted[0].event_id),
+                    )
+            if command.type == "session.cancel":
+                persisted.extend(await self._cancel_assignments_in_transaction(
+                    session_id, reason=command.payload.reason_summary or "Cancelled by the user.",
+                ))
+            elif command.type == "participant.interrupt":
+                persisted.extend(await self._cancel_assignments_in_transaction(
+                    session_id, participant_id=command.payload.participant_id, reason=command.payload.reason_summary,
+                ))
             if interrupted_assignments:
                 await self._db.executemany(
                     "UPDATE assignments SET state = 'interrupted', updated_at_ms = ? WHERE id = ? AND session_id = ?",
@@ -105,6 +124,44 @@ class CommandProcessor:
             from app.services.coordinator_cycle import CoordinatorCycle
             await CoordinatorCycle.supersede_active(session_id)
         return outcome
+
+    async def _cancel_assignments_in_transaction(
+        self, session_id: str, *, reason: str, participant_id: str | None = None,
+    ) -> list[StoredEvent]:
+        """Persist cancellation, attempt fencing, and lease release with its command."""
+
+        query = "SELECT * FROM assignments WHERE session_id = ? AND state IN ('created', 'running')"
+        parameters: list[str] = [session_id]
+        if participant_id is not None:
+            query = """WITH RECURSIVE tree(id) AS (
+                SELECT id FROM assignments WHERE session_id = ? AND assignee_session_agent_id = ?
+                  AND state IN ('created', 'running')
+                UNION ALL
+                SELECT child.id FROM assignments child JOIN tree ON child.parent_id = tree.id
+                  WHERE child.session_id = ? AND child.state IN ('created', 'running')
+            ) SELECT assignment.* FROM assignments assignment JOIN tree ON tree.id = assignment.id"""
+            parameters = [session_id, participant_id, session_id]
+        query += " ORDER BY created_at_ms, rowid"
+        async with self._db.execute(query, tuple(parameters)) as cursor:
+            assignments = await cursor.fetchall()
+        cancelled: list[StoredEvent] = []
+        for assignment in assignments:
+            now = _now_ms()
+            payload = {"assignmentId": assignment["id"], "reasonSummary": reason}
+            event = await self._events._append_in_transaction(
+                event_id=str(uuid.uuid4()), session_id=session_id, event_type="assignment.cancelled", actor_id="system",
+                payload=payload, payload_json=_safe_json(payload), timestamp_ms=now, correlation_id=None, command_id=None,
+            )
+            await self._db.execute("UPDATE assignments SET state = 'cancelled', terminal_event_id = ?, updated_at_ms = ? WHERE id = ?", (event.event_id, now, assignment["id"]))
+            await self._db.execute("UPDATE assignment_attempts SET state = 'cancelled', completed_at_ms = ?, updated_at_ms = ? WHERE assignment_id = ? AND state = 'running'", (now, now, assignment["id"]))
+            if assignment["writer_lease_id"] is not None:
+                async with self._db.execute("SELECT project_id, session_id FROM writer_leases WHERE id = ? AND released_at_ms IS NULL", (assignment["writer_lease_id"],)) as cursor:
+                    lease = await cursor.fetchone()
+                if lease is not None:
+                    await self._db.execute("UPDATE writer_leases SET released_at_ms = ?, release_reason = 'cancelled' WHERE id = ?", (now, assignment["writer_lease_id"]))
+                    await self._db.execute("UPDATE projects SET lock_session_id = NULL, lock_acquired_at_ms = NULL, updated_at_ms = ? WHERE id = ? AND lock_session_id = ?", (now, lease["project_id"], lease["session_id"]))
+            cancelled.append(event)
+        return cancelled
 
     async def _current_status(self, session_id: str) -> str:
         async with self._db.execute("SELECT status FROM sessions WHERE id = ?", (session_id,)) as cursor:
