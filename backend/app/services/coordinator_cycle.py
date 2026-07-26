@@ -67,6 +67,8 @@ class CoordinatorCycle:
     """
 
     _active_streams: ClassVar[dict[str, tuple[Provider, str]]] = {}
+    _decision_providers: ClassVar[dict[str, tuple[Provider, ProviderRequest]]] = {}
+    _active_turns: ClassVar[set[str]] = set()
     _superseded_sessions: ClassVar[set[str]] = set()
 
     def __init__(self, db: aiosqlite.Connection) -> None:
@@ -88,6 +90,23 @@ class CoordinatorCycle:
         provider, request_id = active
         await provider.cancel(request_id)
         return True
+
+    @classmethod
+    async def run_registered_limit_decision(cls, db: aiosqlite.Connection, session_id: str) -> None:
+        """Run a pending bounded decision after its durable request commits."""
+
+        registered = cls._decision_providers.get(session_id)
+        if registered is None:
+            return
+        provider, request = registered
+        from app.services.limit_resolution_service import LimitResolutionService
+        await LimitResolutionService(db).execute_coordinator_decision(session_id, provider, request)
+
+    @classmethod
+    def can_start_limit_decision(cls, session_id: str) -> bool:
+        """A decision turn is valid only while its Coordinator context is live."""
+
+        return session_id in cls._active_turns and session_id in cls._decision_providers
 
     async def validate(self, session_id: str, action_value: Any) -> CoordinatorAction:
         try:
@@ -151,6 +170,8 @@ class CoordinatorCycle:
                 "A Coordinator decision is already active for this session.",
             )
         action_values: list[Any] = []
+        self._decision_providers[session_id] = (provider, request)
+        self._active_turns.add(session_id)
         try:
             for attempt in range(2):
                 if session_id in self._superseded_sessions:
@@ -175,6 +196,12 @@ class CoordinatorCycle:
                     if isinstance(result.action, AssignmentsAction):
                         await self.persist_assignments(session_id, result.action)
                         await AssignmentScheduler(self._db).dispatch_ready(session_id)
+                        # A reached limit can be produced by dispatch itself.
+                        # Reuse this live Coordinator provider once, but the
+                        # resolution service replaces its request with a strict
+                        # tool-free decision schema and never asks for a retry.
+                        from app.services.limit_resolution_service import LimitResolutionService
+                        await LimitResolutionService(self._db).execute_coordinator_decision(session_id, provider, request)
                     elif isinstance(result.action, PartialAction):
                         if await self.request_partial_acceptance(session_id, result.action) is None:
                             return CoordinatorCycleResult(
@@ -184,6 +211,11 @@ class CoordinatorCycle:
                     return result
             return await self.resolve_actions(session_id, action_values)
         finally:
+            # All synchronous runtime limit producers commit their request in
+            # the active turn. Consume it here, after their transaction ended.
+            from app.services.limit_resolution_service import LimitResolutionService
+            await LimitResolutionService(self._db).execute_coordinator_decision(session_id, provider, request)
+            self._active_turns.discard(session_id)
             active = self._active_streams.get(session_id)
             if active is not None and active[0] is provider:
                 self._active_streams.pop(session_id, None)
@@ -196,12 +228,22 @@ class CoordinatorCycle:
             if isinstance(event, StructuredOutput):
                 return event.value
             if isinstance(event, Usage):
-                from app.services.budget_counter_service import BudgetCounterService
-                await BudgetCounterService(self._db).record_coordinator_usage(
-                    session_id, input_tokens=event.input_tokens or 0, output_tokens=event.output_tokens or 0,
-                    normalized_cost=event.cost_usd, duration_ms=0,
-                    cost_uncertainty="exact" if event.cost_usd is not None and event.exact else ("estimated" if event.cost_usd is not None else "unavailable"),
-                )
+                from app.services.budget_counter_service import BudgetCounterService, BudgetExceeded
+                try:
+                    await BudgetCounterService(self._db).record_coordinator_usage(
+                        session_id, input_tokens=event.input_tokens or 0, output_tokens=event.output_tokens or 0,
+                        normalized_cost=event.cost_usd, duration_ms=0,
+                        cost_uncertainty="exact" if event.cost_usd is not None and event.exact else ("estimated" if event.cost_usd is not None else "unavailable"),
+                    )
+                except BudgetExceeded as error:
+                    from app.db.database import transaction
+                    from app.services.limit_resolution_service import LimitResolutionService
+                    async with transaction(self._db):
+                        await LimitResolutionService(self._db).request_latest_in_transaction(
+                            session_id, counter=error.counter, scope_id=error.scope_id,
+                            reason_summary="Coordinator usage reached a configured limit.",
+                        )
+                    return {"type": "limit_reached"}
                 continue
             if isinstance(event, (Cancelled, RetryableError, TerminalError)):
                 return {"type": "invalid_provider_result", "reason": getattr(event, "code", "cancelled")}

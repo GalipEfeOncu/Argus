@@ -383,6 +383,16 @@ decision. A hard ceiling cannot be extended by this response. With `ask_user`,
 the session enters `waiting_decision`; with `stop`, the affected assignment is
 ended immediately.
 
+Loop signals are a durable projection rather than raw event-text scans. Review
+findings, failure signatures, and workspace/diff no-progress checks are
+normalized to redacted SHA-256 fingerprints; the original review prose and tool
+output are not stored by this mechanism. A mutating follow-up may identify only
+a previously observed finding fingerprint. Its revision reservation is made as
+the proposal is accepted, so a rejected, read-only, or unrelated proposal cannot
+consume or bypass that finding's revision budget. Limit-resolution requests are
+also durable and tied to the source `limit.reached` event; replayed, stale, or
+unrequested human decisions are rejected.
+
 ## REST resources
 
 The REST API manages durable configuration; real-time execution uses WebSocket commands and events.

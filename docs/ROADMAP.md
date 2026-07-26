@@ -716,7 +716,7 @@ Current status (2026-07-26):
   late provider corrections adjust totals by their durable delta. Paused time
   does not consume the wall-clock budget.
 
-### 4.3 Loop detection and Coordinator initiative
+### 4.3 Loop detection and Coordinator initiative (✅ Completed)
 
 Deliverables:
 
@@ -734,6 +734,28 @@ Tests:
 - Same finding phrased differently, distinct finding at same path, unchanged
   diff, repeated test signature, reassign evasion, decision timeout, malformed
   decision, no remaining assignee, partial delivery, and human interrupt.
+
+Current status (2026-07-26):
+
+- ✅ Review findings, failure outcomes, and unchanged workspace/diff states are
+  reduced to durable redacted SHA-256 fingerprints with occurrence counts. No
+  raw review prose, prompt, secret, or tool-output body is retained for loop
+  detection.
+- ✅ Only an accepted mutating Coordinator follow-up bound to an already known
+  finding fingerprint reserves that finding's revision counter. Read-only,
+  rejected, and unrelated proposals cannot consume or evade it.
+- ✅ Reached limits create one durable resolution request: `ask_user` validates
+  the pending human decision, `coordinator_decides` permits exactly one
+  tool-free structured choice, and `stop` records a terminal outcome. Reassign
+  and approach changes remain bounded by the available pool and hard ceilings.
+
+Completion evidence (2026-07-26):
+
+- Source: this change
+- Verification: `npm run generate:contracts`; targeted Phase 4.3 backend tests
+  and the repository verification suite (results recorded with this change).
+- Artifacts/benchmarks: regenerated event/OpenAPI contracts and generated client types.
+- Deferred/unavailable: release-shell and platform probes remain Phase 7 work; no new release-risk regression introduced.
 
 ### 4.4 Approval and grant engine
 

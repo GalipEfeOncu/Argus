@@ -71,26 +71,45 @@ class AssignmentScheduler:
                     "objective": proposal.objective, "acceptanceCriteria": proposal.acceptance_criteria,
                     "operationClass": proposal.operation_class, "requestedCapabilities": proposal.requested_capabilities,
                     "reasonSummary": proposal.reason_summary,
+                    **({"findingFingerprint": proposal.finding_fingerprint} if proposal.finding_fingerprint is not None else {}),
                 },
             )
             now = _now_ms()
+            from app.services.budget_counter_service import BudgetExceeded
+            assignment_id = f"asn_{uuid.uuid4().hex}"
             try:
                 await self._validate_proposal(session_id, snapshot, proposal, parent_id)
+                if proposal.operation_class == "mutating" and proposal.finding_fingerprint is not None:
+                    from app.services.loop_detection_service import LoopDetectionService
+                    await LoopDetectionService(self._db).reserve_follow_up_revision_in_transaction(
+                        session_id, assignment_id, proposal.finding_fingerprint,
+                    )
+            except BudgetExceeded as error:
+                from app.services.limit_resolution_service import LimitResolutionService
+                await LimitResolutionService(self._db).request_latest_in_transaction(
+                    session_id, counter=error.counter, scope_id=error.scope_id, assignment_id=assignment_id,
+                    fingerprint=proposal.finding_fingerprint,
+                )
+                rejection = SchedulerRejected("revision_limit_reached", "The finding's revision limit was reached.")
             except SchedulerRejected as error:
                 rejection = error
+            except ValueError as error:
+                if str(error) != "unknown_finding_fingerprint":
+                    raise
+                rejection = SchedulerRejected("unknown_finding_fingerprint", "The mutating follow-up is not tied to a known review finding.")
+            if rejection is not None:
                 resolved = await self._event(session_id, "error.created", "system", {
-                    "errorId": f"proposal_{proposal.proposal_id}", "code": error.code,
-                    "summary": error.summary, "recoverable": True,
+                    "errorId": f"proposal_{proposal.proposal_id}", "code": rejection.code,
+                    "summary": rejection.summary, "recoverable": True,
                 })
                 await self._db.execute(
                     """INSERT INTO assignment_proposals (id, session_id, parent_assignment_id, actor_id, proposal_json,
                        validation_state, validation_code, proposed_event_id, resolved_event_id, created_at_ms)
                        VALUES (?, ?, ?, 'coordinator', ?, 'rejected', ?, ?, ?, ?)""",
-                    (proposal.proposal_id, session_id, parent_id, _safe_json(raw), error.code,
+                    (proposal.proposal_id, session_id, parent_id, _safe_json(raw), rejection.code,
                      proposed.event_id, resolved.event_id, now),
                 )
             else:
-                assignment_id = f"asn_{uuid.uuid4().hex}"
                 created = await self._event(
                     session_id, "assignment.created", "system", {
                         "assignmentId": assignment_id, "proposalId": proposal.proposal_id,
@@ -114,6 +133,11 @@ class AssignmentScheduler:
                     (proposal.proposal_id, session_id, parent_id, _safe_json(raw), assignment_id,
                      proposed.event_id, created.event_id, now),
                 )
+                if proposal.operation_class == "mutating" and proposal.finding_fingerprint is not None:
+                    from app.services.loop_detection_service import LoopDetectionService
+                    await LoopDetectionService(self._db).link_follow_up_in_transaction(
+                        session_id, assignment_id, proposal.finding_fingerprint,
+                    )
         if rejection is not None:
             raise rejection
         assert assignment_id is not None
@@ -185,7 +209,11 @@ class AssignmentScheduler:
                             session_id, counter="parallel_read_only_assignments", scope_type="session",
                             scope_id=session_id, assignment_id=str(row["id"]), hold=True,
                         )
-                    except BudgetExceeded:
+                    except BudgetExceeded as error:
+                        from app.services.limit_resolution_service import LimitResolutionService
+                        await LimitResolutionService(self._db).request_latest_in_transaction(
+                            session_id, counter=error.counter, scope_id=error.scope_id, assignment_id=str(row["id"]),
+                        )
                         continue
                     capacity_reservation_id = capacity.id
                     lease_id = None
@@ -206,7 +234,11 @@ class AssignmentScheduler:
                         session_id, counter="assignment_attempts", scope_type="assignment",
                         scope_id=str(row["id"]), assignment_id=str(row["id"]),
                     )
-                except BudgetExceeded:
+                except BudgetExceeded as error:
+                    from app.services.limit_resolution_service import LimitResolutionService
+                    await LimitResolutionService(self._db).request_latest_in_transaction(
+                        session_id, counter=error.counter, scope_id=error.scope_id, assignment_id=str(row["id"]),
+                    )
                     if capacity_reservation_id is not None:
                         await budgets.release_prestart(capacity)
                     if lease_id is not None:
@@ -250,6 +282,11 @@ class AssignmentScheduler:
         try:
             await BudgetCounterService(self._db).record_model_iteration(str(active["session_id"]), str(active["id"]))
         except BudgetExceeded as error:
+            async with transaction(self._db):
+                from app.services.limit_resolution_service import LimitResolutionService
+                await LimitResolutionService(self._db).request_latest_in_transaction(
+                    str(active["session_id"]), counter=error.counter, scope_id=error.scope_id, assignment_id=str(active["id"]),
+                )
             raise SchedulerRejected("model_iteration_limit_reached", "The assignment model-iteration limit was reached.") from error
         async with transaction(self._db):
             async with self._db.execute("SELECT assignment.* FROM assignment_attempts attempt JOIN assignments assignment ON assignment.id = attempt.assignment_id WHERE attempt.id = ?", (attempt_id,)) as cursor:
@@ -286,6 +323,33 @@ class AssignmentScheduler:
             await self._db.execute("UPDATE assignments SET state = 'completed', terminal_event_id = ?, updated_at_ms = ? WHERE id = ?", (event.event_id, now, assignment["id"]))
             from app.services.gate_engine import GateEngine
             await GateEngine(self._db).record_evidence(session_id, assignment, evidence)
+            from app.services.loop_detection_service import LoopDetectionService
+            from app.services.limit_resolution_service import LimitResolutionService
+            loops = LoopDetectionService(self._db)
+            signals = list(await loops.record_review_evidence_in_transaction(session_id, str(assignment["id"]), evidence))
+            if assignment["operation_class"] == "mutating":
+                finding = await loops.finding_for_assignment(session_id, str(assignment["id"]))
+                if finding is not None:
+                    async with self._db.execute("SELECT revision_checksum FROM workspaces WHERE session_id = ?", (session_id,)) as cursor:
+                        workspace = await cursor.fetchone()
+                    if workspace is not None:
+                        async with self._db.execute(
+                            "SELECT checksum FROM artifacts WHERE session_id = ? AND kind = 'diff' ORDER BY created_at_ms DESC, rowid DESC LIMIT 1",
+                            (session_id,),
+                        ) as cursor:
+                            diff = await cursor.fetchone()
+                        signals.append(await loops.record_no_progress_in_transaction(
+                            session_id, str(assignment["id"]), str(workspace["revision_checksum"]),
+                            None if diff is None else str(diff["checksum"]),
+                        ))
+            counters = {"review_finding": "repeated_finding", "failure": "repeated_failure", "no_progress": "no_progress"}
+            for signal in signals:
+                if signal.reached:
+                    await LimitResolutionService(self._db).request_latest_in_transaction(
+                        session_id, counter=counters[signal.kind], scope_id=signal.assignment_id or session_id,
+                        assignment_id=signal.assignment_id, fingerprint=signal.fingerprint,
+                        reason_summary="Repeated redacted loop signal requires a bounded resolution.",
+                    )
             await self._release_assignment_lease(assignment, "completed")
 
     async def fail_attempt(
@@ -308,6 +372,16 @@ class AssignmentScheduler:
             now = _now_ms()
             await self._db.execute("UPDATE assignment_attempts SET state = 'failed', failure_fingerprint = ?, normalized_outcome_json = ?, completed_at_ms = ?, updated_at_ms = ? WHERE id = ?", (code, _safe_json({"status": "failed", "code": code}), now, now, attempt_id))
             await self._db.execute("UPDATE assignments SET state = ?, terminal_event_id = ?, updated_at_ms = ? WHERE id = ?", ("created" if retry else "failed", None if retry else event.event_id, now, assignment["id"]))
+            from app.services.loop_detection_service import LoopDetectionService
+            from app.services.limit_resolution_service import LimitResolutionService
+            signal = await LoopDetectionService(self._db).record_failure_in_transaction(
+                session_id, str(assignment["id"]), code, summary,
+            )
+            if signal.reached:
+                await LimitResolutionService(self._db).request_latest_in_transaction(
+                    session_id, counter="repeated_failure", scope_id=str(assignment["id"]), assignment_id=str(assignment["id"]),
+                    fingerprint=signal.fingerprint, reason_summary="Repeated redacted failure signal requires a bounded resolution.",
+                )
             await self._release_assignment_lease(assignment, "retry" if retry else "failed")
             return retry
 

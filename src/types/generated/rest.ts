@@ -616,6 +616,8 @@ export interface components {
             acceptanceCriteria: string[];
             /** Assigneeagentid */
             assigneeAgentId: string;
+            /** Findingfingerprint */
+            findingFingerprint?: string | null;
             /** Objective */
             objective: string;
             /**
@@ -753,10 +755,14 @@ export interface components {
         DecisionRequestedPayload: {
             /** Choices */
             choices: ("reassign" | "change_approach" | "deliver_partial" | "stop")[];
+            /** Counter */
+            counter?: string | null;
             /** Decisionid */
             decisionId: string;
+            /** Fingerprint */
+            fingerprint?: string | null;
             /** Purpose */
-            purpose?: "partial_completion" | null;
+            purpose?: ("partial_completion" | "limit_resolution") | null;
             /** Reasonsummary */
             reasonSummary: string;
             /** Scopeid */
@@ -983,7 +989,7 @@ export interface components {
              * Counter
              * @enum {string}
              */
-            counter: "revisions" | "assignment_attempts" | "model_iterations" | "tool_calls" | "wall_clock_seconds" | "tokens" | "cost" | "parallel_read_only_assignments";
+            counter: "revisions" | "assignment_attempts" | "model_iterations" | "tool_calls" | "wall_clock_seconds" | "tokens" | "cost" | "parallel_read_only_assignments" | "repeated_finding" | "repeated_failure" | "no_progress";
             /** Current */
             current: number;
             /** Fingerprint */

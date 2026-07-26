@@ -10,6 +10,7 @@ from app.schemas.session_events import CamelModel, Identifier, Summary
 
 
 ConciseSummary = Annotated[str, Field(min_length=1, max_length=800)]
+FindingFingerprint = Annotated[str, Field(pattern=r"^[0-9a-f]{64}$")]
 
 
 class CoordinatorAssignment(CamelModel):
@@ -22,6 +23,27 @@ class CoordinatorAssignment(CamelModel):
     requested_budget: dict[str, int | float | None] = Field(max_length=20)
     requested_capabilities: list[Identifier] = Field(default_factory=list, max_length=20)
     reason_summary: ConciseSummary
+    finding_fingerprint: FindingFingerprint | None = None
+
+
+class CoordinatorLimitDecision(CamelModel):
+    """The only model output accepted for a reached-limit decision turn."""
+
+    choice: Literal["reassign", "change_approach", "deliver_partial", "stop"]
+    reason_summary: ConciseSummary
+
+
+LIMIT_DECISION_ADAPTER = TypeAdapter(CoordinatorLimitDecision)
+
+
+def parse_coordinator_limit_decision(value: Any) -> CoordinatorLimitDecision:
+    """Validate a tool-free, single structured limit decision."""
+
+    return LIMIT_DECISION_ADAPTER.validate_python(value)
+
+
+def coordinator_limit_decision_schema() -> dict[str, Any]:
+    return LIMIT_DECISION_ADAPTER.json_schema()
 
 
 class AssignmentsAction(CamelModel):

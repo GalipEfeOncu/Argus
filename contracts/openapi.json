@@ -1031,6 +1031,18 @@
             "title": "Assigneeagentid",
             "type": "string"
           },
+          "findingFingerprint": {
+            "anyOf": [
+              {
+                "pattern": "^[0-9a-f]{64}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Findingfingerprint"
+          },
           "objective": {
             "maxLength": 4000,
             "minLength": 1,
@@ -1424,16 +1436,45 @@
             "title": "Choices",
             "type": "array"
           },
+          "counter": {
+            "anyOf": [
+              {
+                "maxLength": 160,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Counter"
+          },
           "decisionId": {
             "maxLength": 160,
             "minLength": 1,
             "title": "Decisionid",
             "type": "string"
           },
+          "fingerprint": {
+            "anyOf": [
+              {
+                "maxLength": 160,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fingerprint"
+          },
           "purpose": {
             "anyOf": [
               {
-                "const": "partial_completion",
+                "enum": [
+                  "partial_completion",
+                  "limit_resolution"
+                ],
                 "type": "string"
               },
               {
@@ -2086,7 +2127,10 @@
               "wall_clock_seconds",
               "tokens",
               "cost",
-              "parallel_read_only_assignments"
+              "parallel_read_only_assignments",
+              "repeated_finding",
+              "repeated_failure",
+              "no_progress"
             ],
             "title": "Counter",
             "type": "string"

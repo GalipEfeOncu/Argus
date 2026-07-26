@@ -151,6 +151,7 @@ class AssignmentProposedPayload(CamelModel):
     operation_class: Literal["read_only", "mutating"]
     requested_capabilities: list[Identifier] = Field(default_factory=list, max_length=50)
     reason_summary: Summary
+    finding_fingerprint: Annotated[str, Field(pattern=r"^[0-9a-f]{64}$")] | None = None
 
 
 class AssignmentProposedEvent(EventEnvelope):
@@ -295,6 +296,7 @@ class LimitPayload(CamelModel):
     counter: Literal[
         "revisions", "assignment_attempts", "model_iterations", "tool_calls",
         "wall_clock_seconds", "tokens", "cost", "parallel_read_only_assignments",
+        "repeated_finding", "repeated_failure", "no_progress",
     ]
     scope_id: Identifier
     current: float = Field(ge=0)
@@ -322,8 +324,10 @@ class DecisionRequestedPayload(CamelModel):
         min_length=1, max_length=4
     )
     reason_summary: Summary
-    purpose: Literal["partial_completion"] | None = None
+    purpose: Literal["partial_completion", "limit_resolution"] | None = None
     unmet_requirements: list[Summary] | None = Field(default=None, max_length=50)
+    counter: Identifier | None = None
+    fingerprint: Identifier | None = None
 
 
 class DecisionRequestedEvent(EventEnvelope):

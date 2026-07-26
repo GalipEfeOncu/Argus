@@ -38,6 +38,8 @@ export interface ProjectedLimit {
   threshold: number;
   hard: boolean;
   resolution: string;
+  fingerprint?: string;
+  occurrenceCount?: number;
 }
 
 export interface ProjectedApproval {
@@ -52,6 +54,10 @@ export interface ProjectedDecision {
   scopeId: string;
   choices: string[];
   reasonSummary: string;
+  purpose?: 'partial_completion' | 'limit_resolution';
+  counter?: string;
+  fingerprint?: string;
+  unmetRequirements?: string[];
 }
 
 export interface ProjectedUsage {
@@ -332,6 +338,10 @@ function projectEvent(state: SessionProjection, event: ArgusSessionEvent, correl
             scopeId: event.payload.scopeId,
             choices: [...event.payload.choices],
             reasonSummary: event.payload.reasonSummary,
+            ...(event.payload.purpose === null || event.payload.purpose === undefined ? {} : { purpose: event.payload.purpose }),
+            ...(event.payload.counter === null || event.payload.counter === undefined ? {} : { counter: event.payload.counter }),
+            ...(event.payload.fingerprint === null || event.payload.fingerprint === undefined ? {} : { fingerprint: event.payload.fingerprint }),
+            ...(event.payload.unmetRequirements === null || event.payload.unmetRequirements === undefined ? {} : { unmetRequirements: [...event.payload.unmetRequirements] }),
           },
         },
       };
@@ -371,6 +381,8 @@ function projectEvent(state: SessionProjection, event: ArgusSessionEvent, correl
             threshold: event.payload.threshold,
             hard: event.payload.hard,
             resolution: event.payload.resolution,
+            ...(event.payload.fingerprint === null || event.payload.fingerprint === undefined ? {} : { fingerprint: event.payload.fingerprint }),
+            ...(event.payload.occurrenceCount === null || event.payload.occurrenceCount === undefined ? {} : { occurrenceCount: event.payload.occurrenceCount }),
           },
         },
       };

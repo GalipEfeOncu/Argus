@@ -136,6 +136,13 @@ class FirstVerticalTaskRunner:
                     await budgets.release_prestart(tool_reservation)
                 rejected = error
         if rejected is not None:
+            from app.services.budget_counter_service import BudgetExceeded
+            if isinstance(rejected, BudgetExceeded):
+                from app.services.limit_resolution_service import LimitResolutionService
+                async with transaction(self._db):
+                    await LimitResolutionService(self._db).request_latest_in_transaction(
+                        session_id, counter=rejected.counter, scope_id=rejected.scope_id, assignment_id=scheduled.assignment_id,
+                    )
             raise rejected
         assert tool_reservation is not None and revision_reservation is not None
         async with transaction(self._db):

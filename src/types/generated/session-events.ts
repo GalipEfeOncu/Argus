@@ -276,6 +276,7 @@ export type Eventid7 = string;
  */
 export type Acceptancecriteria = [string, ...string[]];
 export type Assigneeagentid = string;
+export type Findingfingerprint = string | null;
 export type Objective = string;
 export type Operationclass = "read_only" | "mutating";
 export type Parentid = string | null;
@@ -452,7 +453,10 @@ export type Counter =
   | "wall_clock_seconds"
   | "tokens"
   | "cost"
-  | "parallel_read_only_assignments";
+  | "parallel_read_only_assignments"
+  | "repeated_finding"
+  | "repeated_failure"
+  | "no_progress";
 export type Current = number;
 export type Fingerprint = string | null;
 export type Hard = boolean;
@@ -497,8 +501,10 @@ export type Choices =
       "reassign" | "change_approach" | "deliver_partial" | "stop",
       "reassign" | "change_approach" | "deliver_partial" | "stop"
     ];
+export type Counter1 = string | null;
 export type Decisionid = string;
-export type Purpose = "partial_completion" | null;
+export type Fingerprint1 = string | null;
+export type Purpose = ("partial_completion" | "limit_resolution") | null;
 export type Reasonsummary4 = string;
 export type Scopeid1 = string;
 export type Unmetrequirements = string[] | null;
@@ -702,6 +708,7 @@ export interface AssignmentProposedEvent {
 export interface AssignmentProposedPayload {
   acceptanceCriteria: Acceptancecriteria;
   assigneeAgentId: Assigneeagentid;
+  findingFingerprint?: Findingfingerprint;
   objective: Objective;
   operationClass: Operationclass;
   parentId?: Parentid;
@@ -948,7 +955,9 @@ export interface DecisionRequestedEvent {
 }
 export interface DecisionRequestedPayload {
   choices: Choices;
+  counter?: Counter1;
   decisionId: Decisionid;
+  fingerprint?: Fingerprint1;
   purpose?: Purpose;
   reasonSummary: Reasonsummary4;
   scopeId: Scopeid1;

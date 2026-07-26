@@ -146,6 +146,8 @@ test('Phase 1.4 simulator paths expose gate success, partial completion, denial 
   scenario.simulator.runScenario(sessionId, 'limit_partial');
   projection = scenario.simulator.getProjection(sessionId)!;
   expect(projection.status).toBe('waiting_decision');
+  expect(projection.limits.revisions).toMatchObject({ fingerprint: 'repeat-finding', occurrenceCount: 3 });
+  expect(projection.decisions['demo-decision']).toMatchObject({ purpose: 'limit_resolution', counter: 'revisions', fingerprint: 'repeat-finding' });
   scenario.simulator.resolveDecision(sessionId, 'demo-decision', 'deliver_partial');
   scenario.clock.advanceBy(25);
   expect(scenario.simulator.getProjection(sessionId)?.status).toBe('completed_partial');

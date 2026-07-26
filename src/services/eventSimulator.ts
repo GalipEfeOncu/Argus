@@ -304,7 +304,7 @@ export class EventSimulator {
         break;
       case 'limit_partial':
         this.emit(sessionId, 'limit.reached', coordinator.id, { counter: 'revisions', scopeId: 'demo-assignment', current: 3, threshold: 3, hard: true, resolution: 'ask_user', fingerprint: 'repeat-finding', occurrenceCount: 3 });
-        this.emit(sessionId, 'decision.requested', coordinator.id, { decisionId: 'demo-decision', scopeId: 'demo-assignment', choices: ['reassign', 'change_approach', 'deliver_partial', 'stop'], reasonSummary: 'Repeated finding reached the configured revision limit.' });
+        this.emit(sessionId, 'decision.requested', coordinator.id, { decisionId: 'demo-decision', scopeId: 'demo-assignment', choices: ['reassign', 'change_approach', 'deliver_partial', 'stop'], reasonSummary: 'Repeated finding reached the configured revision limit.', purpose: 'limit_resolution', counter: 'revisions', fingerprint: 'repeat-finding' });
         break;
       case 'denied_capability_replan':
         this.emit(sessionId, 'approval.requested', builder.id, { approvalId: 'demo-denied-approval', capability: 'workspace.write', scopeSummary: 'Write the isolated workspace change.', assignmentId: 'demo-assignment' });

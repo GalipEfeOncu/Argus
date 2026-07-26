@@ -53,6 +53,8 @@ class CommandProcessor:
         """Persist the accepted outcome atomically; duplicates return the original event."""
 
         supersede_coordinator = False
+        limit_partial = False
+        replan_decision_id: str | None = None
         if command.type in {"session.cancel", "participant.interrupt"}:
             # A cancellation is committed only after an already-authorized
             # workspace mutation leaves its short critical section.  This
@@ -65,12 +67,25 @@ class CommandProcessor:
                 return CommandOutcome(duplicate, True)
 
             status = await self._current_status(session_id)
-            if command.type == "decision.resolve" and command.payload.choice == "deliver_partial":
-                await self._require_partial_acceptance(session_id, command.payload.decision_id)
+            if command.type == "decision.resolve":
+                partial_request = await self._is_pending_partial_acceptance(session_id, command.payload.decision_id)
+                if partial_request:
+                    await self._require_partial_acceptance(session_id, command.payload.decision_id)
+                else:
+                    from app.services.limit_resolution_service import LimitDecisionRejected, LimitResolutionService
+                    try:
+                        await LimitResolutionService(self._db).validate_human_choice_in_transaction(
+                            session_id, command.payload.decision_id, command.payload.choice,
+                        )
+                    except LimitDecisionRejected as error:
+                        raise CommandRejected(str(error)) from error
+                    limit_partial = command.payload.choice == "deliver_partial"
+                    if command.payload.choice in {"reassign", "change_approach"}:
+                        replan_decision_id = command.payload.decision_id
             if command.type == "session.configuration.update":
                 specs, interrupted_assignments = await self._configuration_outcome_specs(session_id, command)
             else:
-                specs = self._outcome_specs(session_id, command, status)
+                specs = self._limit_partial_specs(session_id, command, status) if limit_partial else self._outcome_specs(session_id, command, status)
                 interrupted_assignments = ()
             persisted: list[StoredEvent] = []
             for index, (event_type, actor_id, payload) in enumerate(specs):
@@ -100,6 +115,15 @@ class CommandProcessor:
                          _safe_json({"summary": command.payload.scope_summary}), now, now,
                          persisted[0].event_id, persisted[0].event_id),
                     )
+            if command.type == "decision.resolve" and not partial_request:
+                from app.services.limit_resolution_service import LimitResolutionService
+                await LimitResolutionService(self._db).finalize_human_choice_in_transaction(
+                    session_id, command.payload.decision_id, command.payload.choice, persisted[0].event_id,
+                )
+            if command.type == "decision.resolve" and command.payload.choice == "stop" and not partial_request:
+                persisted.extend(await self._cancel_assignments_in_transaction(
+                    session_id, reason=command.payload.reason_summary or "Stopped after a reached limit.",
+                ))
             if command.type == "session.cancel":
                 persisted.extend(await self._cancel_assignments_in_transaction(
                     session_id, reason=command.payload.reason_summary or "Cancelled by the user.",
@@ -108,6 +132,9 @@ class CommandProcessor:
                 persisted.extend(await self._cancel_assignments_in_transaction(
                     session_id, participant_id=command.payload.participant_id, reason=command.payload.reason_summary,
                 ))
+            if command.type in {"session.cancel", "participant.interrupt"}:
+                from app.services.limit_resolution_service import LimitResolutionService
+                await LimitResolutionService(self._db).cancel_pending_in_transaction(session_id)
             if interrupted_assignments:
                 await self._db.executemany(
                     "UPDATE assignments SET state = 'interrupted', updated_at_ms = ? WHERE id = ? AND session_id = ?",
@@ -135,6 +162,9 @@ class CommandProcessor:
             # SQLite transaction boundary.
             from app.services.coordinator_cycle import CoordinatorCycle
             await CoordinatorCycle.supersede_active(session_id)
+        if replan_decision_id is not None:
+            from app.services.limit_resolution_service import LimitResolutionService
+            await LimitResolutionService(self._db).replan_after_resolution(session_id, replan_decision_id)
         return outcome
 
     async def _cancel_assignments_in_transaction(
@@ -204,6 +234,21 @@ class CommandProcessor:
             if await cursor.fetchone() is None:
                 raise CommandRejected("partial_acceptance_not_requested")
 
+    async def _is_pending_partial_acceptance(self, session_id: str, decision_id: str) -> bool:
+        async with self._db.execute(
+            """SELECT 1 FROM events requested WHERE requested.session_id = ?
+               AND requested.event_type = 'decision.requested'
+               AND json_extract(requested.payload_json, '$.decisionId') = ?
+               AND json_extract(requested.payload_json, '$.purpose') = 'partial_completion'
+               AND NOT EXISTS (
+                 SELECT 1 FROM events recorded WHERE recorded.session_id = requested.session_id
+                   AND recorded.event_type = 'decision.recorded'
+                   AND json_extract(recorded.payload_json, '$.decisionId') = ?
+               ) LIMIT 1""",
+            (session_id, decision_id, decision_id),
+        ) as cursor:
+            return await cursor.fetchone() is not None
+
     @staticmethod
     def _require_transition(current: str, target: str) -> None:
         if target not in LIFECYCLE_TRANSITIONS.get(current, frozenset()):
@@ -256,6 +301,20 @@ class CommandProcessor:
                 ("session.status_changed", "system", {"status": target, "reasonSummary": "Decision applied."}),
             ]
         raise CommandRejected(f"unsupported_command:{command.type}")
+
+    def _limit_partial_specs(
+        self, session_id: str, command: ArgusSessionCommand, status: str,
+    ) -> list[tuple[str, str, dict[str, Any]]]:
+        if command.type != "decision.resolve":
+            raise CommandRejected("unsupported_limit_decision")
+        if status != "waiting_decision":
+            self._require_transition(status, "waiting_decision")
+        partial_id = f"partial_{uuid.uuid4().hex}"
+        return [
+            ("decision.recorded", "human", {"decisionId": command.payload.decision_id, "choice": "deliver_partial", "reasonSummary": command.payload.reason_summary or "Partial outcome requested."}),
+            ("decision.requested", "system", {"decisionId": partial_id, "scopeId": session_id, "choices": ["deliver_partial", "stop"], "reasonSummary": command.payload.reason_summary or "Confirm the partial outcome.", "purpose": "partial_completion", "unmetRequirements": ["A reached limit prevented further full completion."]}),
+            ("session.status_changed", "system", {"status": "waiting_decision", "reasonSummary": "Waiting for the user to accept the partial outcome."}),
+        ]
 
     async def _configuration_outcome_specs(
         self, session_id: str, command: ArgusSessionCommand,
