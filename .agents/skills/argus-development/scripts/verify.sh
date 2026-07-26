@@ -8,6 +8,7 @@ case "$scope" in
     python3 .agents/skills/argus-development/scripts/check_docs.py
     ;;
   frontend)
+    npm run check:version
     npm run type-check
     npm run test
     npm run build
@@ -21,6 +22,7 @@ case "$scope" in
     ;;
   all)
     python3 .agents/skills/argus-development/scripts/check_docs.py
+    npm run check:version
     npm run type-check
     npm run test
     npm run build

@@ -11,11 +11,13 @@ extend these rules for their directory trees.
 2. Inspect nearby implementation and tests before proposing a solution. Treat
    documentation marked as `target` as a contract to implement, not proof that
    the behavior already exists.
-3. State the affected contract, persistence, UI, workspace, and permission
+3. Classify the change as internal-only, user-visible, roadmap completion/phase
+   exit, or release preparation and apply the companion-update rules below.
+4. State the affected contract, persistence, UI, workspace, and permission
    boundaries. Mark a boundary `not affected` when appropriate.
-4. Make one focused vertical slice and keep generated artifacts synchronized
+5. Make one focused vertical slice and keep generated artifacts synchronized
    with their authoritative source.
-5. Run the narrowest relevant verification, then review the complete diff for
+6. Run the narrowest relevant verification, then review the complete diff for
    unrelated changes, secrets, stale claims, and generated-file drift.
 
 ## Product invariants
@@ -58,6 +60,33 @@ For REST or WebSocket behavior:
 
 Use ordered, versioned events and idempotent client commands. Do not hand-maintain duplicate protocol types.
 
+## Change classification and release hygiene
+
+Apply these companion updates in the same focused change. Link to the owning
+contract instead of copying its policy into implementation files.
+
+- **Internal-only:** tests, refactors, build tooling, or documentation with no
+  user-visible behavior change do not require an application-version bump.
+- **User-visible:** add a concise entry under the appropriate `Unreleased`
+  heading in [CHANGELOG.md](CHANGELOG.md). Include safe security fixes without
+  publishing exploit details. Do not bump the application version yet.
+- **Roadmap completion:** update [docs/ROADMAP.md](docs/ROADMAP.md) only after the
+  implementation, tests, generated contracts, and authoritative documentation
+  agree. Add the completion-evidence block required by its cross-phase controls;
+  never mark target prose as current behavior prematurely.
+- **Phase exit:** in addition to completion evidence, run and record the available
+  release-readiness runway probes and apply the Alpha/Beta/RC milestone rule.
+  Unavailable platform/signing evidence is an explicit blocker or deferred risk,
+  never an inferred pass.
+- **Release preparation:** read
+  [IMPLEMENTATION_SPEC.md section 14](docs/IMPLEMENTATION_SPEC.md#14-versioning-and-release-train),
+  move `Unreleased` changelog entries into the dated release, select SemVer from
+  compatibility impact, and run `npm run version:set -- <version>`. Version bumps
+  occur only in a dedicated release change, not in ordinary feature work.
+
+At handoff, state the classification, companion files updated, version decision
+(`unchanged` for non-release work), and checks or release evidence not run.
+
 ## Implementation rules
 
 - Prefer focused vertical slices over broad partial rewrites.
@@ -92,6 +121,7 @@ The underlying layer checks are:
 
 ```bash
 npm run type-check
+npm run check:version
 (cd backend && .venv/bin/python3 -c "import app.main; print('backend import OK')")
 (cd src-tauri && cargo check)
 ```

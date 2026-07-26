@@ -65,6 +65,7 @@ jobs:
       - run: npm run check:contracts
         env:
           ARGUS_BACKEND_PYTHON: python
+      - run: npm run check:version
 
   rust:
     name: Rust format, clippy, and test

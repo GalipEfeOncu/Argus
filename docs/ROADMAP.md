@@ -50,6 +50,64 @@ slices are ordered by dependency unless explicitly marked parallel-safe. Do not
 use LangGraph or another model graph as session topology; the persisted event
 log, scheduler, assignments, gates, and counters own orchestration.
 
+## Cross-phase delivery controls
+
+These controls run throughout delivery without authorizing product work from a
+later phase or allowing a probe to satisfy that phase's exit gate.
+
+### Release-readiness runway
+
+- At every phase exit, run the narrowest available packaged-shell, sidecar,
+  provider-contract, upgrade, and platform smoke probes. Record unavailable
+  native runners and signing/notarization prerequisites as explicit release
+  risks; one platform's result never certifies another platform.
+- Keep the native CI matrix, installer skeleton, sidecar composition report, and
+  provider conformance harness executable as soon as their dependencies exist.
+  A feasibility probe may discover risk early, but it may not ship target
+  behavior or mark a later roadmap slice complete.
+- Attach development-host results only as calibration. Release claims still
+  require the signed or release-equivalent native evidence defined by Phase 7.
+
+### Evidence-linked completion records
+
+- Every newly completed slice records its completion date, source change,
+  verification commands and results, relevant generated or benchmark artifacts,
+  and every skipped check with its blocker. Use `this change` as the source while
+  the work is uncommitted; the commit or pull request containing the status then
+  becomes the durable reference. Never invent a future commit hash.
+- A checked heading or prose status without this evidence is not sufficient to
+  pass a slice or phase gate. Phase exits also confirm contract generation,
+  documentation agreement, a clean focused diff, and no unresolved release-risk
+  regression introduced by the phase.
+- CI artifacts may expire, so durable summaries retain the tool version, target,
+  result, and source commit needed to reproduce the evidence without copying
+  credentials, private reasoning, or project data into the repository.
+
+Use this block directly below a new or updated completion status:
+
+```text
+Completion evidence (YYYY-MM-DD):
+- Source: this change | <commit/PR/tag>
+- Verification: <commands and summarized results>
+- Artifacts/benchmarks: <durable references or not applicable>
+- Deferred/unavailable: none | <check and explicit reason>
+```
+
+### Product-maturity milestones
+
+- **Alpha — Phase 5 exit:** an installable internal/developer preview exercises
+  customizable roles, local skills, and supported provider adapters. It is not
+  production-ready and may still lack complete recovery and apply workflows.
+- **Beta — Phase 6 exit:** the product is feature-complete for the 1.0 scope and
+  may enter a bounded user pilot after recovery, diff acceptance, and degraded
+  modes pass. New scope requires an explicit roadmap change.
+- **Release candidate — Phase 7:** signed native candidates enter a stabilization
+  window. Only release blockers, security fixes, compatibility fixes, and
+  evidence corrections may change the candidate.
+- Stable `1.0.0` is permitted only after Phase 7 exit and the final definition of
+  done pass. Version selection and synchronized metadata follow
+  [IMPLEMENTATION_SPEC.md](IMPLEMENTATION_SPEC.md#14-versioning-and-release-train).
+
 ## Current baseline and migration target
 
 The initial baseline contained a React shared-room prototype and simulator,
@@ -363,7 +421,7 @@ Current status (2026-07-23):
   upgrade, simulated interrupted migration rollback, concurrent sequencing,
   projection rebuild equivalence, and persistence secret scanning.
 
-### 2.2 Event store and command processor
+### 2.2 Event store and command processor (✅ Completed)
 
 Deliverables:
 
@@ -838,6 +896,9 @@ Deliverables:
   and verify reproducible clean builds where feasible.
 - Sign/notarize installers, publish checksums and versioned release notes, and
   test install/upgrade/uninstall with preservation of user configuration.
+- Select the release version from the compatibility impact, synchronize every
+  application manifest, update the changelog, and create one immutable `vX.Y.Z`
+  tag according to the versioning and release-train contract.
 - Add database/config backup before migrations and documented rollback/recovery.
 - Publish threat model, privacy statement, vulnerability contact, known limits,
   and operator troubleshooting.

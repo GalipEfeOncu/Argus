@@ -392,3 +392,63 @@ budgets above. Platform-specific exclusions must be visible before release and
 cannot silently degrade safety or orchestration semantics.
 
 A phase is complete only when its behavior is implemented, automated tests pass, documentation reflects the result, and the next phase no longer depends on an undecided design choice.
+
+## 14. Versioning and release train
+
+Argus uses [Semantic Versioning 2.0.0](https://semver.org/) for every distributed
+desktop application and update. `package.json` is the authoritative application
+version. The release tooling keeps its root `package-lock.json` entries,
+`src-tauri/Cargo.toml`, the Argus package in `src-tauri/Cargo.lock`, and
+`src-tauri/tauri.conf.json` synchronized. CI runs `npm run check:version` and
+rejects drift. Use this command to prepare a version change:
+
+```bash
+npm run version:set -- 1.2.3
+```
+
+Changing a version does not itself create a release. Version changes belong in
+one focused release change with the changelog and release evidence; ordinary
+feature commits and pull requests remain under the `Unreleased` changelog entry.
+
+### Version selection
+
+| Change delivered to users | Version action after 1.0 | Example |
+| --- | --- | --- |
+| Backward-compatible bug, security, performance, or packaging fix | Increment `PATCH` | `1.0.0` → `1.0.1` |
+| Backward-compatible feature, provider, role, setting, or substantial UX addition | Increment `MINOR`, reset patch | `1.0.3` → `1.1.0` |
+| Incompatible change to supported API, stored configuration, skill/provider contract, or user workflow without a transparent compatibility path | Increment `MAJOR`, reset minor and patch | `1.4.2` → `2.0.0` |
+
+A database or configuration migration is not automatically a major release when
+the supported previous version upgrades safely without user data loss and the
+documented rollback/recovery contract remains valid. Deprecate public contracts
+before removal when practical. Security urgency does not permit mislabeling an
+incompatible release.
+
+Before stable 1.0, `0.MINOR.PATCH` identifies development baselines and may
+contain breaking changes that are called out in the changelog. The planned 1.0
+maturity sequence is:
+
+1. Phase 5 Alpha: `1.0.0-alpha.1`, then increment `alpha.N` for each distributed Alpha.
+2. Phase 6 Beta: `1.0.0-beta.1`, then increment `beta.N` for each distributed Beta.
+3. Phase 7 candidate: `1.0.0-rc.1`, then increment `rc.N` for each candidate.
+4. Final Phase 7 and definition-of-done pass: `1.0.0`.
+
+Later prereleases follow the target version, for example `1.3.0-beta.2` before
+`1.3.0`. Do not put a commit hash in the synchronized release version; CI and
+support evidence record the source commit separately.
+
+### Release transaction
+
+Every distributed update uses one auditable release change:
+
+1. Classify user-visible and compatibility impact and choose the next version.
+2. Move applicable `Unreleased` changelog entries into a dated version section.
+3. Run `npm run version:set -- <version>` and commit every synchronized manifest
+   and lockfile change together.
+4. Run all verification scopes, contract/version drift, security scanning, the
+   applicable upgrade/rollback suite, and native artifact gates for the release
+   channel.
+5. Merge the release change, create the immutable annotated tag `v<version>` on
+   that exact commit, and build/sign artifacts from the tag.
+6. Publish checksums and release notes. Never move or reuse a published version
+   or tag; a correction receives a new patch or prerelease number.

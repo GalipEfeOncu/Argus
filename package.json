@@ -15,6 +15,8 @@
     "test:watch": "vitest",
     "generate:contracts": "node scripts/generate-contracts.mjs",
     "check:contracts": "node scripts/check-contracts.mjs",
+    "check:version": "node scripts/version.mjs check",
+    "version:set": "node scripts/version.mjs set",
     "benchmark:fixtures": "node scripts/benchmarks/generate-fixtures.mjs",
     "benchmark:validate": "node scripts/benchmarks/benchmark.mjs validate",
     "benchmark:compare": "node scripts/benchmarks/benchmark.mjs compare",

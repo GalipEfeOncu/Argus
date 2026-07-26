@@ -16,6 +16,7 @@ prompts or implementation notes.
 | What is allowed and where is it enforced? | [SECURITY.md](SECURITY.md) | Security contract |
 | Which MVP decisions are already settled? | [IMPLEMENTATION_SPEC.md](IMPLEMENTATION_SPEC.md) | Implementation contract |
 | What performance and platform budgets must pass? | [IMPLEMENTATION_SPEC.md](IMPLEMENTATION_SPEC.md#12-performance-and-footprint-budgets) | Release contract |
+| How are releases and versions numbered? | [IMPLEMENTATION_SPEC.md](IMPLEMENTATION_SPEC.md#14-versioning-and-release-train) | Release contract |
 | What should be built next? | [ROADMAP.md](ROADMAP.md) | Phase plan and exit criteria |
 
 The [design reference](assets/argus-design-reference.png) is visual input, not an
@@ -35,12 +36,18 @@ behavior or scope may change.
 | Filesystem, shell, git, credentials, or Tauri permissions | `SECURITY.md`, `ARCHITECTURE.md` |
 | Agents, roles, skills, or orchestration | `PRODUCT.md`, `ARCHITECTURE.md`, `IMPLEMENTATION_SPEC.md` |
 | Roadmap or status claim | `ROADMAP.md` and the current implementation/tests |
+| Roadmap slice completion or phase exit | `ROADMAP.md` cross-phase controls, current implementation/tests, and `IMPLEMENTATION_SPEC.md` section 14 for a maturity milestone |
+| Release, version, or changelog | `IMPLEMENTATION_SPEC.md` section 14, `CHANGELOG.md`, and `ROADMAP.md` product-maturity milestones |
 
 ## Documentation rules
 
 - Describe current behavior as current and unimplemented behavior as target or planned.
 - Keep one owner for each decision. Link to it instead of copying normative text.
 - Update code, tests, generated contracts, and related documentation in the same change.
+- Record user-visible changes under `CHANGELOG.md` `Unreleased`; do not bump the
+  application version outside a dedicated release change.
+- A roadmap completion claim must include the evidence block required by
+  `ROADMAP.md`; a phase exit must also record release-readiness probes.
 - Use relative links and repository-relative paths in prose and commands.
 - Prefer durable headings; other documents and agent tasks may deep-link to them.
 - Do not include credentials, private model reasoning, personal machine paths, or user project data.
