@@ -112,6 +112,20 @@ test('a pre-authorized workspace write stays prompt-free and retains the selecte
   expect(events.find((event) => event.type === 'assignment.created')?.payload.assigneeAgentId).toBe('agent-builder-alpha');
 });
 
+test('deny-interactive mode emits a visible denial and replan without an approval prompt', () => {
+  const scenario = createSimulatorScenario();
+  const base = createConfiguration({}, 'quick');
+  scenario.simulator.start(sessionId, {
+    ...base,
+    approvalPolicy: { ...base.approvalPolicy, behavior: 'deny_interactive' },
+  });
+  scenario.clock.advanceBy(3_300);
+
+  const events = scenario.simulator.getProjection(sessionId)?.events ?? [];
+  expect(events.map((event) => event.type)).not.toContain('approval.requested');
+  expect(events.find((event) => event.type === 'error.created')?.payload).toMatchObject({ code: 'permission_denied', recoverable: true });
+});
+
 test('two same-role instances retain distinct legacy-store keys while canonical assignments use an instance ID', () => {
   const scenario = createSimulatorScenario();
   const base = createConfiguration({}, 'quick');

@@ -14,6 +14,9 @@ All notable user-visible changes to Argus are recorded here. The project follows
 - Durable loop detection and bounded limit resolution: repeated review findings,
   failures, and unchanged workspaces now request a user decision, a single
   tool-free Coordinator choice, or stop according to the session policy.
+- Durable approval and grant enforcement: permission profiles, capability
+  overrides, expiring exact-scope grants, and no-interruption denial now remain
+  enforced across reconnects and restarts.
 
 No stable Argus version has been published yet. The manifest version `0.1.0` is
 the current development baseline, not a stable release claim.

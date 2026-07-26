@@ -89,6 +89,7 @@ class ApprovalPolicy(CamelModel):
     permission_profile: Literal["strict", "balanced", "autonomous", "expert_unrestricted"] = "balanced"
     behavior: Literal["ask_each_time", "ask_by_policy", "preauthorize_session", "deny_interactive"] = "ask_by_policy"
     preauthorized_capabilities: list[Identifier] = Field(default_factory=list, max_length=50)
+    capability_overrides: dict[Identifier, Literal["allow", "ask", "deny"]] = Field(default_factory=dict, max_length=50)
     limit_resolution: Literal["ask_user", "coordinator_decides", "stop"] = "coordinator_decides"
 
 

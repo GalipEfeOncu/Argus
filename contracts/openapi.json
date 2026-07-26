@@ -15,6 +15,23 @@
             "title": "Behavior",
             "type": "string"
           },
+          "capabilityOverrides": {
+            "additionalProperties": {
+              "enum": [
+                "allow",
+                "ask",
+                "deny"
+              ],
+              "type": "string"
+            },
+            "maxProperties": 50,
+            "propertyNames": {
+              "maxLength": 160,
+              "minLength": 1
+            },
+            "title": "Capabilityoverrides",
+            "type": "object"
+          },
           "limitResolution": {
             "default": "coordinator_decides",
             "enum": [
@@ -150,6 +167,19 @@
             "title": "Capability",
             "type": "string"
           },
+          "scopePath": {
+            "anyOf": [
+              {
+                "maxLength": 160,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scopepath"
+          },
           "scopeSummary": {
             "maxLength": 4000,
             "minLength": 1,
@@ -246,6 +276,18 @@
             "title": "Approvalid",
             "type": "string"
           },
+          "grantExpiresAtMs": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Grantexpiresatms"
+          },
           "grantId": {
             "anyOf": [
               {
@@ -258,6 +300,22 @@
               }
             ],
             "title": "Grantid"
+          },
+          "grantScope": {
+            "anyOf": [
+              {
+                "enum": [
+                  "once",
+                  "scope",
+                  "session"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Grantscope"
           },
           "reasonSummary": {
             "anyOf": [

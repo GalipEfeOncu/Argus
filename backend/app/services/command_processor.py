@@ -104,17 +104,14 @@ class CommandProcessor:
                 except ConfigurationError as error:
                     raise CommandRejected(error.code) from error
                 supersede_coordinator = any(instruction.delivery_kind == "coordinator" for instruction in instructions)
-            if command.type == "approval.resolve" and command.payload.resolution == "grant":
-                now = _now_ms()
-                for capability in command.payload.grant_capabilities:
-                    await self._db.execute(
-                        """INSERT INTO approvals (id, session_id, capability, scope_json, decision, resolver_id,
-                           requested_at_ms, resolved_at_ms, request_event_id, resolution_event_id)
-                           VALUES (?, ?, ?, ?, 'granted', 'human', ?, ?, ?, ?)""",
-                        (f"grant_{command.command_id}_{capability}", session_id, capability,
-                         _safe_json({"summary": command.payload.scope_summary}), now, now,
-                         persisted[0].event_id, persisted[0].event_id),
+            if command.type == "approval.resolve":
+                from app.services.approval_grant_service import ApprovalGrantService, ApprovalRejected
+                try:
+                    await ApprovalGrantService(self._db).resolve_in_transaction(
+                        session_id, command.payload, persisted[0].event_id,
                     )
+                except ApprovalRejected as error:
+                    raise CommandRejected(error.code) from error
             if command.type == "decision.resolve" and not partial_request:
                 from app.services.limit_resolution_service import LimitResolutionService
                 await LimitResolutionService(self._db).finalize_human_choice_in_transaction(
@@ -282,7 +279,12 @@ class CommandProcessor:
             resolution = {"approve": "approved", "reject": "rejected", "grant": "granted"}[payload.resolution]
             approval: dict[str, Any] = {"approvalId": payload.approval_id, "resolution": resolution}
             if payload.resolution == "grant":
-                approval["grantId"] = f"grant_{command.command_id}"
+                approval["grantId"] = payload.approval_id
+                approval["grantScope"] = payload.grant_scope or "once"
+                # The deterministic service stores the bounded expiry. The UI
+                # never infers unlimited authority from a missing timestamp.
+                grant_scope = payload.grant_scope or "once"
+                approval["grantExpiresAtMs"] = _now_ms() + (payload.grant_duration_seconds or {"once": 300, "scope": 3600, "session": 86400}[grant_scope]) * 1000
                 approval["reasonSummary"] = payload.scope_summary
             return [
                 ("approval.resolved", "human", approval),
@@ -342,6 +344,9 @@ class CommandProcessor:
             snapshot, consequences = await service.update(
                 session_id, command.payload.expected_configuration_version, command.payload.patch,
             )
+            from app.services.approval_grant_service import ApprovalGrantService
+            await ApprovalGrantService(self._db).revoke_stale_policy_in_transaction(session_id, snapshot.policy_hash)
+            await ApprovalGrantService(self._db).create_preauthorizations_in_transaction(session_id, snapshot)
         except ConfigurationError as error:
             raise CommandRejected(error.code) from error
         changed = [field for field in command.payload.patch.model_fields_set]

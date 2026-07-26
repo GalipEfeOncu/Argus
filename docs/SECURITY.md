@@ -24,6 +24,13 @@ Argus runs model-selected work against local projects. That makes provider crede
 
 Users can override a decision once, for a bounded scope, or for a session. Policy changes are themselves recorded as events.
 
+Every grant is durable but bounded: it records the requested capability, a
+canonical workspace-relative scope, grant kind (`once`, `scope`, or `session`),
+expiry, and the configuration policy hash that authorized it. A grant is
+revoked when its policy hash becomes stale; a once grant is consumed atomically
+with the request it authorizes. A human resolution may only grant the exact
+pending capability and scope, never a Coordinator-supplied expansion.
+
 ## Approval behavior
 
 Approval behavior is separate from orchestration limits. A session chooses one

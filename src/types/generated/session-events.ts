@@ -424,6 +424,7 @@ export type Eventid17 = string;
 export type Approvalid = string;
 export type Assignmentid8 = string | null;
 export type Capability = string;
+export type Scopepath = string | null;
 export type Scopesummary = string;
 export type Sequence17 = number;
 export type Sessionid17 = string;
@@ -434,7 +435,9 @@ export type Actorid18 = string;
 export type Correlationid18 = string | null;
 export type Eventid18 = string;
 export type Approvalid1 = string;
+export type Grantexpiresatms = number | null;
 export type Grantid = string | null;
+export type Grantscope = ("once" | "scope" | "session") | null;
 export type Reasonsummary3 = string | null;
 export type Resolution = "approved" | "rejected" | "granted";
 export type Sequence18 = number;
@@ -891,6 +894,7 @@ export interface ApprovalRequestedPayload {
   approvalId: Approvalid;
   assignmentId?: Assignmentid8;
   capability: Capability;
+  scopePath?: Scopepath;
   scopeSummary: Scopesummary;
 }
 export interface ApprovalResolvedEvent {
@@ -906,7 +910,9 @@ export interface ApprovalResolvedEvent {
 }
 export interface ApprovalResolvedPayload {
   approvalId: Approvalid1;
+  grantExpiresAtMs?: Grantexpiresatms;
   grantId?: Grantid;
+  grantScope?: Grantscope;
   reasonSummary?: Reasonsummary3;
   resolution: Resolution;
 }

@@ -63,7 +63,7 @@ export function createConfiguration(
     preauthorizationAcknowledged: false, preauthorizationScope: '', availableAgents,
     availableAgentIds: availableAgents.map((agent) => agent.id), requiredRoleRules: [],
     executionLimits: balancedLimits,
-    approvalPolicy: { permissionProfile: 'balanced', behavior: 'ask_by_policy', preauthorizedCapabilities: [], limitResolution: 'coordinator_decides' },
+    approvalPolicy: { permissionProfile: 'balanced', behavior: 'ask_by_policy', preauthorizedCapabilities: [], capabilityOverrides: {}, limitResolution: 'coordinator_decides' },
   };
   return preset === 'custom' ? base : applyPreset(base, preset);
 }
@@ -75,18 +75,18 @@ export function applyPreset(configuration: SessionConfiguration, preset: Exclude
     quick: {
       preset: 'quick', workspaceMode: 'worktree', availableAgentIds: idsFor(['builder']), requiredRoleRules: [],
       executionLimits: { ...balancedLimits, maxRevisionsPerFinding: 0, maxAssignmentAttempts: 3, maxModelIterationsPerAssignment: 8, maxToolCallsPerAssignment: 30, maxSessionTokens: 100_000, maxWallClockSeconds: 3_600, maxParallelReadOnlyAssignments: 1 },
-      approvalPolicy: { permissionProfile: 'balanced', behavior: 'ask_by_policy', preauthorizedCapabilities: [], limitResolution: 'stop' },
+      approvalPolicy: { permissionProfile: 'balanced', behavior: 'ask_by_policy', preauthorizedCapabilities: [], capabilityOverrides: {}, limitResolution: 'stop' },
     },
     balanced: {
       preset: 'balanced', workspaceMode: 'worktree', availableAgentIds: idsFor(['planner', 'builder', 'reviewer', 'tester', 'ui_agent']),
       requiredRoleRules: [rule('reviewer', 'when_changes', 'approved_review'), rule('tester', 'when_changes', 'passing_test_run')], executionLimits: balancedLimits,
-      approvalPolicy: { permissionProfile: 'balanced', behavior: 'ask_by_policy', preauthorizedCapabilities: [], limitResolution: 'coordinator_decides' },
+      approvalPolicy: { permissionProfile: 'balanced', behavior: 'ask_by_policy', preauthorizedCapabilities: [], capabilityOverrides: {}, limitResolution: 'coordinator_decides' },
     },
     thorough: {
       preset: 'thorough', workspaceMode: 'worktree', availableAgentIds: idsFor(['planner', 'builder', 'reviewer', 'tester', 'ui_agent']),
       requiredRoleRules: [rule('reviewer', 'always', 'approved_review'), rule('tester', 'when_changes', 'passing_test_run')],
       executionLimits: { ...balancedLimits, maxRevisionsPerFinding: 5, maxAssignmentAttempts: 12, maxModelIterationsPerAssignment: 32, maxToolCallsPerAssignment: 160, maxSessionTokens: 1_000_000, maxWallClockSeconds: 28_800, maxParallelReadOnlyAssignments: 4 },
-      approvalPolicy: { permissionProfile: 'balanced', behavior: 'ask_by_policy', preauthorizedCapabilities: [], limitResolution: 'ask_user' },
+      approvalPolicy: { permissionProfile: 'balanced', behavior: 'ask_by_policy', preauthorizedCapabilities: [], capabilityOverrides: {}, limitResolution: 'ask_user' },
     },
   };
   return { ...configuration, ...presets[preset], executionLimits: { ...presets[preset].executionLimits }, approvalPolicy: { ...presets[preset].approvalPolicy }, requiredRoleRules: [...presets[preset].requiredRoleRules] };
@@ -135,7 +135,7 @@ export function validateConfiguration(configuration: SessionConfiguration): stri
   if (configuration.requiredRoleRules.length > 0 && configuration.executionLimits.maxWallClockSeconds === 0) errors.push('Required role gates are incompatible with zero wall-clock time.');
   if (configuration.requiredRoleRules.some((required) => required.role === 'tester' && required.applicability === 'always') && configuration.executionLimits.maxToolCallsPerAssignment === 0) errors.push('An always-required Tester gate is incompatible with zero tool calls.');
   const policy = configuration.approvalPolicy;
-  const allowedPreauthorization = policy.permissionProfile === 'autonomous'
+  const allowedPreauthorization = policy.permissionProfile === 'autonomous' || policy.permissionProfile === 'expert_unrestricted'
     ? ['workspace.read', 'workspace.write', 'test.run']
     : policy.permissionProfile === 'balanced' ? ['workspace.read', 'test.run'] : [];
   if (policy.behavior !== 'preauthorize_session' && policy.preauthorizedCapabilities.length > 0) errors.push('Pre-authorized capabilities require no-interruption mode.');
@@ -144,6 +144,8 @@ export function validateConfiguration(configuration: SessionConfiguration): stri
   if (configuration.workspaceMode === 'direct_write' && !configuration.directWriteAcknowledged) errors.push('Direct-write mode requires acknowledgement that rollback is limited.');
   if (policy.behavior === 'preauthorize_session' && !configuration.preauthorizationScope.trim()) errors.push('Pre-authorized work requires an exact workspace scope.');
   if (policy.behavior === 'preauthorize_session' && policy.permissionProfile === 'autonomous' && !configuration.preauthorizationAcknowledged) errors.push('Autonomous pre-authorization requires explicit acknowledgement.');
+  if (policy.permissionProfile === 'expert_unrestricted' && !configuration.preauthorizationAcknowledged) errors.push('Expert unrestricted permissions require explicit acknowledgement.');
+  if (Object.values(policy.capabilityOverrides).some((decision) => !['allow', 'ask', 'deny'].includes(decision))) errors.push('Capability overrides must allow, ask, or deny.');
   return errors;
 }
 
@@ -154,7 +156,8 @@ export function authoritySummary(configuration: SessionConfiguration): string[] 
   return [
     `Coordinator is always available and may select: ${available.length ? available.join(', ') : 'no specialists'}.`,
     gates.length ? `Completion requires evidence from: ${gates.join(', ')}.` : 'No completion gates are required.',
-    noInterruption ? `Pre-authorized until terminal result: ${configuration.approvalPolicy.preauthorizedCapabilities.join(', ') || 'no capabilities'} in ${configuration.preauthorizationScope || 'an unselected workspace'}. Pause and cancel remain reachable; non-bypassable safety denials still stop work.` : 'The app can pause, cancel, interrupt participants, and request policy approval while work is running.',
+    `Authority: ${configuration.approvalPolicy.permissionProfile.replaceAll('_', ' ')} profile; ${configuration.approvalPolicy.behavior.replaceAll('_', ' ')} behavior${Object.keys(configuration.approvalPolicy.capabilityOverrides).length ? `; overrides: ${Object.entries(configuration.approvalPolicy.capabilityOverrides).map(([capability, decision]) => `${capability}=${decision}`).join(', ')}` : ''}.`,
+    noInterruption ? `Pre-authorized until terminal result: ${configuration.approvalPolicy.preauthorizedCapabilities.join(', ') || 'no capabilities'} in the entire isolated session workspace. Pause and cancel remain reachable; ungranted requests are denied and non-bypassable safety denials still stop work.` : 'The app can pause, cancel, interrupt participants, and request policy approval while work is running.',
     `Workspace writes use ${configuration.workspaceMode.replace('_', ' ')} mode${configuration.workspaceMode === 'direct_write' ? '; rollback is limited and was explicitly acknowledged' : ''}; outside-workspace and destructive actions remain forbidden.`,
   ];
 }

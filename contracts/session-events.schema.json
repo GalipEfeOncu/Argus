@@ -103,6 +103,20 @@
           "title": "Capability",
           "type": "string"
         },
+        "scopePath": {
+          "anyOf": [
+            {
+              "maxLength": 160,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Scopepath"
+        },
         "scopeSummary": {
           "maxLength": 4000,
           "minLength": 1,
@@ -200,6 +214,19 @@
           "title": "Approvalid",
           "type": "string"
         },
+        "grantExpiresAtMs": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Grantexpiresatms"
+        },
         "grantId": {
           "anyOf": [
             {
@@ -213,6 +240,23 @@
           ],
           "default": null,
           "title": "Grantid"
+        },
+        "grantScope": {
+          "anyOf": [
+            {
+              "enum": [
+                "once",
+                "scope",
+                "session"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Grantscope"
         },
         "reasonSummary": {
           "anyOf": [

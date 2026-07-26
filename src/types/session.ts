@@ -48,6 +48,7 @@ export type OutputLanguage = 'en' | 'tr';
 export type RequiredRoleApplicability = 'always' | 'when_changes' | 'when_capability_used';
 export type PermissionProfile = 'strict' | 'balanced' | 'autonomous' | 'expert_unrestricted';
 export type ApprovalBehavior = 'ask_each_time' | 'ask_by_policy' | 'preauthorize_session' | 'deny_interactive';
+export type CapabilityOverrideDecision = 'allow' | 'ask' | 'deny';
 export type LimitResolution = 'ask_user' | 'coordinator_decides' | 'stop';
 
 export interface AgentInstance {
@@ -83,6 +84,7 @@ export interface ApprovalPolicy {
   permissionProfile: PermissionProfile;
   behavior: ApprovalBehavior;
   preauthorizedCapabilities: string[];
+  capabilityOverrides: Record<string, CapabilityOverrideDecision>;
   limitResolution: LimitResolution;
 }
 

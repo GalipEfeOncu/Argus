@@ -477,22 +477,24 @@ class AssignmentScheduler:
             raise SchedulerRejected("missing_capability", "The proposed agent lacks a requested capability.")
         if proposal.operation_class == "mutating" and "workspace.write" not in proposal.requested_capabilities:
             raise SchedulerRejected("writer_capability_required", "Mutating work must explicitly request workspace.write.")
-        if proposal.requested_capabilities and not await self._has_grant(session_id, snapshot, proposal.requested_capabilities):
+        if proposal.requested_capabilities and not await self._has_grant(
+            session_id, snapshot, proposal.requested_capabilities, proposal.operation_class,
+        ):
             raise SchedulerRejected("permission_grant_required", "The requested capabilities do not have an active policy grant.")
 
-    async def _has_grant(self, session_id: str, snapshot: ConfigurationSnapshot, capabilities: list[str]) -> bool:
-        policy = snapshot.approval_policy
-        requested = set(capabilities)
-        if policy["behavior"] == "preauthorize_session":
-            return requested <= set(policy["preauthorizedCapabilities"])
-        if policy["behavior"] == "deny_interactive":
-            return False
-        async with self._db.execute(
-            "SELECT capability FROM approvals WHERE session_id = ? AND decision IN ('approved', 'granted') AND (grant_expires_at_ms IS NULL OR grant_expires_at_ms > ?)",
-            (session_id, _now_ms()),
-        ) as cursor:
-            granted = {str(row["capability"]) for row in await cursor.fetchall()}
-        return requested <= granted
+    async def _has_grant(
+        self, session_id: str, snapshot: ConfigurationSnapshot, capabilities: list[str], operation_class: str,
+    ) -> bool:
+        from app.services.approval_grant_service import ApprovalGrantService
+        service = ApprovalGrantService(self._db)
+        for capability in capabilities:
+            decision = await service.evaluate_snapshot(
+                session_id, snapshot, capability=capability, scope_path=".", operation_class=operation_class,
+                consume_once=False,
+            )
+            if decision.outcome != "allow":
+                return False
+        return True
 
     async def _acquire_writer_lease(self, session_id: str, assignment_id: str) -> str:
         now = _now_ms()

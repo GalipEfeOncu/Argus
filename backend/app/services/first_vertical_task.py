@@ -13,7 +13,7 @@ import uuid
 
 import aiosqlite
 
-from app.db.repositories import EventRepository, _now_ms
+from app.db.repositories import EventRepository, _now_ms, _safe_json
 from app.db.database import transaction
 from app.providers.protocol import ProviderRequest, StructuredOutput
 from app.providers.scripted import ScriptedProvider
@@ -32,29 +32,61 @@ class FirstVerticalTaskRunner:
         self._events = EventRepository(db)
         self._managed_root = managed_root
 
-    async def request_scoped_write_grant(self, session_id: str) -> str:
-        """Persist the visible pause for one bounded workspace.write grant."""
+    async def request_scoped_write_grant(self, session_id: str) -> str | None:
+        """Request a grant, returning an approval ID only when user input is needed.
 
-        async with self._db.execute("SELECT status FROM sessions WHERE id = ?", (session_id,)) as cursor:
-            session = await cursor.fetchone()
-        if session is None or session["status"] not in {"preparing", "running"}:
-            raise ValueError("The isolated task is no longer runnable.")
-        approval_id = f"approval_write_{uuid.uuid4().hex}"
-        await self._events.append(
-            event_id=f"evt_{uuid.uuid4().hex}", session_id=session_id,
-            event_type="approval.requested", actor_id="builder",
-            payload={
-                "approvalId": approval_id, "capability": "workspace.write",
-                "scopeSummary": "Write one generated file inside this session's isolated workspace.",
-            }, timestamp_ms=_now_ms(), correlation_id=approval_id,
-        )
-        await self._events.append(
-            event_id=f"evt_{uuid.uuid4().hex}", session_id=session_id,
-            event_type="session.status_changed", actor_id="system",
-            payload={"status": "waiting_approval", "reasonSummary": "Waiting for a scoped workspace write grant."},
-            timestamp_ms=_now_ms(), correlation_id=approval_id,
-        )
-        return approval_id
+        ``None`` means an existing policy grant authorizes the task immediately;
+        an empty string means policy denied it and the denial is already visible.
+        """
+
+        from app.services.approval_grant_service import ApprovalGrantService
+        async with transaction(self._db):
+            # Acquire the write transaction before inspecting the status.  A
+            # concurrent pause or cancellation must win instead of being
+            # overwritten by our derived waiting/running transition.
+            async with self._db.execute("SELECT status FROM sessions WHERE id = ?", (session_id,)) as cursor:
+                session = await cursor.fetchone()
+            if session is None or session["status"] not in {"preparing", "running"}:
+                raise ValueError("The isolated task is no longer runnable.")
+            authority = await ApprovalGrantService(self._db).request_in_transaction(
+                session_id, capability="workspace.write", scope_path=".", assignment_id=None,
+                operation_class="mutating", scope_summary="Write one generated file inside this session's isolated workspace.",
+            )
+            if authority.outcome == "ask":
+                await self._events._append_in_transaction(
+                    event_id=f"evt_{uuid.uuid4().hex}", session_id=session_id,
+                    event_type="session.status_changed", actor_id="system",
+                    payload={"status": "waiting_approval", "reasonSummary": "Waiting for a scoped workspace write grant."},
+                    payload_json=_safe_json({"status": "waiting_approval", "reasonSummary": "Waiting for a scoped workspace write grant."}),
+                    timestamp_ms=_now_ms(), correlation_id=authority.grant_id, command_id=None,
+                )
+            elif authority.outcome == "allow" and session["status"] == "preparing":
+                # A durable pre-authorization needs the same runnable-state
+                # transition that a later human grant creates.  Without this,
+                # the scheduler correctly refuses to dispatch while the
+                # session remains in ``preparing``.
+                payload = {
+                    "status": "running",
+                    "reasonSummary": "A session-scoped pre-authorization allows the isolated Builder task.",
+                }
+                await self._events._append_in_transaction(
+                    event_id=f"evt_{uuid.uuid4().hex}", session_id=session_id,
+                    event_type="session.status_changed", actor_id="system",
+                    payload=payload, payload_json=_safe_json(payload),
+                    timestamp_ms=_now_ms(), correlation_id=authority.grant_id, command_id=None,
+                )
+            elif authority.outcome == "deny":
+                payload = {"errorId": f"permission_{uuid.uuid4().hex}", "code": "permission_denied", "summary": authority.reason, "recoverable": True}
+                await self._events._append_in_transaction(
+                    event_id=f"evt_{uuid.uuid4().hex}", session_id=session_id, event_type="error.created", actor_id="system",
+                    payload=payload, payload_json=_safe_json(payload),
+                    timestamp_ms=_now_ms(), correlation_id=None, command_id=None,
+                )
+        if authority.outcome == "ask":
+            return authority.grant_id or ""
+        if authority.outcome == "allow":
+            return None
+        return ""
 
     async def run_after_grant(self, session_id: str) -> str:
         """Route to Builder, write one file, produce a diff artifact, and complete."""
@@ -122,14 +154,30 @@ class FirstVerticalTaskRunner:
         tool_reservation = None
         revision_reservation = None
         rejected = None
+        tool_id = f"tool_{uuid.uuid4().hex}"
         async with transaction(self._db):
             try:
+                from app.services.approval_grant_service import ApprovalGrantService
+                authority = await ApprovalGrantService(self._db).evaluate(
+                    session_id, capability="workspace.write", scope_path=".", operation_class="mutating", consume_once=True,
+                )
+                if authority.outcome != "allow":
+                    raise PermissionError("The scoped workspace.write grant is no longer active.")
                 tool_reservation = await budgets.reserve_in_transaction(
                     session_id, counter="tool_calls", scope_type="assignment", scope_id=scheduled.assignment_id,
                     assignment_id=scheduled.assignment_id, hold=True,
                 )
                 revision_reservation = await budgets.reserve_in_transaction(
                     session_id, counter="revisions", scope_type="finding", scope_id=session_id, hold=True,
+                )
+                requested_payload = {
+                    "toolExecutionId": tool_id, "assignmentId": scheduled.assignment_id, "toolName": "write_file",
+                    "operationClass": "mutating", "requestSummary": "Write one generated file inside the isolated workspace.",
+                }
+                await self._events._append_in_transaction(
+                    event_id=f"evt_{uuid.uuid4().hex}", session_id=session_id, event_type="tool.requested", actor_id="builder",
+                    payload=requested_payload, payload_json=_safe_json(requested_payload), timestamp_ms=_now_ms(),
+                    correlation_id=scheduled.attempt_id, command_id=None,
                 )
             except Exception as error:
                 if tool_reservation is not None:
@@ -148,13 +196,6 @@ class FirstVerticalTaskRunner:
         async with transaction(self._db):
             await budgets.consume_reservation(tool_reservation)
             await budgets.consume_reservation(revision_reservation)
-        tool_id = f"tool_{uuid.uuid4().hex}"
-        await self._events.append(
-            event_id=f"evt_{uuid.uuid4().hex}", session_id=session_id, event_type="tool.requested", actor_id="builder",
-            payload={"toolExecutionId": tool_id, "assignmentId": scheduled.assignment_id, "toolName": "write_file",
-                     "operationClass": "mutating", "requestSummary": "Write one generated file inside the isolated workspace."},
-            timestamp_ms=_now_ms(), correlation_id=scheduled.attempt_id,
-        )
         await self._events.append(
             event_id=f"evt_{uuid.uuid4().hex}", session_id=session_id, event_type="tool.started", actor_id="builder",
             payload={"toolExecutionId": tool_id, "assignmentId": scheduled.assignment_id, "toolName": "write_file"},
@@ -211,10 +252,8 @@ class FirstVerticalTaskRunner:
         return artifact_id
 
     async def _has_scoped_write_grant(self, session_id: str) -> bool:
-        async with self._db.execute(
-            """SELECT 1 FROM approvals WHERE session_id = ? AND capability = 'workspace.write'
-               AND decision IN ('approved', 'granted')
-               AND (grant_expires_at_ms IS NULL OR grant_expires_at_ms > ?) LIMIT 1""",
-            (session_id, _now_ms()),
-        ) as cursor:
-            return await cursor.fetchone() is not None
+        from app.services.approval_grant_service import ApprovalGrantService
+        decision = await ApprovalGrantService(self._db).evaluate(
+            session_id, capability="workspace.write", scope_path=".", operation_class="mutating", consume_once=False,
+        )
+        return decision.outcome == "allow"

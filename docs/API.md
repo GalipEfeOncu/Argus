@@ -168,7 +168,7 @@ classes are `read_only` and `mutating`.
 | `session.start`, `session.pause`, `session.resume` | none (empty object) | — |
 | `session.cancel` | none | `reasonSummary` |
 | `participant.interrupt` | `participantId`, `reasonSummary` | — |
-| `approval.resolve` | `approvalId`, `resolution` | `grantCapabilities`, `scopeSummary` |
+| `approval.resolve` | `approvalId`, `resolution` | `grantCapabilities`, `scopeSummary`, `grantScope`, `grantDurationSeconds` |
 | `session.configuration.update` | `expectedConfigurationVersion`, non-empty `patch` | `confirmConsequences` |
 | `decision.resolve` | `decisionId`, `choice` | `reasonSummary` |
 
@@ -176,9 +176,13 @@ For `approval.resolve`, `resolution` is `approve`, `reject`, or `grant`; a
 grant requires non-empty bounded `grantCapabilities` and a non-empty
 human-readable `scopeSummary`. `approve` and `reject` must not carry
 `grantCapabilities`, so ignored capabilities cannot widen a permission. A
+grant can be `once`, `scope`, or `session` scoped and always receives a durable
+expiry; its capability must exactly match its persisted request, its scope
+cannot widen that request, and its policy hash must still match at use time.
+A missing, resolved, revoked, expired, or policy-stale approval ID is rejected.
 configuration `patch` may set `availableAgentIds`, `requiredRoleRules`, any
 `executionLimits` field, `approvalBehavior`, `permissionProfile`,
-`preauthorizedCapabilities`, or `limitResolution`; a capability-based required-role rule
+`preauthorizedCapabilities`, `capabilityOverrides`, or `limitResolution`; a capability-based required-role rule
 includes `capability`, while other rule applicability values must omit it.
 Decision choices are `reassign`, `change_approach`, `deliver_partial`, or
 `stop`. Limit resolution is `ask_user`, `coordinator_decides`, or `stop`.
@@ -195,6 +199,17 @@ Pause, resume, cancel, and human messages remain normal canonical commands;
 an accepted cancellation is serialized with an in-flight workspace mutation.
 Rejected commands are emitted as correlated `error.created` events rather than
 an out-of-band WebSocket payload, allowing clients to clear pending state.
+
+### Approval and authority evaluation
+
+The backend evaluates every capability request in this order: non-bypassable
+denial, canonical workspace scope, permission profile, capability override,
+stored policy-bound grant, then approval behavior. The most restrictive result
+wins. `ask_each_time` never reuses a grant; `deny_interactive` never creates a
+prompt and returns a visible denial for ungranted work. `preauthorize_session`
+creates auditable, expiring session grants at start after the required
+acknowledgement. Coordinator output cannot resolve an approval or manufacture a
+grant.
 
 ## Session configuration contract
 

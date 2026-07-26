@@ -232,22 +232,19 @@ async def test_lease_loss_and_canonical_cancel_fence_late_worker_output(temporar
 
 
 @pytest.mark.asyncio
-async def test_human_grant_is_persisted_for_scheduler_policy_checks(temporary_sqlite_db) -> None:
+async def test_session_preauthorization_is_persisted_for_scheduler_policy_checks(temporary_sqlite_db) -> None:
     database = await get_db()
     try:
         await scheduler_session(database)
-        await SessionRepository(database).set_status("scheduler_session", "waiting_approval")
-        outcome = await CommandProcessor(database).process("scheduler_session", parse_session_command({
-            "commandId": "grant-read", "type": "approval.resolve",
-            "payload": {"approvalId": "approval-read", "resolution": "grant", "grantCapabilities": ["workspace.read"], "scopeSummary": "Read the active workspace."},
-        }))
-        async with database.execute("SELECT capability, decision FROM approvals WHERE session_id = 'scheduler_session'") as cursor:
+        async with database.execute("SELECT capability, decision, grant_scope FROM approvals WHERE session_id = 'scheduler_session' ORDER BY capability") as cursor:
             grants = [dict(row) for row in await cursor.fetchall()]
     finally:
         await database.close()
 
-    assert outcome.events[0].event_type == "approval.resolved"
-    assert grants == [{"capability": "workspace.read", "decision": "granted"}]
+    assert grants == [
+        {"capability": "workspace.read", "decision": "granted", "grant_scope": "session"},
+        {"capability": "workspace.write", "decision": "granted", "grant_scope": "session"},
+    ]
 
 
 def test_static_agent_graph_websocket_route_is_removed() -> None:

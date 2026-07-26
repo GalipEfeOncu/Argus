@@ -55,6 +55,16 @@ async def test_lifecycle_transitions_include_waiting_states_and_reject_illegal_c
             event_id="waiting_approval", session_id="session_1", event_type="session.status_changed", actor_id="system",
             payload={"status": "waiting_approval"}, timestamp_ms=2,
         )
+        approval_request = await EventRepository(database).append(
+            event_id="approval_requested", session_id="session_1", event_type="approval.requested", actor_id="system",
+            payload={"approvalId": "approval_1", "capability": "workspace.write", "scopeSummary": "Session workspace only."}, timestamp_ms=2,
+        )
+        await database.execute(
+            """INSERT INTO approvals (id, session_id, capability, scope_json, decision, requested_at_ms, request_event_id)
+               VALUES ('approval_1', 'session_1', 'workspace.write', '{\"summary\":\"Session workspace only.\"}', 'pending', 2, ?)""",
+            (approval_request.event_id,),
+        )
+        await database.commit()
         approval = await processor.process("session_1", parse_session_command({
             "commandId": "approve", "type": "approval.resolve",
             "payload": {"approvalId": "approval_1", "resolution": "approve"},

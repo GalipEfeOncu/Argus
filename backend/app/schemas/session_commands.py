@@ -82,6 +82,8 @@ class ApprovalGrantPayload(ApprovalResolvePayloadBase):
     resolution: Literal["grant"]
     grant_capabilities: list[Identifier] = Field(min_length=1, max_length=50)
     scope_summary: Summary
+    grant_scope: Literal["once", "scope", "session"] | None = None
+    grant_duration_seconds: int | None = Field(default=None, ge=1, le=86_400)
 
 
 ApprovalResolvePayload = Annotated[
@@ -121,6 +123,7 @@ class SessionConfigurationPatch(CamelModel):
     ] | None = None
     permission_profile: Literal["strict", "balanced", "autonomous", "expert_unrestricted"] | None = None
     preauthorized_capabilities: list[Identifier] | None = Field(default=None, max_length=50)
+    capability_overrides: dict[Identifier, Literal["allow", "ask", "deny"]] | None = Field(default=None, max_length=50)
     execution_limits: ExecutionLimitsPatch | None = None
     limit_resolution: Literal["ask_user", "coordinator_decides", "stop"] | None = None
 

@@ -66,7 +66,9 @@ async def _run_first_vertical_step(session_id: str, *, after_grant: bool) -> Non
         if after_grant:
             await runner.run_after_grant(session_id)
         else:
-            await runner.request_scoped_write_grant(session_id)
+            approval_id = await runner.request_scoped_write_grant(session_id)
+            if approval_id is None:
+                await runner.run_after_grant(session_id)
         committed = await events.page_after(session_id, after_sequence=before, limit=200)
         await connection_hub.publish(session_id, [event_wire_value(event) for event in committed.events])
     except (RuntimeError, ValueError) as error:

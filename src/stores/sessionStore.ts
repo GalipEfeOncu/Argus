@@ -71,6 +71,7 @@ export const useSessionStore = create<SessionStoreState>()(
                 ...(patch.approvalBehavior === undefined || patch.approvalBehavior === null ? {} : { behavior: patch.approvalBehavior }),
                 ...(patch.permissionProfile === undefined || patch.permissionProfile === null ? {} : { permissionProfile: patch.permissionProfile }),
                 ...(patch.preauthorizedCapabilities === undefined || patch.preauthorizedCapabilities === null ? {} : { preauthorizedCapabilities: patch.preauthorizedCapabilities }),
+                ...(patch.capabilityOverrides === undefined || patch.capabilityOverrides === null ? {} : { capabilityOverrides: patch.capabilityOverrides }),
                 ...(patch.limitResolution === undefined || patch.limitResolution === null ? {} : { limitResolution: patch.limitResolution }),
               },
               ...(patch.executionLimits === undefined || patch.executionLimits === null ? {} : {

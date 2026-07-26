@@ -45,6 +45,37 @@
           "title": "Grantcapabilities",
           "type": "array"
         },
+        "grantDurationSeconds": {
+          "anyOf": [
+            {
+              "maximum": 86400,
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Grantdurationseconds"
+        },
+        "grantScope": {
+          "anyOf": [
+            {
+              "enum": [
+                "once",
+                "scope",
+                "session"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Grantscope"
+        },
         "resolution": {
           "const": "grant",
           "title": "Resolution",
@@ -589,6 +620,31 @@
           ],
           "default": null,
           "title": "Availableagentids"
+        },
+        "capabilityOverrides": {
+          "anyOf": [
+            {
+              "additionalProperties": {
+                "enum": [
+                  "allow",
+                  "ask",
+                  "deny"
+                ],
+                "type": "string"
+              },
+              "maxProperties": 50,
+              "propertyNames": {
+                "maxLength": 160,
+                "minLength": 1
+              },
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Capabilityoverrides"
         },
         "executionLimits": {
           "anyOf": [

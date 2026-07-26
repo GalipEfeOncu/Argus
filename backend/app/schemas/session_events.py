@@ -273,6 +273,7 @@ class ApprovalRequestedPayload(CamelModel):
     assignment_id: Identifier | None = None
     capability: Identifier
     scope_summary: Summary
+    scope_path: Identifier | None = None
 
 
 class ApprovalRequestedEvent(EventEnvelope):
@@ -284,6 +285,8 @@ class ApprovalResolvedPayload(CamelModel):
     approval_id: Identifier
     resolution: Literal["approved", "rejected", "granted"]
     grant_id: Identifier | None = None
+    grant_scope: Literal["once", "scope", "session"] | None = None
+    grant_expires_at_ms: int | None = Field(default=None, ge=0)
     reason_summary: Summary | None = None
 
 

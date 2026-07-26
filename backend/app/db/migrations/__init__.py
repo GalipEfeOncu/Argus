@@ -29,6 +29,7 @@ from app.db.migrations import (
     v0011_gate_engine,
     v0012_budget_counters,
     v0013_loop_resolution,
+    v0014_approval_grants,
 )
 
 
@@ -65,6 +66,7 @@ MIGRATIONS: tuple[Migration, ...] = (
     Migration(11, "required_role_gate_engine", v0011_gate_engine.apply),
     Migration(12, "budget_counters", v0012_budget_counters.apply),
     Migration(13, "loop_detection_and_limit_resolution", v0013_loop_resolution.apply),
+    Migration(14, "scoped_approval_grants", v0014_approval_grants.apply),
 )
 
 

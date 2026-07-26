@@ -244,6 +244,10 @@ export interface components {
              * @enum {string}
              */
             behavior: "ask_each_time" | "ask_by_policy" | "preauthorize_session" | "deny_interactive";
+            /** Capabilityoverrides */
+            capabilityOverrides?: {
+                [key: string]: "allow" | "ask" | "deny";
+            };
             /**
              * Limitresolution
              * @default coordinator_decides
@@ -296,6 +300,8 @@ export interface components {
             assignmentId?: string | null;
             /** Capability */
             capability: string;
+            /** Scopepath */
+            scopePath?: string | null;
             /** Scopesummary */
             scopeSummary: string;
         };
@@ -332,8 +338,12 @@ export interface components {
         ApprovalResolvedPayload: {
             /** Approvalid */
             approvalId: string;
+            /** Grantexpiresatms */
+            grantExpiresAtMs?: number | null;
             /** Grantid */
             grantId?: string | null;
+            /** Grantscope */
+            grantScope?: ("once" | "scope" | "session") | null;
             /** Reasonsummary */
             reasonSummary?: string | null;
             /**

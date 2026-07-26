@@ -116,10 +116,13 @@ class WebSocketManager {
       eventSimulator.resolveApproval(this.sessionId, approved, approvalId);
       return;
     }
+    const pending = this.sessionId === null ? undefined : useSessionRoomStore.getState().projections[this.sessionId]?.approvals[approvalId];
     this.send({
       commandId: crypto.randomUUID(),
       type: 'approval.resolve',
-      payload: { approvalId, resolution: approved ? 'approve' : 'reject' },
+      payload: approved && pending !== undefined
+        ? { approvalId, resolution: 'grant', grantCapabilities: [pending.capability], scopeSummary: pending.scopeSummary, grantScope: 'once' }
+        : { approvalId, resolution: approved ? 'approve' : 'reject' },
     });
   }
 

@@ -143,9 +143,12 @@ export class EventSimulator {
     this.schedule(sessionId, 2500, () => this.tool(sessionId, implementationAgent, planningAgent));
     const writePreauthorized = configuration?.approvalPolicy.behavior === 'preauthorize_session'
       && configuration.approvalPolicy.preauthorizedCapabilities.includes('workspace.write');
+    const denyInteractive = configuration?.approvalPolicy.behavior === 'deny_interactive';
     this.schedule(sessionId, 3300, () => writePreauthorized
       ? this.message(sessionId, implementationAgent, 'The pre-authorized workspace change completed within the selected session scope.')
-      : this.approval(sessionId, implementationAgent));
+      : denyInteractive
+        ? this.deniedCapabilityReplan(sessionId, implementationAgent)
+        : this.approval(sessionId, implementationAgent));
   }
 
   stop(sessionId: string): void {
@@ -309,8 +312,7 @@ export class EventSimulator {
       case 'denied_capability_replan':
         this.emit(sessionId, 'approval.requested', builder.id, { approvalId: 'demo-denied-approval', capability: 'workspace.write', scopeSummary: 'Write the isolated workspace change.', assignmentId: 'demo-assignment' });
         this.emit(sessionId, 'approval.resolved', 'human', { approvalId: 'demo-denied-approval', resolution: 'rejected', reasonSummary: 'User denied the requested capability.' });
-        this.emit(sessionId, 'session.status_changed', 'system', { status: 'running', reasonSummary: 'Capability denied; Coordinator is replanning.' });
-        this.message(sessionId, coordinator, 'The write capability was denied. I will replan with the remaining read-only tools.');
+        this.deniedCapabilityReplan(sessionId, builder);
         break;
       case 'reconnect_streaming':
         this.streamMessage(sessionId, coordinator, 'Reconnecting while streaming', [' preserves the ordered message.', ' The connection recovered.']);
@@ -432,6 +434,15 @@ export class EventSimulator {
     this.emit(sessionId, 'approval.requested', implementationAgent.id, {
       approvalId: 'demo-approval', capability: 'workspace_write', scopeSummary: 'Write an isolated workspace change.', assignmentId: 'demo-assignment',
     });
+  }
+
+  private deniedCapabilityReplan(sessionId: string, implementationAgent: SimulatorAgent): void {
+    this.emit(sessionId, 'error.created', 'system', {
+      errorId: 'demo-no-interruption-denial', code: 'permission_denied',
+      summary: 'No-interruption mode denied an ungranted workspace write.', recoverable: true,
+    });
+    this.participant(sessionId, implementationAgent, 'working', 'Replanning with remaining read-only capabilities');
+    this.message(sessionId, coordinator, 'The requested write is not pre-authorized, so I will replan with the remaining read-only tools.');
   }
 
   private complete(sessionId: string, agent: SimulatorAgent, summary: string, evidence: Array<{ kind: string; summary: string }>): void {

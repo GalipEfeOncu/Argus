@@ -46,6 +46,8 @@ export type Approvalid2 = string;
  * @maxItems 50
  */
 export type Grantcapabilities = [string, ...string[]];
+export type Grantdurationseconds = number | null;
+export type Grantscope = ("once" | "scope" | "session") | null;
 export type Resolution2 = "grant";
 export type Scopesummary = string;
 export type Type6 = "approval.resolve";
@@ -54,6 +56,9 @@ export type Confirmconsequences = boolean;
 export type Expectedconfigurationversion = number;
 export type Approvalbehavior = ("ask_each_time" | "ask_by_policy" | "preauthorize_session" | "deny_interactive") | null;
 export type Availableagentids = string[] | null;
+export type Capabilityoverrides = {
+  [k: string]: "allow" | "ask" | "deny";
+} | null;
 export type Maxassignmentattempts = number | null;
 export type Maxmodeliterationsperassignment = number | null;
 export type Maxparallelreadonlyassignments = number | null;
@@ -283,6 +288,8 @@ export interface ApprovalRejectPayload {
 export interface ApprovalGrantPayload {
   approvalId: Approvalid2;
   grantCapabilities: Grantcapabilities;
+  grantDurationSeconds?: Grantdurationseconds;
+  grantScope?: Grantscope;
   resolution: Resolution2;
   scopeSummary: Scopesummary;
 }
@@ -299,6 +306,7 @@ export interface SessionConfigurationUpdatePayload {
 export interface SessionConfigurationPatch {
   approvalBehavior?: Approvalbehavior;
   availableAgentIds?: Availableagentids;
+  capabilityOverrides?: Capabilityoverrides;
   executionLimits?: ExecutionLimitsPatch | null;
   limitResolution?: Limitresolution;
   permissionProfile?: Permissionprofile;

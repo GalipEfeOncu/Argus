@@ -167,10 +167,12 @@ class SessionConfigurationService:
         policy = configuration.approval_policy
         if not set(policy.preauthorized_capabilities) <= _KNOWN_CAPABILITIES:
             raise ConfigurationError("unsafe_preauthorization", "Only workspace-scoped safe capabilities may be pre-authorized.")
+        if not set(policy.capability_overrides) <= _KNOWN_CAPABILITIES:
+            raise ConfigurationError("unknown_capability_override", "Capability overrides may only name known workspace capabilities.")
         if policy.behavior != "preauthorize_session" and policy.preauthorized_capabilities:
             raise ConfigurationError("preauthorization_behavior_mismatch", "Pre-authorized capabilities require preauthorize_session behavior.")
-        if policy.behavior == "preauthorize_session" and policy.permission_profile != "autonomous":
-            raise ConfigurationError("unsafe_preauthorization", "Session pre-authorization requires the Autonomous permission profile.")
+        if policy.behavior == "preauthorize_session" and policy.permission_profile not in {"autonomous", "expert_unrestricted"}:
+            raise ConfigurationError("unsafe_preauthorization", "Session pre-authorization requires Autonomous or acknowledged Expert unrestricted permissions.")
         if workspace_mode == "direct_write" and "workspace.write" in policy.preauthorized_capabilities:
             raise ConfigurationError("unsafe_preauthorization", "Direct-write workspace access cannot be pre-authorized.")
         if workspace_mode == "direct_write" and not acknowledged_direct_write:
@@ -205,7 +207,7 @@ class SessionConfigurationService:
                 (snapshot_ids[agent.id], session_id, agent.agent_definition_id, agent.role, _safe_json(snapshot),
                  _safe_json(agent.model_snapshot), _safe_json(agent.skill_snapshot), now),
             )
-        return await self._insert_snapshot(
+        snapshot = await self._insert_snapshot(
             session_id=session_id, version=1, available_agent_ids=[snapshot_ids[agent_id] for agent_id in available],
             required_role_rules=[_model_dump(rule) for rule in configuration.required_role_rules],
             execution_limits=_model_dump(configuration.execution_limits),
@@ -215,6 +217,9 @@ class SessionConfigurationService:
                 {"direct_write_limited_rollback"} if workspace_mode == "direct_write" and acknowledged_direct_write else set()
             )), agent_snapshots=agent_snapshots,
         )
+        from app.services.approval_grant_service import ApprovalGrantService
+        await ApprovalGrantService(self._db).create_preauthorizations_in_transaction(session_id, snapshot)
+        return snapshot
 
     async def current(self, session_id: str) -> ConfigurationSnapshot:
         async with self._db.execute(
@@ -275,6 +280,12 @@ class SessionConfigurationService:
             _PROFILE_RANK[next_policy["permissionProfile"]] < _PROFILE_RANK[old_profile]
             or _BEHAVIOR_RANK[next_policy["behavior"]] < _BEHAVIOR_RANK[current.approval_policy["behavior"]]
             or not set(next_policy["preauthorizedCapabilities"]).issuperset(current.approval_policy["preauthorizedCapabilities"])
+            or any(
+                next_policy.get("capabilityOverrides", {}).get(capability) in {"ask", "deny"}
+                and next_policy.get("capabilityOverrides", {}).get(capability)
+                != current.approval_policy.get("capabilityOverrides", {}).get(capability)
+                for capability in next_policy.get("capabilityOverrides", {})
+            )
         )
         async with self._db.execute(
             """SELECT id, assignee_session_agent_id FROM assignments
@@ -326,6 +337,8 @@ class SessionConfigurationService:
             policy["permissionProfile"] = patch.permission_profile
         if "preauthorized_capabilities" in fields:
             policy["preauthorizedCapabilities"] = patch.preauthorized_capabilities
+        if "capability_overrides" in fields:
+            policy["capabilityOverrides"] = patch.capability_overrides
         if "limit_resolution" in fields:
             policy["limitResolution"] = patch.limit_resolution
         candidate["approvalPolicy"] = policy

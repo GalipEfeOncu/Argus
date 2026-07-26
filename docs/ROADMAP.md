@@ -648,7 +648,7 @@ Current status (2026-07-26):
 Phase 3 exit: the static fixed pipeline is no longer session orchestration and a
 Coordinator dynamically completes one provider-neutral isolated coding task.
 
-## Phase 4 — Gates, customizable limits, and approval autonomy
+## Phase 4 — Gates, customizable limits, and approval autonomy (✅ Completed)
 
 ### 4.1 Required-role gate engine (✅ Completed)
 
@@ -757,7 +757,7 @@ Completion evidence (2026-07-26):
 - Artifacts/benchmarks: regenerated event/OpenAPI contracts and generated client types.
 - Deferred/unavailable: release-shell and platform probes remain Phase 7 work; no new release-risk regression introduced.
 
-### 4.4 Approval and grant engine
+### 4.4 Approval and grant engine (✅ Completed)
 
 Deliverables:
 
@@ -779,6 +779,19 @@ Security tests:
 
 Phase 4 exit: user-selected teams, required roles, limits, loop handling, and all
 approval behaviors work end to end and remain enforced after reconnect/restart.
+
+Completion evidence (2026-07-26):
+
+- Source: Phase 4.4 approval-grant service, durable migration, scheduler and
+  first-vertical-task enforcement, generated contracts, setup authority review,
+  and Phase 4 security tests.
+- Verification: focused approval/grant security tests, backend suite, contract
+  generation, frontend type-check/test/build, documentation validation, and
+  repository verification suite (results recorded with this change).
+- Artifacts/benchmarks: policy-bound approval rows, migration 14, regenerated
+  OpenAPI/session command/session event schemas and TypeScript clients.
+- Deferred/unavailable: packaged release-shell and platform probes remain
+  Phase 7 work; no release-risk regression introduced.
 
 ## Phase 5 — Roles, skills, models, and provider breadth
 

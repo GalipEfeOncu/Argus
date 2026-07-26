@@ -78,10 +78,11 @@ function normalizeSessionConfig(config: SessionConfig, response: SessionCreateRe
         ...config.configuration.approvalPolicy,
         ...response.approvalPolicy,
         preauthorizedCapabilities: serverValue(response.approvalPolicy.preauthorizedCapabilities, config.configuration.approvalPolicy.preauthorizedCapabilities),
+        capabilityOverrides: serverValue(response.approvalPolicy.capabilityOverrides, config.configuration.approvalPolicy.capabilityOverrides),
       },
       workspaceMode: response.workspacePolicy.mode ?? config.configuration.workspaceMode,
       directWriteAcknowledged: response.acknowledgements.includes('direct_write_limited_rollback'),
-      preauthorizationAcknowledged: response.acknowledgements.includes('autonomous_permissions'),
+      preauthorizationAcknowledged: response.acknowledgements.includes('autonomous_permissions') || response.acknowledgements.includes('expert_unrestricted_permissions'),
     },
   };
 }
@@ -101,6 +102,7 @@ function toSessionCreateRequest(config: SessionConfig): components['schemas']['S
   const acknowledgements = [
     ...(config.configuration.directWriteAcknowledged ? ['direct_write_limited_rollback'] : []),
     ...(config.configuration.preauthorizationAcknowledged && config.configuration.approvalPolicy.permissionProfile === 'autonomous' ? ['autonomous_permissions'] : []),
+    ...(config.configuration.preauthorizationAcknowledged && config.configuration.approvalPolicy.permissionProfile === 'expert_unrestricted' ? ['expert_unrestricted_permissions'] : []),
   ];
   return {
     projectPath: config.projectPath,
