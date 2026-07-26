@@ -102,6 +102,7 @@ class RequiredRoleRulePatch(CamelModel):
     capability: Identifier | None = None
     success_evidence: Identifier
     minimum_completions: int = Field(ge=1)
+    acceptance_fields: list[Identifier] = Field(default_factory=list, max_length=20)
 
     @model_validator(mode="after")
     def require_capability_when_applicable(self) -> "RequiredRoleRulePatch":

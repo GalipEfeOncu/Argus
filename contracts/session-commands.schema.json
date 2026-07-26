@@ -437,6 +437,16 @@
     "RequiredRoleRulePatch": {
       "additionalProperties": false,
       "properties": {
+        "acceptanceFields": {
+          "items": {
+            "maxLength": 160,
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 20,
+          "title": "Acceptancefields",
+          "type": "array"
+        },
         "applicability": {
           "enum": [
             "always",

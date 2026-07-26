@@ -432,6 +432,8 @@ class ProjectWorkspaceService:
             await self._db.execute("INSERT OR IGNORE INTO artifacts (id, session_id, kind, checksum, metadata_json, created_at_ms) VALUES (?, ?, 'diff', ?, ?, ?)",
                                    (str(uuid.uuid4()), session_id, revision, _safe_json({"summary": diff_summary, "workspaceRevision": revision}), now))
             await self._audit(session_id, "workspace.mutated", {"revisionChecksum": revision, "diffSummary": diff_summary})
+            from app.services.gate_engine import GateEngine
+            await GateEngine(self._db).invalidate_after_mutation(session_id, revision)
         return revision
 
     def _diff_summary(self, workspace: WorkspaceRecord) -> str:

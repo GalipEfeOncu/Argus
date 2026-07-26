@@ -56,6 +56,7 @@ class Evidence(CamelModel):
     kind: Identifier
     summary: Summary
     artifact_ids: list[Identifier] = Field(default_factory=list, max_length=50)
+    data: dict[str, Any] | None = Field(default=None, max_length=50)
 
 
 class SessionSnapshotPayload(CamelModel):
@@ -321,6 +322,8 @@ class DecisionRequestedPayload(CamelModel):
         min_length=1, max_length=4
     )
     reason_summary: Summary
+    purpose: Literal["partial_completion"] | None = None
+    unmet_requirements: list[Summary] | None = Field(default=None, max_length=50)
 
 
 class DecisionRequestedEvent(EventEnvelope):

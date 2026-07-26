@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import asyncio
 from dataclasses import dataclass, replace
-import json
 from typing import Any, ClassVar
+import uuid
 
 import aiosqlite
 from pydantic import ValidationError
@@ -23,6 +23,7 @@ from app.schemas.coordinator_actions import (
     AssignmentsAction,
     CoordinatorAction,
     FinalAction,
+    PartialAction,
     parse_coordinator_action,
 )
 from app.services.assignment_scheduler import AssignmentScheduler
@@ -173,6 +174,12 @@ class CoordinatorCycle:
                     if isinstance(result.action, AssignmentsAction):
                         await self.persist_assignments(session_id, result.action)
                         await AssignmentScheduler(self._db).dispatch_ready(session_id)
+                    elif isinstance(result.action, PartialAction):
+                        if await self.request_partial_acceptance(session_id, result.action) is None:
+                            return CoordinatorCycleResult(
+                                None, result.correction_requested, True, None, "partial_outcome_not_runnable",
+                                "The session stopped or paused before the partial outcome could be presented.",
+                            )
                     return result
             return await self.resolve_actions(session_id, action_values)
         finally:
@@ -208,44 +215,46 @@ class CoordinatorCycle:
                 raise CoordinatorActionRejected("missing_capability", "Coordinator requested a capability the selected agent does not declare.")
 
     async def _validate_final(self, session_id: str, snapshot: ConfigurationSnapshot) -> None:
-        applicable = await self._applicable_rules(session_id, snapshot)
-        for rule in applicable:
-            async with self._db.execute(
-                """SELECT COUNT(*) AS evidence_count
-                   FROM gate_evidence evidence
-                   JOIN assignments assignment ON assignment.id = evidence.assignment_id
-                   JOIN session_agents agent ON agent.id = assignment.assignee_session_agent_id
-                   WHERE evidence.session_id = ? AND evidence.rule_id = ?
-                     AND evidence.evidence_kind = ? AND evidence.validation_state = 'valid'
-                     AND evidence.invalidated_at_ms IS NULL AND agent.role = ?""",
-                (session_id, rule["id"], rule["successEvidence"], rule["role"]),
-            ) as cursor:
-                count = int((await cursor.fetchone())["evidence_count"])
-            if count < rule["minimumCompletions"]:
-                raise CoordinatorActionRejected("required_gate_unmet", "Coordinator cannot deliver a final result while required evidence is missing.")
+        from app.services.gate_engine import GateEngine
 
-    async def _applicable_rules(self, session_id: str, snapshot: ConfigurationSnapshot) -> list[dict[str, Any]]:
-        has_changes = False
-        used_capabilities: set[str] = set()
-        async with self._db.execute(
-            """SELECT event_type, payload_json FROM events
-               WHERE session_id = ? AND event_type IN ('artifact.diff_updated', 'assignment.proposed')""", (session_id,)
-        ) as cursor:
-            rows = await cursor.fetchall()
-        for row in rows:
-            # Avoid a second model-facing representation; this is a small
-            # deterministic projection of the existing canonical event payload.
-            payload = json.loads(row["payload_json"])
-            if row["event_type"] == "artifact.diff_updated" and (payload.get("additions", 0) or payload.get("deletions", 0)):
-                has_changes = True
-            if row["event_type"] == "assignment.proposed":
-                used_capabilities.update(str(capability) for capability in payload.get("requestedCapabilities", []))
-        return [
-            rule for rule in snapshot.required_role_rules
-            if rule["applicability"] == "always"
-            or (rule["applicability"] == "when_changes" and has_changes)
-            or (rule["applicability"] == "when_capability_used" and rule["capability"] in used_capabilities)
-        ]
+        gates = GateEngine(self._db)
+        if any(state.status == "pending" for state in await gates.states(session_id)):
+            await gates.route_unsatisfied(session_id)
+            await gates.append_states(session_id)
+            await AssignmentScheduler(self._db).dispatch_ready(session_id)
+            raise CoordinatorActionRejected(
+                "required_gate_unmet",
+                "Coordinator cannot deliver a final result while required evidence is missing; eligible gate work was queued.",
+            )
+
+    async def request_partial_acceptance(self, session_id: str, action: PartialAction) -> str | None:
+        """Turn a model's partial outcome into an explicit human-only decision."""
+
+        from app.db.database import transaction
+        from app.db.repositories import EventRepository, _now_ms, _safe_json
+
+        decision_id = f"partial_{uuid.uuid4().hex}"
+        request_payload = {
+            "decisionId": decision_id, "scopeId": session_id, "choices": ["deliver_partial", "stop"],
+            "reasonSummary": action.final_summary, "purpose": "partial_completion",
+            "unmetRequirements": action.unmet_requirements,
+        }
+        async with transaction(self._db):
+            async with self._db.execute("SELECT status FROM sessions WHERE id = ?", (session_id,)) as cursor:
+                session = await cursor.fetchone()
+            if session is None or session["status"] != "running":
+                return None
+            events = EventRepository(self._db)
+            await events._append_in_transaction(
+                event_id=f"evt_{uuid.uuid4().hex}", session_id=session_id, event_type="decision.requested", actor_id="system",
+                payload=request_payload, payload_json=_safe_json(request_payload), timestamp_ms=_now_ms(), correlation_id=None, command_id=None,
+            )
+            status_payload = {"status": "waiting_decision", "reasonSummary": "Waiting for the user to accept or stop the partial outcome."}
+            await events._append_in_transaction(
+                event_id=f"evt_{uuid.uuid4().hex}", session_id=session_id, event_type="session.status_changed", actor_id="system",
+                payload=status_payload, payload_json=_safe_json(status_payload), timestamp_ms=_now_ms(), correlation_id=decision_id, command_id=None,
+            )
+        return decision_id
 
 
 _SUPERSEDED = object()

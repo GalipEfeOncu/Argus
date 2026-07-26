@@ -245,7 +245,8 @@ class AssignmentScheduler:
             now = _now_ms()
             await self._db.execute("UPDATE assignment_attempts SET state = 'completed', normalized_outcome_json = ?, completed_at_ms = ?, updated_at_ms = ? WHERE id = ?", (_safe_json({"status": "completed", "summary": output_summary}), now, now, attempt_id))
             await self._db.execute("UPDATE assignments SET state = 'completed', terminal_event_id = ?, updated_at_ms = ? WHERE id = ?", (event.event_id, now, assignment["id"]))
-            await self._record_evidence(session_id, assignment, evidence)
+            from app.services.gate_engine import GateEngine
+            await GateEngine(self._db).record_evidence(session_id, assignment, evidence)
             await self._release_assignment_lease(assignment, "completed")
 
     async def fail_attempt(
@@ -379,25 +380,6 @@ class AssignmentScheduler:
         ) as cursor:
             granted = {str(row["capability"]) for row in await cursor.fetchall()}
         return requested <= granted
-
-    async def _record_evidence(self, session_id: str, assignment: aiosqlite.Row, evidence: list[dict[str, Any]]) -> None:
-        async with self._db.execute("SELECT role FROM session_agents WHERE id = ?", (assignment["assignee_session_agent_id"],)) as cursor:
-            agent = await cursor.fetchone()
-        if agent is None:
-            return
-        snapshot = await SessionConfigurationService(self._db).current(session_id)
-        now = _now_ms()
-        for rule in snapshot.required_role_rules:
-            if rule["role"] != agent["role"]:
-                continue
-            for item in evidence:
-                if item.get("kind") != rule["successEvidence"]:
-                    continue
-                await self._db.execute(
-                    """INSERT INTO gate_evidence (id, session_id, rule_id, assignment_id, evidence_kind, validation_state,
-                       artifact_ids_json, created_at_ms) VALUES (?, ?, ?, ?, ?, 'valid', ?, ?)""",
-                    (f"evidence_{uuid.uuid4().hex}", session_id, rule["id"], assignment["id"], item["kind"], _safe_json(item.get("artifactIds", [])), now),
-                )
 
     async def _acquire_writer_lease(self, session_id: str, assignment_id: str) -> str:
         now = _now_ms()

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from enum import Enum
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import ConfigDict, Field, model_validator
 from pydantic.alias_generators import to_camel
@@ -38,6 +38,7 @@ class SessionAgentInput(CamelModel):
     agent_definition_id: Identifier | None = None
     model_snapshot: dict[str, object] = Field(default_factory=dict)
     skill_snapshot: list[object] = Field(default_factory=list, max_length=50)
+    evidence_schema: dict[str, Any] | None = None
 
 
 class RequiredRoleRule(CamelModel):
@@ -47,6 +48,7 @@ class RequiredRoleRule(CamelModel):
     capability: Identifier | None = None
     success_evidence: Identifier
     minimum_completions: int = Field(default=1, ge=1)
+    acceptance_fields: list[Identifier] = Field(default_factory=list, max_length=20)
 
     @model_validator(mode="after")
     def validate_capability(self) -> "RequiredRoleRule":
@@ -158,6 +160,7 @@ class SessionAgentSnapshotResponse(CamelModel):
     source_agent_id: Identifier
     role: Identifier
     capabilities: list[Identifier]
+    evidence_schema: dict[str, Any] | None = None
 
 
 class SessionCreateResponse(SessionConfigurationResponse):

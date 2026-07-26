@@ -67,6 +67,13 @@ async def test_lifecycle_transitions_include_waiting_states_and_reject_illegal_c
             event_id="waiting_decision", session_id="session_1", event_type="session.status_changed", actor_id="system",
             payload={"status": "waiting_decision"}, timestamp_ms=3,
         )
+        await EventRepository(database).append(
+            event_id="partial_requested", session_id="session_1", event_type="decision.requested", actor_id="system",
+            payload={
+                "decisionId": "decision_1", "scopeId": "session_1", "choices": ["deliver_partial", "stop"],
+                "reasonSummary": "A partial result needs human acceptance.", "purpose": "partial_completion",
+            }, timestamp_ms=3,
+        )
         partial = await processor.process("session_1", parse_session_command({
             "commandId": "partial", "type": "decision.resolve",
             "payload": {"decisionId": "decision_1", "choice": "deliver_partial"},

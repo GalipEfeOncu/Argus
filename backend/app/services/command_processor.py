@@ -65,6 +65,8 @@ class CommandProcessor:
                 return CommandOutcome(duplicate, True)
 
             status = await self._current_status(session_id)
+            if command.type == "decision.resolve" and command.payload.choice == "deliver_partial":
+                await self._require_partial_acceptance(session_id, command.payload.decision_id)
             if command.type == "session.configuration.update":
                 specs, interrupted_assignments = await self._configuration_outcome_specs(session_id, command)
             else:
@@ -177,6 +179,24 @@ class CommandProcessor:
         # Transitional sessions are readable, but their first canonical command
         # starts from the canonical lifecycle's created state.
         return "created" if row["status"] == "setup" else str(row["status"])
+
+    async def _require_partial_acceptance(self, session_id: str, decision_id: str) -> None:
+        """Only a persisted partial-outcome request can become completed_partial."""
+
+        async with self._db.execute(
+            """SELECT 1 FROM events requested WHERE requested.session_id = ?
+               AND requested.event_type = 'decision.requested'
+               AND json_extract(requested.payload_json, '$.decisionId') = ?
+               AND json_extract(requested.payload_json, '$.purpose') = 'partial_completion'
+               AND NOT EXISTS (
+                 SELECT 1 FROM events recorded WHERE recorded.session_id = requested.session_id
+                   AND recorded.event_type = 'decision.recorded'
+                   AND json_extract(recorded.payload_json, '$.decisionId') = ?
+               ) LIMIT 1""",
+            (session_id, decision_id, decision_id),
+        ) as cursor:
+            if await cursor.fetchone() is None:
+                raise CommandRejected("partial_acceptance_not_requested")
 
     @staticmethod
     def _require_transition(current: str, target: str) -> None:

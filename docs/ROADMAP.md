@@ -592,7 +592,7 @@ Coordinator dynamically completes one provider-neutral isolated coding task.
 
 ## Phase 4 — Gates, customizable limits, and approval autonomy
 
-### 4.1 Required-role gate engine
+### 4.1 Required-role gate engine (✅ Completed)
 
 Deliverables:
 
@@ -610,6 +610,22 @@ Tests:
 - Required Reviewer/Tester, conditional gate not applicable, missing eligible
   agent, invalid model prose, stale evidence, multiple minimum completions,
   custom evidence schema, and partial outcome.
+
+Current status (2026-07-26):
+
+- ✅ The deterministic gate engine evaluates `always`, `when_changes`, and
+  accepted `when_capability_used` assignments; it routes pending Reviewer and
+  Tester work before a session can claim full success.
+- ✅ Built-in Planner, Builder/UI Agent, Reviewer, and Tester evidence is
+  structured and validated by code. Custom roles use a session-snapshotted,
+  explicitly supported JSON-Schema subset; unsupported contracts are rejected
+  during configuration.
+- ✅ Reviewer and Tester evidence is tied to the workspace checksum and is
+  invalidated after a later mutation. The reference live vertical task now
+  queues applicable review gates rather than bypassing them.
+- ✅ Partial Coordinator outcomes preserve unmet requirements and wait for an
+  explicit human acceptance before ending as `completed_partial`, never as
+  full completion.
 
 ### 4.2 Budget and counter service
 

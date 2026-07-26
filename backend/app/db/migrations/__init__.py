@@ -26,6 +26,7 @@ from app.db.migrations import (
     v0008_assignment_context_metadata,
     v0009_participant_instructions,
     v0010_assignment_scheduler,
+    v0011_gate_engine,
 )
 
 
@@ -59,6 +60,7 @@ MIGRATIONS: tuple[Migration, ...] = (
     Migration(8, "assignment_context_metadata", v0008_assignment_context_metadata.apply),
     Migration(9, "participant_instructions", v0009_participant_instructions.apply),
     Migration(10, "assignment_scheduler", v0010_assignment_scheduler.apply),
+    Migration(11, "required_role_gate_engine", v0011_gate_engine.apply),
 )
 
 

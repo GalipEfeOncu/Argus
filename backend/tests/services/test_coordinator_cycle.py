@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 
 import aiosqlite
 import pytest
@@ -184,7 +185,7 @@ async def test_only_one_coordinator_cycle_can_stream_for_a_session(temporary_sql
 async def test_final_action_cannot_claim_an_unmet_required_gate(temporary_sqlite_db) -> None:
     database = await get_db()
     try:
-        await coordinator_session(database, required_gate=RequiredRoleRule(
+        snapshot = await coordinator_session(database, required_gate=RequiredRoleRule(
             id="review_gate", role="reviewer", applicability="always", successEvidence="approved_review",
         ))
         result = await CoordinatorCycle(database).resolve_actions("coordinator_cycle", [{
@@ -200,7 +201,7 @@ async def test_final_action_cannot_claim_an_unmet_required_gate(temporary_sqlite
 async def test_final_action_enforces_a_capability_gate_after_that_capability_was_requested(temporary_sqlite_db) -> None:
     database = await get_db()
     try:
-        await coordinator_session(database, required_gate=RequiredRoleRule(
+        snapshot = await coordinator_session(database, required_gate=RequiredRoleRule(
             id="test_gate", role="tester", applicability="when_capability_used", capability="test.run",
             successEvidence="passing_test_run",
         ))
@@ -208,11 +209,19 @@ async def test_final_action_enforces_a_capability_gate_after_that_capability_was
             event_id="test-capability-proposal", session_id="coordinator_cycle", event_type="assignment.proposed",
             actor_id="coordinator", timestamp_ms=1,
             payload={
-                "proposalId": "test-proposal", "assigneeAgentId": "builder", "objective": "Run tests.",
+                "proposalId": "test-proposal", "assigneeAgentId": next(agent["id"] for agent in snapshot.agent_snapshots if agent["role"] == "tester"), "objective": "Run tests.",
                 "acceptanceCriteria": ["Record results."], "operationClass": "read_only",
                 "requestedCapabilities": ["test.run"], "reasonSummary": "Verification needs tests.",
             },
         )
+        await database.execute(
+            """INSERT INTO assignment_proposals (id, session_id, actor_id, proposal_json, validation_state,
+               proposed_event_id, created_at_ms) VALUES ('test-proposal', 'coordinator_cycle', 'coordinator', ?, 'accepted', 'test-capability-proposal', 1)""",
+            (json.dumps({
+                "proposalId": "test-proposal", "requestedCapabilities": ["test.run"],
+            }),),
+        )
+        await database.commit()
         result = await CoordinatorCycle(database).resolve_actions("coordinator_cycle", [{
             "type": "final", "finalSummary": "Everything is complete.", "evidenceReferences": ["test-evidence"],
         }])

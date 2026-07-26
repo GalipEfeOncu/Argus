@@ -755,10 +755,14 @@ export interface components {
             choices: ("reassign" | "change_approach" | "deliver_partial" | "stop")[];
             /** Decisionid */
             decisionId: string;
+            /** Purpose */
+            purpose?: "partial_completion" | null;
             /** Reasonsummary */
             reasonSummary: string;
             /** Scopeid */
             scopeId: string;
+            /** Unmetrequirements */
+            unmetRequirements?: string[] | null;
         };
         /** ErrorCreatedEvent */
         ErrorCreatedEvent: {
@@ -806,6 +810,10 @@ export interface components {
         Evidence: {
             /** Artifactids */
             artifactIds?: string[];
+            /** Data */
+            data?: {
+                [key: string]: unknown;
+            } | null;
             /** Kind */
             kind: string;
             /** Summary */
@@ -1270,6 +1278,8 @@ export interface components {
         };
         /** RequiredRoleRule */
         RequiredRoleRule: {
+            /** Acceptancefields */
+            acceptanceFields?: string[];
             /**
              * Applicability
              * @enum {string}
@@ -1314,6 +1324,10 @@ export interface components {
             agentDefinitionId?: string | null;
             /** Capabilities */
             capabilities?: string[];
+            /** Evidenceschema */
+            evidenceSchema?: {
+                [key: string]: unknown;
+            } | null;
             /** Id */
             id: string;
             /** Modelsnapshot */
@@ -1329,6 +1343,10 @@ export interface components {
         SessionAgentSnapshotResponse: {
             /** Capabilities */
             capabilities: string[];
+            /** Evidenceschema */
+            evidenceSchema?: {
+                [key: string]: unknown;
+            } | null;
             /** Id */
             id: string;
             /** Role */

@@ -29,19 +29,26 @@ def _receive_status(socket, status: str) -> dict[str, object]:
     raise AssertionError(f"Did not receive status {status}")
 
 
-def _create_request(project: Path) -> dict[str, object]:
+def _create_request(project: Path, *, require_review: bool = False) -> dict[str, object]:
+    agents: list[dict[str, object]] = [
+        {"id": "coordinator", "role": "coordinator"},
+        {"id": "builder", "role": "builder", "capabilities": ["workspace.write"]},
+    ]
+    if require_review:
+        agents.append({"id": "reviewer", "role": "reviewer", "capabilities": ["workspace.read"]})
+    configuration: dict[str, object] = {
+        "availableAgentIds": [agent["id"] for agent in agents if agent["id"] != "coordinator"],
+        "approvalPolicy": {"permissionProfile": "balanced", "behavior": "ask_by_policy"},
+        "workspacePolicy": {"mode": "snapshot"},
+    }
+    if require_review:
+        configuration["requiredRoleRules"] = [{
+            "id": "review", "role": "reviewer", "applicability": "when_changes", "successEvidence": "approved_review",
+        }]
     return {
         "projectPath": str(project), "goal": "Create a reviewable isolated file.",
         "coordinatorAgentId": "coordinator",
-        "agents": [
-            {"id": "coordinator", "role": "coordinator"},
-            {"id": "builder", "role": "builder", "capabilities": ["workspace.write"]},
-        ],
-        "configuration": {
-            "availableAgentIds": ["builder"],
-            "approvalPolicy": {"permissionProfile": "balanced", "behavior": "ask_by_policy"},
-            "workspacePolicy": {"mode": "snapshot"},
-        },
+        "agents": agents, "configuration": configuration,
         "workspaceMode": "snapshot", "acknowledgeDirectWrite": False,
     }
 
@@ -132,3 +139,28 @@ def test_live_pause_resume_and_cancel_fence_future_vertical_output(temporary_sql
 
     assert approval["payload"]["approvalId"]
     assert not (Path(settings.db_path).parent / "workspaces" / session_id / "workspace" / "argus-vertical-task.txt").exists()
+
+
+def test_vertical_task_routes_required_review_before_it_can_complete(temporary_sqlite_db, tmp_path: Path) -> None:
+    project = tmp_path / "gated-project"
+    project.mkdir()
+
+    with TestClient(app) as client:
+        created = client.post("/sessions/", json=_create_request(project, require_review=True))
+        session_id = created.json()["id"]
+        with client.websocket_connect(f"/ws/sessions/{session_id}?after_sequence=0") as socket:
+            socket.receive_json()
+            socket.send_json({"commandId": "start", "type": "session.start", "payload": {}})
+            socket.receive_json()
+            approval = _receive_type(socket, "approval.requested")
+            socket.send_json({
+                "commandId": "grant", "type": "approval.resolve",
+                "payload": {"approvalId": approval["payload"]["approvalId"], "resolution": "grant", "grantCapabilities": ["workspace.write"], "scopeSummary": "Isolated workspace only."},
+            })
+            _receive_type(socket, "approval.resolved")
+            _receive_type(socket, "assignment.created")
+            _receive_type(socket, "assignment.created")
+
+    events = asyncio.run(_events(session_id))
+    assert any(event.event_type == "gate.status_changed" and event.payload["status"] == "pending" for event in events)
+    assert not any(event.event_type == "session.status_changed" and event.payload["status"] == "completed" for event in events)

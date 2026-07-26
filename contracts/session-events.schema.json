@@ -1317,6 +1317,19 @@
           "title": "Decisionid",
           "type": "string"
         },
+        "purpose": {
+          "anyOf": [
+            {
+              "const": "partial_completion",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Purpose"
+        },
         "reasonSummary": {
           "maxLength": 4000,
           "minLength": 1,
@@ -1328,6 +1341,24 @@
           "minLength": 1,
           "title": "Scopeid",
           "type": "string"
+        },
+        "unmetRequirements": {
+          "anyOf": [
+            {
+              "items": {
+                "maxLength": 4000,
+                "minLength": 1,
+                "type": "string"
+              },
+              "maxItems": 50,
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Unmetrequirements"
         }
       },
       "required": [
@@ -1473,6 +1504,20 @@
           "maxItems": 50,
           "title": "Artifactids",
           "type": "array"
+        },
+        "data": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "maxProperties": 50,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Data"
         },
         "kind": {
           "maxLength": 160,

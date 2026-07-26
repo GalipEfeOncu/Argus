@@ -43,7 +43,7 @@ async def test_fresh_database_has_every_phase_2_1_table_and_migration_metadata(t
         await database.close()
 
     assert REQUIRED_TABLES <= tables
-    assert versions == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+    assert versions == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
     assert "idx_events_session_sequence" in event_indexes
 
 

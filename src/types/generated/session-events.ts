@@ -322,6 +322,9 @@ export type Assignmentid2 = string;
  * @maxItems 50
  */
 export type Artifactids = string[];
+export type Data = {
+  [k: string]: unknown;
+} | null;
 export type Kind = string;
 export type Summary = string;
 /**
@@ -495,8 +498,10 @@ export type Choices =
       "reassign" | "change_approach" | "deliver_partial" | "stop"
     ];
 export type Decisionid = string;
+export type Purpose = "partial_completion" | null;
 export type Reasonsummary4 = string;
 export type Scopeid1 = string;
+export type Unmetrequirements = string[] | null;
 export type Sequence21 = number;
 export type Sessionid21 = string;
 export type Timestamp21 = string;
@@ -756,6 +761,7 @@ export interface AssignmentCompletedPayload {
 }
 export interface Evidence1 {
   artifactIds?: Artifactids;
+  data?: Data;
   kind: Kind;
   summary: Summary;
 }
@@ -942,8 +948,10 @@ export interface DecisionRequestedEvent {
 export interface DecisionRequestedPayload {
   choices: Choices;
   decisionId: Decisionid;
+  purpose?: Purpose;
   reasonSummary: Reasonsummary4;
   scopeId: Scopeid1;
+  unmetRequirements?: Unmetrequirements;
 }
 export interface DecisionRecordedEvent {
   actorId: Actorid22;

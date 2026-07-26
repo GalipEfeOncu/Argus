@@ -148,15 +148,15 @@ be omitted or set to `null` where the schema allows.
 | `approval.requested` | `approvalId`, `capability`, `scopeSummary` | `assignmentId` |
 | `approval.resolved` | `approvalId`, `resolution` | `grantId`, `reasonSummary` |
 | `limit.warning`, `limit.reached` | `counter`, `scopeId`, `current`, `threshold`, `hard`, `resolution` | `fingerprint`, `occurrenceCount` |
-| `decision.requested` | `decisionId`, `scopeId`, `choices`, `reasonSummary` | — |
+| `decision.requested` | `decisionId`, `scopeId`, `choices`, `reasonSummary` | `purpose`, `unmetRequirements` |
 | `decision.recorded` | `decisionId`, `choice`, `reasonSummary` | — |
 | `gate.status_changed` | `gateId`, `role`, `status` | `evidence` |
 | `artifact.diff_updated` | `artifactId`, `filePath`, `additions`, `deletions`, `byteLength` | `assignmentId`, `truncated` |
 | `usage.updated` | `scopeId`, `inputTokens`, `outputTokens`, `normalizedCost`, `durationMs` | — |
 | `error.created` | `errorId`, `code`, `summary`, `recoverable` | `relatedId` |
 
-`evidence` entries contain `kind`, a redacted `summary`, and optional
-`artifactIds`. Valid session statuses are `created`, `preparing`, `running`,
+`evidence` entries contain `kind`, a redacted `summary`, optional `artifactIds`,
+and optional structured `data`. Valid session statuses are `created`, `preparing`, `running`,
 `paused`, `waiting_approval`, `waiting_decision`, `completed`,
 `completed_partial`, `cancelled`, and `failed`; participant statuses are `idle`,
 `working`, `waiting`, `paused`, `errored`, and `stopped`. Assignment operation
@@ -264,6 +264,19 @@ versioned role-specific evidence kind such as `approved_review`,
 The scheduler alone changes a gate to satisfied after validating assignment
 evidence.
 
+Planner rules may declare `acceptanceFields`; each named field must be present
+in the structured plan evidence. Built-in evidence is deterministic: Planner
+requires non-empty plan steps; Builder/UI Agent requires a diff artifact or an
+explicit verified no-change result; Reviewer requires an approved review; and
+Tester requires a named command, a zero exit code, and at least one test.
+Reviewer and Tester evidence includes `workspaceRevision`, which must match the
+active workspace checksum. A later mutation invalidates their older evidence.
+A custom required role must snapshot an `evidenceSchema` contract on its session
+agent; its evidence `data` must satisfy it. The current supported JSON-Schema
+subset is deliberately strict: `type`, `enum`, object `required`/`properties`/
+`additionalProperties`, array `items`/`minItems`, string `minLength`, and numeric
+`minimum`; unsupported keywords are rejected when the session is configured.
+
 ### Configuration updates
 
 `session.configuration.update` contains `expectedConfigurationVersion` and a
@@ -299,6 +312,11 @@ modify limits or pool membership, create gate evidence, or mark a gate
 satisfied. A malformed or unauthorized response receives one correction
 request; a second invalid response stops the cycle and follows the configured
 limit-resolution policy.
+
+A `partial` action creates a visible `decision.requested` event with purpose
+`partial_completion`, including its unmet requirements, and puts the session in `waiting_decision`. Only a human
+`decision.resolve` for that persisted decision can transition the session to
+`completed_partial`; it never transitions to `completed`.
 
 An unmentioned `message.send` is persisted as a pending instruction for the
 mandatory Coordinator. Explicit mention IDs resolve to exactly one immutable

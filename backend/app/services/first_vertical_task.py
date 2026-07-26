@@ -161,6 +161,13 @@ class FirstVerticalTaskRunner:
             session_id, scheduled.attempt_id, output_summary="Builder completed the isolated reference change.",
             evidence=[{"kind": "implementation_summary", "summary": "One isolated file and diff artifact were produced.", "artifactIds": [artifact_id]}],
         )
+        from app.services.gate_engine import GateEngine
+        gates = GateEngine(self._db)
+        if any(state.status == "pending" for state in await gates.states(session_id)):
+            await gates.route_unsatisfied(session_id)
+            await gates.append_states(session_id)
+            await scheduler.dispatch_ready(session_id)
+            return artifact_id
         await self._events.append(
             event_id=f"evt_{uuid.uuid4().hex}", session_id=session_id, event_type="session.status_changed", actor_id="system",
             payload={"status": "completed", "reasonSummary": "The isolated reference task completed with a reviewable diff."},

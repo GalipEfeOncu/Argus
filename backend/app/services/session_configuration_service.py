@@ -19,6 +19,7 @@ from pydantic import ValidationError
 from app.db.repositories import _now_ms, _safe_json
 from app.schemas.session import SessionAgentInput, SessionConfigurationInput
 from app.schemas.session_commands import SessionConfigurationPatch
+from app.services.evidence_schema import is_supported_json_schema
 
 
 class ConfigurationError(ValueError):
@@ -149,6 +150,10 @@ class SessionConfigurationService:
             expected_evidence = _EVIDENCE_BY_ROLE.get(rule.role)
             if expected_evidence is not None and rule.success_evidence != expected_evidence:
                 raise ConfigurationError("unsupported_evidence", f"Role '{rule.role}' requires '{expected_evidence}' evidence.")
+            if expected_evidence is None and any(agent.evidence_schema is None for agent in eligible):
+                raise ConfigurationError("custom_evidence_schema_required", "Custom required roles need a registered evidence schema.")
+            if expected_evidence is None and any(not is_supported_json_schema(agent.evidence_schema) for agent in eligible):
+                raise ConfigurationError("unsupported_custom_evidence_schema", "Custom evidence schemas use the supported JSON-Schema subset only.")
             if rule.applicability == "when_capability_used" and not any(rule.capability in agent.capabilities for agent in eligible):
                 raise ConfigurationError("required_role_capability_unavailable", "An eligible required-role agent must have the configured capability.")
         limits = configuration.execution_limits
@@ -188,7 +193,8 @@ class SessionConfigurationService:
         namespace = uuid.uuid5(uuid.NAMESPACE_URL, f"argus-session:{session_id}")
         snapshot_ids = {agent.id: str(uuid.uuid5(namespace, agent.id)) for agent in agents}
         agent_snapshots = [
-            {"id": snapshot_ids[agent.id], "sourceAgentId": agent.id, "role": agent.role, "capabilities": agent.capabilities}
+            {"id": snapshot_ids[agent.id], "sourceAgentId": agent.id, "role": agent.role,
+             "capabilities": agent.capabilities, "evidenceSchema": agent.evidence_schema}
             for agent in agents
         ]
         for agent in agents:
@@ -225,7 +231,7 @@ class SessionConfigurationService:
             raw = json.loads(agent["snapshot_json"])
             agent_snapshots.append({
                 "id": agent["id"], "sourceAgentId": raw["id"], "role": agent["role"],
-                "capabilities": raw.get("capabilities", []),
+                "capabilities": raw.get("capabilities", []), "evidenceSchema": raw.get("evidenceSchema"),
             })
         return ConfigurationSnapshot(
             row["id"], row["session_id"], row["version"], json.loads(row["available_agent_ids_json"]),
