@@ -421,7 +421,7 @@ export class EventSimulator {
     this.emit(sessionId, 'tool.completed', implementationAgent.id, {
       toolExecutionId: 'demo-read-project', assignmentId: 'demo-assignment', status: 'succeeded', resultSummary: 'Read the project context and prepared a compact diff summary.', durationMs: 120, artifactIds: ['demo-diff'],
     });
-    this.emit(sessionId, 'usage.updated', implementationAgent.id, { scopeId: 'demo-assignment', inputTokens: 120, outputTokens: 60, normalizedCost: 0.002, durationMs: 120 });
+    this.emit(sessionId, 'usage.updated', implementationAgent.id, { scopeId: 'demo-assignment', inputTokens: 120, outputTokens: 60, normalizedCost: 0.002, costUncertainty: 'exact', durationMs: 120 });
     this.emit(sessionId, 'handoff.created', planningAgent.id, {
       handoffId: 'demo-handoff', sourceAssignmentId: 'demo-assignment', targetAgentId: implementationAgent.id, summary: 'The scoped plan and diff summary are ready for implementation.', artifactIds: ['demo-diff'],
     });

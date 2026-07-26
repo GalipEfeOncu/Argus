@@ -14,6 +14,7 @@ import uuid
 import aiosqlite
 
 from app.db.repositories import EventRepository, _now_ms
+from app.db.database import transaction
 from app.providers.protocol import ProviderRequest, StructuredOutput
 from app.providers.scripted import ScriptedProvider
 from app.services.assignment_scheduler import AssignmentScheduler, ScheduledAssignment
@@ -113,6 +114,33 @@ class FirstVerticalTaskRunner:
 
     async def _write_and_complete(self, session_id: str, scheduled: ScheduledAssignment) -> str:
         scheduler = AssignmentScheduler(self._db)
+        from app.services.budget_counter_service import BudgetCounterService
+        budgets = BudgetCounterService(self._db)
+        # Reserve both the tool and the resulting revision before requesting a
+        # mutating operation.  A hard limit therefore prevents the write rather
+        # than merely reporting it after the workspace changed.
+        tool_reservation = None
+        revision_reservation = None
+        rejected = None
+        async with transaction(self._db):
+            try:
+                tool_reservation = await budgets.reserve_in_transaction(
+                    session_id, counter="tool_calls", scope_type="assignment", scope_id=scheduled.assignment_id,
+                    assignment_id=scheduled.assignment_id, hold=True,
+                )
+                revision_reservation = await budgets.reserve_in_transaction(
+                    session_id, counter="revisions", scope_type="finding", scope_id=session_id, hold=True,
+                )
+            except Exception as error:
+                if tool_reservation is not None:
+                    await budgets.release_prestart(tool_reservation)
+                rejected = error
+        if rejected is not None:
+            raise rejected
+        assert tool_reservation is not None and revision_reservation is not None
+        async with transaction(self._db):
+            await budgets.consume_reservation(tool_reservation)
+            await budgets.consume_reservation(revision_reservation)
         tool_id = f"tool_{uuid.uuid4().hex}"
         await self._events.append(
             event_id=f"evt_{uuid.uuid4().hex}", session_id=session_id, event_type="tool.requested", actor_id="builder",

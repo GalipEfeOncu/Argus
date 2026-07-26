@@ -36,6 +36,7 @@ class ScheduledAssignment:
     attempt_id: str
     operation_class: str
     writer_lease_id: str | None
+    capacity_reservation_id: str | None = None
 
 
 class AssignmentScheduler:
@@ -174,10 +175,19 @@ class AssignmentScheduler:
             ) as cursor:
                 pending = await cursor.fetchall()
             started: list[ScheduledAssignment] = []
+            from app.services.budget_counter_service import BudgetCounterService, BudgetExceeded
+            budgets = BudgetCounterService(self._db)
             for row in pending:
+                capacity_reservation_id: str | None = None
                 if row["operation_class"] == "read_only":
-                    if active_readers >= read_limit:
+                    try:
+                        capacity = await budgets.reserve_in_transaction(
+                            session_id, counter="parallel_read_only_assignments", scope_type="session",
+                            scope_id=session_id, assignment_id=str(row["id"]), hold=True,
+                        )
+                    except BudgetExceeded:
                         continue
+                    capacity_reservation_id = capacity.id
                     lease_id = None
                     active_readers += 1
                 else:
@@ -191,6 +201,18 @@ class AssignmentScheduler:
                         # started in this transaction.
                         continue
                     writer_running = True
+                try:
+                    await budgets.reserve_in_transaction(
+                        session_id, counter="assignment_attempts", scope_type="assignment",
+                        scope_id=str(row["id"]), assignment_id=str(row["id"]),
+                    )
+                except BudgetExceeded:
+                    if capacity_reservation_id is not None:
+                        await budgets.release_prestart(capacity)
+                    if lease_id is not None:
+                        await self._release_unassigned_writer_lease(lease_id)
+                        writer_running = False
+                    continue
                 attempt_id = f"att_{uuid.uuid4().hex}"
                 now = _now_ms()
                 await self._db.execute(
@@ -205,13 +227,30 @@ class AssignmentScheduler:
                        FROM assignments WHERE id = ?""",
                     (attempt_id, f"worker_{attempt_id}", now, now, row["id"]),
                 )
+                if capacity_reservation_id is not None:
+                    await budgets.consume_reservation(capacity)
                 await self._event(session_id, "assignment.started", "system", {
                     "assignmentId": row["id"], "assigneeAgentId": row["assignee_session_agent_id"],
                 })
-                started.append(ScheduledAssignment(str(row["id"]), await self._proposal_id(str(row["id"])), attempt_id, str(row["operation_class"]), lease_id))
+                started.append(ScheduledAssignment(str(row["id"]), await self._proposal_id(str(row["id"])), attempt_id, str(row["operation_class"]), lease_id, capacity_reservation_id))
             return tuple(started)
 
     async def checkpoint(self, attempt_id: str, checkpoint: dict[str, Any]) -> None:
+        # A checkpoint is the worker boundary after one model iteration. Count
+        # it outside the checkpoint-write transaction so a durable hard-limit
+        # event is never rolled back with the rejected write.
+        async with self._db.execute(
+            "SELECT assignment.id, assignment.session_id FROM assignment_attempts attempt JOIN assignments assignment ON assignment.id = attempt.assignment_id WHERE attempt.id = ? AND attempt.state = 'running'",
+            (attempt_id,),
+        ) as cursor:
+            active = await cursor.fetchone()
+        if active is None:
+            raise SchedulerRejected("attempt_not_running", "Checkpoint requires a running attempt.")
+        from app.services.budget_counter_service import BudgetCounterService, BudgetExceeded
+        try:
+            await BudgetCounterService(self._db).record_model_iteration(str(active["session_id"]), str(active["id"]))
+        except BudgetExceeded as error:
+            raise SchedulerRejected("model_iteration_limit_reached", "The assignment model-iteration limit was reached.") from error
         async with transaction(self._db):
             async with self._db.execute("SELECT assignment.* FROM assignment_attempts attempt JOIN assignments assignment ON assignment.id = attempt.assignment_id WHERE attempt.id = ?", (attempt_id,)) as cursor:
                 assignment = await cursor.fetchone()
@@ -400,6 +439,7 @@ class AssignmentScheduler:
 
     async def _release_assignment_lease(self, assignment: aiosqlite.Row, reason: str) -> None:
         lease_id = assignment["writer_lease_id"]
+        await self._release_read_only_capacity(str(assignment["id"]))
         if lease_id is None:
             return
         now = _now_ms()
@@ -408,6 +448,23 @@ class AssignmentScheduler:
         if lease is None:
             return
         await self._db.execute("UPDATE writer_leases SET released_at_ms = ?, release_reason = ? WHERE id = ?", (now, reason, lease_id))
+        await self._db.execute("UPDATE projects SET lock_session_id = NULL, lock_acquired_at_ms = NULL, updated_at_ms = ? WHERE id = ? AND lock_session_id = ?", (now, lease["project_id"], lease["session_id"]))
+
+    async def _release_read_only_capacity(self, assignment_id: str) -> None:
+        """Release only live read-only capacity after terminal assignment state."""
+
+        from app.services.budget_counter_service import BudgetCounterService
+        await BudgetCounterService(self._db).release_assignment_capacity(assignment_id)
+
+    async def _release_unassigned_writer_lease(self, lease_id: str) -> None:
+        """Undo a lease acquired before a budget rejection, before work starts."""
+
+        now = _now_ms()
+        async with self._db.execute("SELECT project_id, session_id FROM writer_leases WHERE id = ? AND released_at_ms IS NULL", (lease_id,)) as cursor:
+            lease = await cursor.fetchone()
+        if lease is None:
+            return
+        await self._db.execute("UPDATE writer_leases SET released_at_ms = ?, release_reason = 'budget_rejected_prestart' WHERE id = ?", (now, lease_id))
         await self._db.execute("UPDATE projects SET lock_session_id = NULL, lock_acquired_at_ms = NULL, updated_at_ms = ? WHERE id = ? AND lock_session_id = ?", (now, lease["project_id"], lease["session_id"]))
 
     async def _require_active_writer_lease(self, assignment: aiosqlite.Row) -> None:

@@ -57,7 +57,8 @@ export interface ProjectedDecision {
 export interface ProjectedUsage {
   inputTokens: number;
   outputTokens: number;
-  normalizedCost: number;
+  normalizedCost: number | null;
+  costUncertainty: 'exact' | 'estimated' | 'unavailable';
   durationMs: number;
 }
 
@@ -416,7 +417,8 @@ function projectEvent(state: SessionProjection, event: ArgusSessionEvent, correl
           [event.payload.scopeId]: {
             inputTokens: event.payload.inputTokens,
             outputTokens: event.payload.outputTokens,
-            normalizedCost: event.payload.normalizedCost,
+            normalizedCost: event.payload.normalizedCost ?? null,
+            costUncertainty: event.payload.costUncertainty ?? 'exact',
             durationMs: event.payload.durationMs,
           },
         },

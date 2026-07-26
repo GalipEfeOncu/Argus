@@ -11,6 +11,7 @@
     "inputTokens": 100,
     "outputTokens": 50,
     "normalizedCost": 0.01,
+    "costUncertainty": "exact",
     "durationMs": 1200
   }
 }

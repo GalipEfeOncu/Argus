@@ -4341,6 +4341,16 @@
       "UsageUpdatedPayload": {
         "additionalProperties": false,
         "properties": {
+          "costUncertainty": {
+            "default": "exact",
+            "enum": [
+              "exact",
+              "estimated",
+              "unavailable"
+            ],
+            "title": "Costuncertainty",
+            "type": "string"
+          },
           "durationMs": {
             "minimum": 0.0,
             "title": "Durationms",
@@ -4352,9 +4362,16 @@
             "type": "integer"
           },
           "normalizedCost": {
-            "minimum": 0.0,
-            "title": "Normalizedcost",
-            "type": "number"
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Normalizedcost"
           },
           "outputTokens": {
             "minimum": 0.0,
@@ -4372,7 +4389,6 @@
           "scopeId",
           "inputTokens",
           "outputTokens",
-          "normalizedCost",
           "durationMs"
         ],
         "title": "UsageUpdatedPayload",

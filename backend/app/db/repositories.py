@@ -241,6 +241,28 @@ class EventRepository:
                 "UPDATE sessions SET status = ?, updated_at_ms = ? WHERE id = ?",
                 (payload["status"], _now_ms(), session_id),
             )
+            # Wall-clock budgets count runnable time only.  This compact
+            # durable clock is updated beside every canonical status event so
+            # pause/restart behavior never relies on an in-memory timer.
+            async with self._db.execute(
+                "SELECT accumulated_running_ms, running_started_at_ms FROM session_runtime_clocks WHERE session_id = ?",
+                (session_id,),
+            ) as cursor:
+                clock = await cursor.fetchone()
+            running_started = None if clock is None else clock["running_started_at_ms"]
+            accumulated = 0 if clock is None else int(clock["accumulated_running_ms"])
+            target = payload["status"]
+            if target == "running" and running_started is None:
+                running_started = timestamp_ms
+            elif target != "running" and running_started is not None:
+                accumulated += max(0, timestamp_ms - int(running_started))
+                running_started = None
+            await self._db.execute(
+                """INSERT INTO session_runtime_clocks (session_id, accumulated_running_ms, running_started_at_ms, updated_at_ms)
+                   VALUES (?, ?, ?, ?) ON CONFLICT(session_id) DO UPDATE SET accumulated_running_ms = excluded.accumulated_running_ms,
+                   running_started_at_ms = excluded.running_started_at_ms, updated_at_ms = excluded.updated_at_ms""",
+                (session_id, accumulated, running_started, timestamp_ms),
+            )
         return StoredEvent(
             event_id, session_id, next_sequence, event_type, actor_id, correlation_id,
             command_id, payload, timestamp_ms,

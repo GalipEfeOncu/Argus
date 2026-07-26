@@ -58,9 +58,14 @@ export const RuntimeContext: React.FC<RuntimeContextProps> = ({ sessionId }) => 
   const usage = Object.values(projection.usageByScope).reduce((total, value) => ({
     inputTokens: total.inputTokens + value.inputTokens,
     outputTokens: total.outputTokens + value.outputTokens,
-    normalizedCost: total.normalizedCost + value.normalizedCost,
+    normalizedCost: total.normalizedCost === null || value.normalizedCost === null
+      ? null
+      : total.normalizedCost + value.normalizedCost,
+    costUncertainty: total.costUncertainty === 'unavailable' || value.costUncertainty === 'unavailable'
+      ? 'unavailable'
+      : total.costUncertainty === 'estimated' || value.costUncertainty === 'estimated' ? 'estimated' : 'exact',
     durationMs: total.durationMs + value.durationMs,
-  }), { inputTokens: 0, outputTokens: 0, normalizedCost: 0, durationMs: 0 });
+  }), { inputTokens: 0, outputTokens: 0, normalizedCost: 0 as number | null, costUncertainty: 'exact' as 'exact' | 'estimated' | 'unavailable', durationMs: 0 });
   const selectedAgentIds = draftAgentIds ?? configuration?.availableAgentIds ?? [];
   const selectedRules = draftRequiredRules ?? configuration?.requiredRoleRules ?? [];
   const approvalBehavior = draftApprovalBehavior ?? configuration?.approvalPolicy.behavior ?? 'ask_by_policy';
@@ -119,7 +124,8 @@ export const RuntimeContext: React.FC<RuntimeContextProps> = ({ sessionId }) => 
                 : counter === 'tool_calls' ? Math.max(projection.toolCalls, projection.limits[counter]?.current ?? 0)
                   : counter === 'parallel_read_only_assignments' ? Object.values(projection.assignments).filter((assignment) => assignment.operationClass === 'read_only').length
                     : projection.limits[counter]?.current ?? 0;
-        return <li key={counter}>{counter}: {ceiling === null ? 'unlimited user ceiling' : `${Math.max(0, Number(ceiling) - observed)} remaining of ${ceiling}`}{projection.limits[counter] === undefined ? '' : ` (${projection.limits[counter].hard ? 'hard' : 'warning'}; ${projection.limits[counter].resolution})`}</li>;
+        const costUnavailable = counter === 'cost' && observed === null;
+        return <li key={counter}>{costUnavailable ? 'cost: unavailable from provider usage' : `${counter}: ${ceiling === null ? 'unlimited user ceiling' : `${Math.max(0, Number(ceiling) - (observed ?? 0))} remaining of ${ceiling}`}`}{counter === 'cost' && usage.costUncertainty !== 'exact' ? ` (${usage.costUncertainty})` : ''}{projection.limits[counter] === undefined ? '' : ` (${projection.limits[counter].hard ? 'hard' : 'warning'}; ${projection.limits[counter].resolution})`}</li>;
       })}</ul>}</div>
 
       <div className="runtime-detail"><h3>Update future configuration</h3><p>Changes apply only to future dispatches. Removing an active agent or reducing authority requires a server-provided consequence preview before the backend can accept it.</p>{configuration !== undefined && <><fieldset><legend>Future available team</legend>{configuration.availableAgents.map((agent) => <label key={agent.id}><input type="checkbox" checked={selectedAgentIds.includes(agent.id)} onChange={() => toggleFutureAgent(agent.id)} disabled={terminal || configurationPending} />{agent.label}</label>)}</fieldset><fieldset><legend>Future required gates</legend>{configuration.availableAgents.map((agent) => <label key={agent.id}><input type="checkbox" checked={selectedRules.some((rule) => rule.role === agent.role)} onChange={() => toggleFutureGate(agent.role)} disabled={terminal || configurationPending} />{agent.label}</label>)}</fieldset></>}<label>Approval behavior <select value={approvalBehavior} onChange={(event) => setDraftApprovalBehavior(event.target.value as NonNullable<SessionConfigurationPatch['approvalBehavior']>)} disabled={terminal || configurationPending}><option value="ask_by_policy">Ask by policy</option><option value="preauthorize_session">Pre-authorize session</option><option value="deny_interactive">Deny interactive</option></select></label><label>At a hard limit <select value={nextLimitResolution} onChange={(event) => setNextLimitResolution(event.target.value as 'ask_user' | 'coordinator_decides' | 'stop')} disabled={terminal || configurationPending}><option value="ask_user">Ask user</option><option value="coordinator_decides">Coordinator decides</option><option value="stop">Stop</option></select></label><button type="button" onClick={() => updateConfiguration(projection.configurationVersion, configurationPatch)} disabled={terminal || configurationPending}>Request consequence preview</button></div>

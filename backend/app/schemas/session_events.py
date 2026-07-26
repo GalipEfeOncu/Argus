@@ -9,7 +9,7 @@ from datetime import datetime
 import re
 from typing import Annotated, Any, Literal, Union
 
-from pydantic import BaseModel, ConfigDict, Field, TypeAdapter, field_validator
+from pydantic import BaseModel, ConfigDict, Field, TypeAdapter, field_validator, model_validator
 from pydantic.alias_generators import to_camel
 
 
@@ -392,8 +392,15 @@ class UsageUpdatedPayload(CamelModel):
     scope_id: Identifier
     input_tokens: int = Field(ge=0)
     output_tokens: int = Field(ge=0)
-    normalized_cost: float = Field(ge=0)
+    normalized_cost: float | None = Field(default=None, ge=0)
+    cost_uncertainty: Literal["exact", "estimated", "unavailable"] = "exact"
     duration_ms: int = Field(ge=0)
+
+    @model_validator(mode="after")
+    def validate_cost_uncertainty(self) -> "UsageUpdatedPayload":
+        if (self.normalized_cost is None) != (self.cost_uncertainty == "unavailable"):
+            raise ValueError("unavailable cost must omit normalizedCost, and known cost must not be unavailable")
+        return self
 
 
 class UsageUpdatedEvent(EventEnvelope):

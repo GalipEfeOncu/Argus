@@ -248,6 +248,32 @@ acknowledgement descriptors. `direct_write` requires the limited-rollback
 acknowledgement; Autonomous and Expert unrestricted profiles require their
 respective permission acknowledgements before creation.
 
+### Budget and usage accounting
+
+The deterministic budget service persists counters by their natural scope:
+session (`tokens`, normalized `cost`, active wall-clock time, and parallel
+read-only work), assignment (attempts, model iterations, and tool calls), and
+finding (accepted revision work). Counters and reservations survive a restart.
+Before dispatch, the scheduler atomically reserves the assignment attempt and
+any read-only capacity slot with the assignment state transition. A reservation
+that never starts may be returned; a started attempt remains consumed, so a
+retry never receives a free budget unit. Parallel read-only capacity is released
+only after its assignment becomes terminal.
+
+At the configured ratio, the server emits one `limit.warning` for a counter
+scope. A request that would exceed a finite ceiling first appends
+`limit.reached` and then is not started. Internal writer leases and other
+resource guards are separate enforcement mechanisms and are never relaxed by
+an unlimited (`null`) user limit.
+
+`usage.updated.normalizedCost` may be `null` when a provider cannot supply a
+normalizable cost. `costUncertainty` is `exact`, `estimated`, or `unavailable`;
+clients must present the value as an uncertainty rather than treating a missing
+cost as zero. A later provider correction replaces the attempt's normalized
+usage and adjusts durable token/cost totals by its delta. Wall-clock accounting
+uses only runnable time: paused, approval-waiting, decision-waiting, and
+terminal intervals do not consume it.
+
 Validation rejects duplicate agents, a Coordinator in `availableAgentIds`, a
 required rule with no eligible available agent, unsupported evidence types,
 unsafe preauthorizations, and limits that contradict the selected workspace or

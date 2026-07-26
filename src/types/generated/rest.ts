@@ -1711,12 +1711,18 @@ export interface components {
         };
         /** UsageUpdatedPayload */
         UsageUpdatedPayload: {
+            /**
+             * Costuncertainty
+             * @default exact
+             * @enum {string}
+             */
+            costUncertainty: "exact" | "estimated" | "unavailable";
             /** Durationms */
             durationMs: number;
             /** Inputtokens */
             inputTokens: number;
             /** Normalizedcost */
-            normalizedCost: number;
+            normalizedCost?: number | null;
             /** Outputtokens */
             outputTokens: number;
             /** Scopeid */

@@ -18,6 +18,7 @@ from app.providers.protocol import (
     RetryableError,
     StructuredOutput,
     TerminalError,
+    Usage,
 )
 from app.schemas.coordinator_actions import (
     AssignmentsAction,
@@ -194,6 +195,14 @@ class CoordinatorCycle:
                 return _SUPERSEDED
             if isinstance(event, StructuredOutput):
                 return event.value
+            if isinstance(event, Usage):
+                from app.services.budget_counter_service import BudgetCounterService
+                await BudgetCounterService(self._db).record_coordinator_usage(
+                    session_id, input_tokens=event.input_tokens or 0, output_tokens=event.output_tokens or 0,
+                    normalized_cost=event.cost_usd, duration_ms=0,
+                    cost_uncertainty="exact" if event.cost_usd is not None and event.exact else ("estimated" if event.cost_usd is not None else "unavailable"),
+                )
+                continue
             if isinstance(event, (Cancelled, RetryableError, TerminalError)):
                 return {"type": "invalid_provider_result", "reason": getattr(event, "code", "cancelled")}
             if isinstance(event, Finished):

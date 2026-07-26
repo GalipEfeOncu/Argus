@@ -15,7 +15,7 @@ import uuid
 from langchain_core.tools import BaseTool, tool
 
 from app.config import settings
-from app.db.database import get_db
+from app.db.database import get_db, transaction
 from app.services.workspace_service import (
     ProjectWorkspaceService,
     ScopedToolService,
@@ -46,6 +46,49 @@ def create_scoped_tools(workspace: WorkspaceRecord) -> list[BaseTool]:
                 lease_id = await lifecycle.acquire_writer_lease(
                     project_id=workspace.project_id, session_id=workspace.session_id, holder_id=holder_id,
                 )
+                # The legacy adapter has no assignment object in its tool
+                # signature, so resolve the active writer once and still
+                # enforce the configured counters before filesystem work.
+                async with database.execute(
+                    "SELECT id FROM assignments WHERE session_id = ? AND state = 'running' AND operation_class = 'mutating' ORDER BY updated_at_ms DESC LIMIT 1",
+                    (workspace.session_id,),
+                ) as cursor:
+                    assignment = await cursor.fetchone()
+                from app.services.budget_counter_service import BudgetCounterService
+                from app.services.session_configuration_service import ConfigurationError, SessionConfigurationService
+                budgets = BudgetCounterService(database)
+                assignment_id = None if assignment is None else str(assignment["id"])
+                tool_scope = assignment_id or f"workspace:{workspace.session_id}"
+                tool_reservation = None
+                rejected = None
+                try:
+                    # Transitional sessions predate durable configuration and
+                    # therefore have no user-selected limit to enforce.
+                    await SessionConfigurationService(database).current(workspace.session_id)
+                    async with transaction(database):
+                        try:
+                            tool_reservation = await budgets.reserve_in_transaction(
+                                workspace.session_id, counter="tool_calls", scope_type="assignment", scope_id=tool_scope,
+                                assignment_id=assignment_id, hold=True,
+                            )
+                            revision_reservation = await budgets.reserve_in_transaction(
+                                workspace.session_id, counter="revisions", scope_type="finding", scope_id=workspace.session_id, hold=True,
+                            )
+                        except Exception as error:
+                            if tool_reservation is not None:
+                                await budgets.release_prestart(tool_reservation)
+                            rejected = error
+                    if rejected is not None:
+                        raise rejected
+                    async with transaction(database):
+                        await budgets.consume_reservation(tool_reservation)
+                        await budgets.consume_reservation(revision_reservation)
+                except ConfigurationError:
+                    pass
+                except Exception as error:
+                    rejected = error
+                if rejected is not None:
+                    raise rejected
                 result = await asyncio.to_thread(operation)
                 await lifecycle.record_mutation(workspace.session_id)
                 return result

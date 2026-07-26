@@ -113,6 +113,10 @@ class CommandProcessor:
                     "UPDATE assignments SET state = 'interrupted', updated_at_ms = ? WHERE id = ? AND session_id = ?",
                     [(_now_ms(), assignment_id, session_id) for assignment_id in interrupted_assignments],
                 )
+                from app.services.budget_counter_service import BudgetCounterService
+                budgets = BudgetCounterService(self._db)
+                for assignment_id in interrupted_assignments:
+                    await budgets.release_assignment_capacity(assignment_id)
             await self._db.execute(
                 """INSERT INTO command_receipts
                    (session_id, command_id, command_type, command_json, outcome_event_id,
@@ -162,6 +166,8 @@ class CommandProcessor:
             )
             await self._db.execute("UPDATE assignments SET state = 'cancelled', terminal_event_id = ?, updated_at_ms = ? WHERE id = ?", (event.event_id, now, assignment["id"]))
             await self._db.execute("UPDATE assignment_attempts SET state = 'cancelled', completed_at_ms = ?, updated_at_ms = ? WHERE assignment_id = ? AND state = 'running'", (now, now, assignment["id"]))
+            from app.services.budget_counter_service import BudgetCounterService
+            await BudgetCounterService(self._db).release_assignment_capacity(str(assignment["id"]))
             if assignment["writer_lease_id"] is not None:
                 async with self._db.execute("SELECT project_id, session_id FROM writer_leases WHERE id = ? AND released_at_ms IS NULL", (assignment["writer_lease_id"],)) as cursor:
                     lease = await cursor.fetchone()

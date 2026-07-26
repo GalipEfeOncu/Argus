@@ -551,9 +551,10 @@ export type Version24 = 1;
 export type Actorid25 = string;
 export type Correlationid25 = string | null;
 export type Eventid25 = string;
+export type Costuncertainty = "exact" | "estimated" | "unavailable";
 export type Durationms1 = number;
 export type Inputtokens = number;
-export type Normalizedcost = number;
+export type Normalizedcost = number | null;
 export type Outputtokens = number;
 export type Scopeid2 = string;
 export type Sequence25 = number;
@@ -1018,9 +1019,10 @@ export interface UsageUpdatedEvent {
   version: Version25;
 }
 export interface UsageUpdatedPayload {
+  costUncertainty?: Costuncertainty;
   durationMs: Durationms1;
   inputTokens: Inputtokens;
-  normalizedCost: Normalizedcost;
+  normalizedCost?: Normalizedcost;
   outputTokens: Outputtokens;
   scopeId: Scopeid2;
 }

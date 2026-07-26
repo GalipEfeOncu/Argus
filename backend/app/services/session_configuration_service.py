@@ -78,7 +78,7 @@ _BEHAVIOR_RANK = {"deny_interactive": 0, "ask_each_time": 1, "ask_by_policy": 2,
 _COUNTER_LIMIT_FIELDS = {
     "revisions": "maxRevisionsPerFinding", "assignment_attempts": "maxAssignmentAttempts",
     "model_iterations": "maxModelIterationsPerAssignment", "tool_calls": "maxToolCallsPerAssignment",
-    "tokens": "maxSessionTokens", "wall_clock_seconds": "maxWallClockSeconds",
+    "tokens": "maxSessionTokens", "cost": "maxSessionCost", "wall_clock_seconds": "maxWallClockSeconds",
     "parallel_read_only_assignments": "maxParallelReadOnlyAssignments",
 }
 
@@ -283,13 +283,15 @@ class SessionConfigurationService:
             active = await cursor.fetchall()
         invalid = tuple(row["id"] for row in active if row["assignee_session_agent_id"] in removed or reduced_permission)
         async with self._db.execute(
-            "SELECT counter_kind, consumed_value FROM limit_counters WHERE session_id = ?", (session_id,)
+            """SELECT counter_kind,
+               CASE WHEN consumed_real = 0 AND consumed_value <> 0 THEN consumed_value ELSE consumed_real END AS consumed_real
+               FROM limit_counters WHERE session_id = ?""", (session_id,)
         ) as cursor:
             counters = await cursor.fetchall()
         limit_exceeded = any(
             (field := _COUNTER_LIMIT_FIELDS.get(row["counter_kind"])) is not None
             and candidate["executionLimits"].get(field) is not None
-            and row["consumed_value"] > candidate["executionLimits"][field]
+            and row["consumed_real"] > candidate["executionLimits"][field]
             for row in counters
         )
         if limit_exceeded:

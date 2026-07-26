@@ -627,7 +627,7 @@ Current status (2026-07-26):
   explicit human acceptance before ending as `completed_partial`, never as
   full completion.
 
-### 4.2 Budget and counter service
+### 4.2 Budget and counter service (✅ Completed)
 
 Deliverables:
 
@@ -644,6 +644,19 @@ Tests:
 - Zero, one, finite, and null ceilings; ratio warning; concurrent reservations;
   restart; provider usage correction; cost unavailable; wall-clock pause rules;
   and boundary off-by-one cases.
+
+Current status (2026-07-26):
+
+- ✅ Persistent, scoped counters cover assignment attempts, model iterations,
+  tool calls, revisions, session tokens/cost, runnable wall-clock time, and
+  parallel read-only capacity. Dispatch reserves its attempt and capacity in
+  the same database transaction; started attempts remain spent across restart.
+- ✅ Soft warnings are deduplicated per counter scope, while hard-limit events
+  are recorded before the requested excess work can begin. Writer leases remain
+  independent internal resource guards.
+- ✅ Provider usage supports exact, estimated, and unavailable normalized cost;
+  late provider corrections adjust totals by their durable delta. Paused time
+  does not consume the wall-clock budget.
 
 ### 4.3 Loop detection and Coordinator initiative
 
