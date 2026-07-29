@@ -24,6 +24,9 @@ All notable user-visible changes to Argus are recorded here. The project follows
 - Native provider profiles for OpenAI, Anthropic, Google, and OpenAI-compatible
   services, including model discovery, manual model IDs, normalized streaming
   behavior, and OS credential-store references instead of browser-stored keys.
+- Restart-safe session recovery: durable projections, grants, counters, worker
+  checkpoints, leases, and unknown tool/provider outcomes are reconciled after
+  a sidecar restart without automatically replaying a mutating operation.
 
 No stable Argus version has been published yet. The manifest version `0.1.0` is
 the current development baseline, not a stable release claim.

@@ -210,3 +210,20 @@ pub async fn stop(state: State<'_, SidecarState>) -> Result<(), String> {
 pub fn is_running(state: &SidecarState) -> bool {
     state.child.lock().map(|g| g.is_some()).unwrap_or(false)
 }
+
+/// The backend decides idleness from durable sessions, approvals, tool work,
+/// leases, provider work, and live room connections.  Native code only owns
+/// the process handle and applies a bounded grace period.
+pub async fn can_idle_shutdown() -> bool {
+    let client = match reqwest::Client::builder().timeout(std::time::Duration::from_secs(2)).build() {
+        Ok(client) => client,
+        Err(_) => return false,
+    };
+    match client.get("http://127.0.0.1:8000/runtime/idle").send().await {
+        Ok(response) if response.status().is_success() => response
+            .json::<serde_json::Value>().await.ok()
+            .and_then(|value| value.get("idle").and_then(serde_json::Value::as_bool))
+            .unwrap_or(false),
+        _ => false,
+    }
+}

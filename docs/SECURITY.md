@@ -110,6 +110,13 @@ OS-level workspace sandbox; when that sandbox is unavailable they are denied
 rather than run unsandboxed. Lease acquisition, renewal, expiry recovery, and
 release are durable audit records.
 
+After a backend or sidecar restart, no previously in-memory writer lease or
+capacity reservation remains live. The runtime releases those abandoned guards,
+rebuilds projections from immutable events, and recovers worker checkpoints.
+An interrupted mutating tool or provider request is recorded as an unknown
+outcome and cannot be retried merely because its response was lost. A later
+retry must pass the usual scheduler, budget, workspace, and approval checks.
+
 ## Reporting
 
 Until a dedicated security contact is published, report vulnerabilities privately to the repository owner and do not include exploitable details in public issues.

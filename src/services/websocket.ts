@@ -4,6 +4,7 @@ import type { ConnectionState } from './sessionProjection';
 import { eventSimulator } from '@/services/eventSimulator';
 import { syncLegacyProjection } from '@/services/legacyProjectionBridge';
 import { useSessionRoomStore } from '@/stores/sessionRoomStore';
+import { tauriCommands } from '@/services/tauri';
 import {
   SessionStreamClient,
   type SessionTransport,
@@ -22,6 +23,10 @@ export class WebSocketSessionTransport implements SessionTransport {
   connect(sessionId: string, afterSequence: number, handlers: TransportHandlers): void {
     this.disconnect();
     this.intentionalClose = false;
+    // In the desktop shell this transparently wakes an idle sidecar. In a
+    // browser development build the native invoke simply rejects and the
+    // already-running development backend remains the transport source.
+    void tauriCommands.startBackend().catch(() => undefined);
     const socket = new WebSocket(`${WS_BASE}/ws/sessions/${encodeURIComponent(sessionId)}?after_sequence=${afterSequence}`);
     this.socket = socket;
     socket.onopen = () => {

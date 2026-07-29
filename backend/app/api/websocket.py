@@ -49,6 +49,10 @@ class SessionConnectionHub:
             if session_id in self._connections and not self._connections[session_id]:
                 self._connections.pop(session_id, None)
 
+    async def connection_count(self) -> int:
+        async with self._lock:
+            return sum(len(sockets) for sockets in self._connections.values())
+
 
 connection_hub = SessionConnectionHub()
 

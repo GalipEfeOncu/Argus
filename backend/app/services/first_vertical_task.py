@@ -74,7 +74,7 @@ class FirstVerticalTaskRunner:
                     "status": "running",
                     "reasonSummary": "A session-scoped pre-authorization allows the isolated Builder task.",
                 }
-                await self._events._append_in_transaction(
+                requested_event = await self._events._append_in_transaction(
                     event_id=f"evt_{uuid.uuid4().hex}", session_id=session_id,
                     event_type="session.status_changed", actor_id="system",
                     payload=payload, payload_json=_safe_json(payload),
@@ -214,14 +214,23 @@ class FirstVerticalTaskRunner:
                     "toolExecutionId": tool_id, "assignmentId": scheduled.assignment_id, "toolName": "write_file",
                     "operationClass": "mutating", "requestSummary": "Write one generated file inside the isolated workspace.",
                 }
-                await self._events._append_in_transaction(
+                requested_event = await self._events._append_in_transaction(
                     event_id=f"evt_{uuid.uuid4().hex}", session_id=session_id, event_type="tool.requested", actor_id="builder",
                     payload=requested_payload, payload_json=_safe_json(requested_payload), timestamp_ms=_now_ms(),
                     correlation_id=scheduled.attempt_id, command_id=None,
                 )
+                await self._db.execute(
+                    """INSERT INTO tool_executions (id, session_id, assignment_id, tool_name, operation_class,
+                       request_summary, exit_state, artifact_ids_json, requested_event_id, created_at_ms, updated_at_ms)
+                       VALUES (?, ?, ?, 'write_file', 'mutating', ?, 'requested', '[]', ?, ?, ?)""",
+                    (tool_id, session_id, scheduled.assignment_id,
+                     "Write one generated file inside the isolated workspace.", requested_event.event_id, _now_ms(), _now_ms()),
+                )
             except Exception as error:
                 if tool_reservation is not None:
                     await budgets.release_prestart(tool_reservation)
+                if revision_reservation is not None:
+                    await budgets.release_prestart(revision_reservation)
                 rejected = error
         if rejected is not None:
             from app.services.budget_counter_service import BudgetExceeded
@@ -241,6 +250,11 @@ class FirstVerticalTaskRunner:
             payload={"toolExecutionId": tool_id, "assignmentId": scheduled.assignment_id, "toolName": "write_file"},
             timestamp_ms=_now_ms(), correlation_id=scheduled.attempt_id,
         )
+        async with transaction(self._db):
+            await self._db.execute(
+                "UPDATE tool_executions SET exit_state = 'running', updated_at_ms = ? WHERE id = ? AND completed_event_id IS NULL",
+                (_now_ms(), tool_id),
+            )
         relative_path = "argus-vertical-task.txt"
         content = "This reviewable change was written only in the Argus session workspace.\n"
         async with session_mutation_fence.mutation(session_id):
@@ -261,12 +275,18 @@ class FirstVerticalTaskRunner:
                 raise RuntimeError("Workspace mutation did not create a diff artifact.")
             artifact_id = str(artifact["id"])
             await scheduler.checkpoint(scheduled.attempt_id, {"phase": "after_fake_write", "revision": revision})
-        await self._events.append(
+        completed_event = await self._events.append(
             event_id=f"evt_{uuid.uuid4().hex}", session_id=session_id, event_type="tool.completed", actor_id="builder",
             payload={"toolExecutionId": tool_id, "assignmentId": scheduled.assignment_id, "status": "succeeded",
                      "resultSummary": "Wrote the isolated reference file.", "durationMs": 0, "artifactIds": [artifact_id]},
             timestamp_ms=_now_ms(), correlation_id=scheduled.attempt_id,
         )
+        async with transaction(self._db):
+            await self._db.execute(
+                """UPDATE tool_executions SET exit_state = 'succeeded', result_summary = ?, duration_ms = 0,
+                   artifact_ids_json = ?, completed_event_id = ?, updated_at_ms = ? WHERE id = ?""",
+                ("Wrote the isolated reference file.", _safe_json([artifact_id]), completed_event.event_id, _now_ms(), tool_id),
+            )
         await self._events.append(
             event_id=f"evt_{uuid.uuid4().hex}", session_id=session_id, event_type="artifact.diff_updated", actor_id="builder",
             payload={"artifactId": artifact_id, "assignmentId": scheduled.assignment_id, "filePath": relative_path,

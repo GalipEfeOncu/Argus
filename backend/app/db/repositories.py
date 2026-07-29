@@ -447,6 +447,22 @@ class EventRepository:
             )
             return projection
 
+    async def compact_snapshots(self, session_id: str, *, retain: int = 3) -> int:
+        """Bound rebuildable projection snapshots without touching audit events."""
+
+        if retain < 1:
+            raise ValueError("retain must be at least one")
+        await self.create_snapshot(session_id)
+        async with transaction(self._db):
+            cursor = await self._db.execute(
+                """DELETE FROM event_snapshots WHERE session_id = ? AND id NOT IN (
+                    SELECT id FROM event_snapshots WHERE session_id = ?
+                    ORDER BY last_sequence DESC, created_at_ms DESC LIMIT ?
+                )""",
+                (session_id, session_id, retain),
+            )
+            return max(cursor.rowcount, 0)
+
 
 class AssignmentAttemptRepository:
     """Durable, content-free metadata recorded for one worker invocation."""

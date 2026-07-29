@@ -6,7 +6,7 @@ import aiosqlite
 import pytest
 
 from app.db.database import get_db, transaction
-from app.db.repositories import SessionRepository
+from app.db.repositories import EventRepository, SessionRepository
 from app.schemas.coordinator_actions import CoordinatorAssignment
 from app.schemas.session import ApprovalPolicy, ExecutionLimits, SessionAgentInput, SessionConfigurationInput
 from app.schemas.session_commands import parse_session_command
@@ -14,6 +14,8 @@ from app.services.assignment_scheduler import AssignmentScheduler
 from app.services.command_processor import CommandProcessor
 from app.services.coordinator_cycle import CoordinatorCycle
 from app.services.session_configuration_service import SessionConfigurationService
+from app.services.recovery_service import RecoveryService
+from app.services.budget_counter_service import BudgetCounterService
 
 
 async def scheduler_session(database: aiosqlite.Connection, *, reader_skill_snapshot: list[object] | None = None) -> dict[str, str]:
@@ -182,6 +184,58 @@ async def test_parent_cancellation_and_orphan_recovery_stop_future_worker_output
     assert len(cancelled) == 2
     assert recovered == (writer.attempt_id,)
     assert state == "created"
+
+
+@pytest.mark.asyncio
+async def test_restart_unknown_mutation_is_terminal_but_read_only_checkpoint_is_restored(temporary_sqlite_db) -> None:
+    database = await get_db()
+    try:
+        agents = await scheduler_session(database)
+        scheduler = AssignmentScheduler(database)
+        writer_id = await scheduler.accept_coordinator_proposal("scheduler_session", proposal("unknown-mutation", agents["writer"], operation="mutating"))
+        writer = (await scheduler.dispatch_ready("scheduler_session"))[0]
+        request = await EventRepository(database).append(
+            event_id="lost-tool-request", session_id="scheduler_session", event_type="tool.requested", actor_id="builder",
+            payload={"toolExecutionId": "lost_tool", "assignmentId": writer_id, "toolName": "write_file",
+                     "operationClass": "mutating", "requestSummary": "Write an isolated file."}, timestamp_ms=1,
+        )
+        await database.execute(
+            """INSERT INTO tool_executions (id, session_id, assignment_id, tool_name, operation_class, request_summary,
+               exit_state, artifact_ids_json, requested_event_id, created_at_ms, updated_at_ms)
+               VALUES ('lost_tool', 'scheduler_session', ?, 'write_file', 'mutating', 'safe request', 'running', '[]', ?, 1, 1)""",
+            (writer_id, request.event_id),
+        )
+        await database.commit()
+        reader_id = await scheduler.accept_coordinator_proposal("scheduler_session", proposal("checkpoint-reader", agents["reader"]))
+        # The writer remains active, but one reader may run concurrently.
+        reader = next(item for item in await scheduler.dispatch_ready("scheduler_session") if item.assignment_id == reader_id)
+        await scheduler.checkpoint(reader.attempt_id, {"phase": "safe-read-checkpoint"})
+        held = await BudgetCounterService(database).reserve(
+            "scheduler_session", counter="tool_calls", scope_type="assignment", scope_id=reader_id,
+            assignment_id=reader_id, hold=True,
+        )
+        await database.commit()
+        await RecoveryService(database).recover_after_restart()
+        async with database.execute("SELECT state FROM assignments WHERE id = ?", (writer_id,)) as cursor:
+            writer_state = (await cursor.fetchone())["state"]
+        async with database.execute("SELECT checkpoint_json FROM assignment_attempts WHERE id = ?", (reader.attempt_id,)) as cursor:
+            checkpoint = (await cursor.fetchone())["checkpoint_json"]
+        resumed = next(item for item in await scheduler.dispatch_ready("scheduler_session") if item.assignment_id == reader_id)
+        async with database.execute(
+            "SELECT checkpoint_json FROM assignment_attempts WHERE id = ?",
+            (resumed.attempt_id,),
+        ) as cursor:
+            resumed_checkpoint = (await cursor.fetchone())["checkpoint_json"]
+        async with database.execute("SELECT state FROM limit_reservations WHERE id = ?", (held.id,)) as cursor:
+            reservation_state = (await cursor.fetchone())["state"]
+        async with database.execute("SELECT consumed_real FROM limit_counters WHERE session_id = 'scheduler_session' AND counter_kind = 'tool_calls' AND scope_id = ?", (reader_id,)) as cursor:
+            tool_count = (await cursor.fetchone())["consumed_real"]
+    finally:
+        await database.close()
+
+    assert writer_state == "failed"
+    assert 'safe-read-checkpoint' in checkpoint and resumed_checkpoint == checkpoint
+    assert reservation_state == "released" and tool_count == 0
 
 
 @pytest.mark.asyncio

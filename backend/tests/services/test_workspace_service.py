@@ -353,4 +353,4 @@ async def test_restart_recovery_releases_expired_leases_and_removes_unregistered
         await database.close()
 
     assert not orphan.exists()
-    assert recovered["released_at_ms"] is not None and recovered["release_reason"] == "expired_recovery"
+    assert recovered["released_at_ms"] is not None and recovered["release_reason"] == "restart_recovery"

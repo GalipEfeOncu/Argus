@@ -127,3 +127,10 @@ session.
   reduced motion, and never communicate state by motion alone.
 - Sidecar startup, idle shutdown, and transparent restart have explicit compact
   states; they must not freeze navigation or discard a drafted prompt.
+
+When an idle native sidecar stops, the shell remains navigable. The next live
+session transport attempt restarts it and reconnects from the last confirmed
+sequence; the composer draft remains in the mounted shell throughout this
+cycle. Sidecar idleness is permitted only when no active session, pending
+approval or decision, tool/provider work, writer lease, recovery work, or live
+room connection remains.

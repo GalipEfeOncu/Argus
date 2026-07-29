@@ -26,6 +26,27 @@ pub fn run() {
                 }
             });
 
+            // A completed shell remains usable while the sidecar is stopped.
+            // It is restarted by the webview before the next transport attempt.
+            let idle_handle = app.handle().clone();
+            tauri::async_runtime::spawn(async move {
+                let mut idle_since: Option<std::time::Instant> = None;
+                loop {
+                    tokio::time::sleep(std::time::Duration::from_secs(15)).await;
+                    let state = idle_handle.state::<sidecar::SidecarState>();
+                    if !sidecar::is_running(&state) { idle_since = None; continue; }
+                    if sidecar::can_idle_shutdown().await {
+                        let since = idle_since.get_or_insert_with(std::time::Instant::now);
+                        if since.elapsed() >= std::time::Duration::from_secs(60) {
+                            if let Err(error) = sidecar::stop(state).await { eprintln!("[argus] idle stop failed: {error}"); }
+                            idle_since = None;
+                        }
+                    } else {
+                        idle_since = None;
+                    }
+                }
+            });
+
             // ── Open DevTools in debug builds ──────────────────────────
             #[cfg(debug_assertions)]
             {

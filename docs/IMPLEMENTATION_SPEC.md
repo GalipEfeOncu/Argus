@@ -87,8 +87,20 @@ SQLite is the source of truth for local orchestration metadata. Store timestamps
 | `tool_executions` | Tool request, normalized result summary, exit state, duration, and artifact references |
 | `artifacts` | Diffs, exports, file references, and checksums |
 | `provider_profiles` | Non-secret provider metadata and OS credential reference only |
+| `provider_operations` | Safe request fingerprint and terminal outcome state for provider work; never credentials or raw prompts |
 
 Events are never updated or deleted during normal operation. Read models may be rebuilt from them. Session deletion is a deliberate future retention policy, not an implicit cascade.
+
+### Restart recovery and compaction
+
+At startup, release process-local writer leases and reserved capacity, rebuild
+non-setup projections from the ordered event log, restore durable grants,
+counters, decisions, configuration, checkpoints, and workspace records, then
+turn unfinished worker attempts into scheduler-governed orphan recovery. A
+tool or provider operation with a lost result is terminally marked
+`outcome_unknown`; mutating operations are never replayed implicitly. Snapshot
+compaction retains a small checksummed projection history while retaining every
+append-only audit event under the current retention policy.
 
 Configuration rows are immutable versions. Assignment and gate projections may
 be updated transactionally for query performance, but every transition must be

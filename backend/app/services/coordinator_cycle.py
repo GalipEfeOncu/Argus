@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 from dataclasses import dataclass, replace
+from hashlib import sha256
 from typing import Any, ClassVar
 import uuid
 
@@ -29,6 +30,8 @@ from app.schemas.coordinator_actions import (
 )
 from app.services.assignment_scheduler import AssignmentScheduler
 from app.services.session_configuration_service import ConfigurationSnapshot, SessionConfigurationService
+from app.db.database import get_db, transaction
+from app.db.repositories import _now_ms
 
 
 class CoordinatorActionRejected(ValueError):
@@ -221,36 +224,66 @@ class CoordinatorCycle:
                 self._active_streams.pop(session_id, None)
 
     async def _one_structured_output(self, session_id: str, provider: Provider, request: ProviderRequest) -> Any:
-        async for event in provider.stream(request):
-            if session_id in self._superseded_sessions:
-                await provider.cancel(request.request_id)
-                return _SUPERSEDED
-            if isinstance(event, StructuredOutput):
-                return event.value
-            if isinstance(event, Usage):
-                from app.services.budget_counter_service import BudgetCounterService, BudgetExceeded
-                try:
-                    await BudgetCounterService(self._db).record_coordinator_usage(
-                        session_id, input_tokens=event.input_tokens or 0, output_tokens=event.output_tokens or 0,
-                        normalized_cost=event.cost_usd, duration_ms=0,
-                        cost_uncertainty="exact" if event.cost_usd is not None and event.exact else ("estimated" if event.cost_usd is not None else "unavailable"),
-                    )
-                except BudgetExceeded as error:
-                    from app.db.database import transaction
-                    from app.services.limit_resolution_service import LimitResolutionService
-                    async with transaction(self._db):
-                        await LimitResolutionService(self._db).request_latest_in_transaction(
-                            session_id, counter=error.counter, scope_id=error.scope_id,
-                            reason_summary="Coordinator usage reached a configured limit.",
+        operation_id = f"provider_{uuid.uuid4().hex}"
+        # A request fingerprint intentionally excludes messages/prompts and
+        # credentials. It is only an audit correlation for crash recovery.
+        fingerprint = sha256(f"{request.request_id}:{request.model_id}".encode()).hexdigest()
+        # Provider streams intentionally yield to user commands. Use a short
+        # independent SQLite connection for this audit row so it never holds
+        # the command processor's connection transaction open while streaming.
+        audit_db = await get_db()
+        try:
+            async with transaction(audit_db):
+                await audit_db.execute(
+                """INSERT INTO provider_operations (id, session_id, assignment_id, operation_kind, mutation_class,
+                   state, request_fingerprint, started_at_ms) VALUES (?, ?, NULL, 'coordinator', 'read_only', 'running', ?, ?)""",
+                (operation_id, session_id, fingerprint, _now_ms()),
+            )
+        finally:
+            await audit_db.close()
+        outcome = "failed"
+        try:
+            async for event in provider.stream(request):
+                if session_id in self._superseded_sessions:
+                    await provider.cancel(request.request_id)
+                    return _SUPERSEDED
+                if isinstance(event, StructuredOutput):
+                    outcome = "succeeded"
+                    return event.value
+                if isinstance(event, Usage):
+                    from app.services.budget_counter_service import BudgetCounterService, BudgetExceeded
+                    try:
+                        await BudgetCounterService(self._db).record_coordinator_usage(
+                            session_id, input_tokens=event.input_tokens or 0, output_tokens=event.output_tokens or 0,
+                            normalized_cost=event.cost_usd, duration_ms=0,
+                            cost_uncertainty="exact" if event.cost_usd is not None and event.exact else ("estimated" if event.cost_usd is not None else "unavailable"),
                         )
-                    return {"type": "limit_reached"}
-                continue
-            if isinstance(event, (Cancelled, RetryableError, TerminalError)):
-                return {"type": "invalid_provider_result", "reason": getattr(event, "code", "cancelled")}
-            if isinstance(event, Finished):
-                break
-            await asyncio.sleep(0)
-        return {"type": "missing"}
+                    except BudgetExceeded as error:
+                        from app.services.limit_resolution_service import LimitResolutionService
+                        async with transaction(self._db):
+                            await LimitResolutionService(self._db).request_latest_in_transaction(
+                                session_id, counter=error.counter, scope_id=error.scope_id,
+                                reason_summary="Coordinator usage reached a configured limit.",
+                            )
+                        return {"type": "limit_reached"}
+                    continue
+                if isinstance(event, (Cancelled, RetryableError, TerminalError)):
+                    return {"type": "invalid_provider_result", "reason": getattr(event, "code", "cancelled")}
+                if isinstance(event, Finished):
+                    outcome = "succeeded"
+                    break
+                await asyncio.sleep(0)
+            return {"type": "missing"}
+        finally:
+            audit_db = await get_db()
+            try:
+                async with transaction(audit_db):
+                    await audit_db.execute(
+                    "UPDATE provider_operations SET state = ?, completed_at_ms = ? WHERE id = ? AND state = 'running'",
+                    (outcome, _now_ms(), operation_id),
+                )
+            finally:
+                await audit_db.close()
 
     @staticmethod
     def _validate_assignments(snapshot: ConfigurationSnapshot, action: AssignmentsAction) -> None:

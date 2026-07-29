@@ -65,6 +65,21 @@ client's applied-event cursor: ordered replay after the requested cursor
 rebuilds timeline state. A later full snapshot revision must be applied
 atomically with its projection data.
 
+### Restart recovery
+
+On sidecar startup, the runtime rebuilds each non-setup session projection from
+its immutable events, restores durable configuration, grants, counters,
+decisions, leases, and worker checkpoints, then marks unfinished worker work
+as orphaned. A lost response from a mutating tool or provider operation is
+recorded as a failed visible operation with an **unknown outcome**; it is never
+replayed automatically. Recoverable work is left as a durable, queued recovery
+attempt with its last checkpoint; the owned worker dispatcher may resume it
+only through normal scheduler policy, never because a browser reconnected.
+
+Projection snapshots are checksummed, rebuildable caches. Argus retains a
+bounded number per session and never deletes append-only event records as part
+of snapshot compaction.
+
 ### Server event types
 
 | Type | Purpose |

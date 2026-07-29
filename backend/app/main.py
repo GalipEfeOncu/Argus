@@ -5,11 +5,12 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
-from app.api import agent_definitions, contracts, models_router, projects, providers, sessions, skills, websocket as ws_router
+from app.api import agent_definitions, contracts, models_router, projects, providers, runtime, sessions, skills, websocket as ws_router
 from app.db.database import init_db
 from app.db.database import get_db
 from app.services.workspace_service import ProjectWorkspaceService
 from app.services.agent_definition_service import AgentDefinitionService
+from app.services.recovery_service import RecoveryService
 
 
 @asynccontextmanager
@@ -21,6 +22,8 @@ async def lifespan(app: FastAPI):
     try:
         await AgentDefinitionService(db).ensure_builtin_templates()
         await ProjectWorkspaceService(db, managed_root=Path(settings.db_path).expanduser().resolve().parent / "workspaces").recover_after_restart()
+        report = await RecoveryService(db).recover_after_restart()
+        print(f"[Argus] Recovery checked {report.sessions} sessions; orphaned attempts={report.orphaned_attempts}")
     finally:
         await db.close()
     print(f"[Argus] Backend ready on {settings.host}:{settings.port}")
@@ -54,6 +57,7 @@ app.include_router(providers.router, prefix="/providers", tags=["providers"])
 app.include_router(models_router.router, prefix="/models", tags=["models"])
 app.include_router(contracts.router, prefix="/contracts", tags=["contracts"])
 app.include_router(ws_router.router, tags=["websocket"])
+app.include_router(runtime.router, prefix="/runtime", tags=["runtime"])
 
 
 @app.get("/health")

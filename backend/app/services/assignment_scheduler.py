@@ -257,7 +257,9 @@ class AssignmentScheduler:
                     """INSERT INTO assignment_attempts (id, assignment_id, attempt_number, configuration_version,
                        checkpoint_json, usage_json, normalized_outcome_json, state, request_id, started_at_ms, updated_at_ms)
                        SELECT ?, id, COALESCE((SELECT MAX(attempt_number) + 1 FROM assignment_attempts WHERE assignment_id = assignments.id), 1),
-                              configuration_version, '{}', '{}', '{}', 'running', ?, ?, ?
+                              configuration_version, COALESCE((SELECT checkpoint_json FROM assignment_attempts
+                                WHERE assignment_id = assignments.id AND state = 'orphaned'
+                                ORDER BY attempt_number DESC LIMIT 1), '{}'), '{}', '{}', 'running', ?, ?, ?
                        FROM assignments WHERE id = ?""",
                     (attempt_id, f"worker_{attempt_id}", now, now, row["id"]),
                 )
@@ -461,7 +463,9 @@ class AssignmentScheduler:
             cancelled.extend(await self.cancel_assignment(session_id, assignment_id, reason=reason))
         return tuple(dict.fromkeys(cancelled))
 
-    async def recover_orphaned_attempts(self, session_id: str) -> tuple[str, ...]:
+    async def recover_orphaned_attempts(
+        self, session_id: str, *, blocked_assignment_ids: frozenset[str] = frozenset(),
+    ) -> tuple[str, ...]:
         """Turn attempts left running by a sidecar crash into safely retryable work."""
 
         async with transaction(self._db):
@@ -471,20 +475,33 @@ class AssignmentScheduler:
                    WHERE assignment.session_id = ? AND attempt.state = 'running'""", (session_id,)
             ) as cursor:
                 rows = await cursor.fetchall()
+            if not rows:
+                return ()
             recovered: list[str] = []
             snapshot = await SessionConfigurationService(self._db).current(session_id)
             ceiling = snapshot.execution_limits.get("maxAssignmentAttempts")
             for row in rows:
                 now = _now_ms()
-                await self._db.execute("UPDATE assignment_attempts SET state = 'orphaned', completed_at_ms = ?, updated_at_ms = ? WHERE id = ?", (now, now, row["attempt_id"]))
+                blocked = str(row["id"]) in blocked_assignment_ids
+                await self._db.execute("UPDATE assignment_attempts SET state = ?, completed_at_ms = ?, updated_at_ms = ? WHERE id = ?", ("outcome_unknown" if blocked else "orphaned", now, now, row["attempt_id"]))
                 exhausted = ceiling is not None and int(row["attempt_number"]) >= int(ceiling)
-                if exhausted:
+                if blocked:
+                    event = await self._event(session_id, "assignment.failed", "system", {
+                        "assignmentId": row["id"], "failureCode": "mutation_outcome_unknown",
+                        "failureSummary": "A mutating tool outcome was lost during restart; Argus will not replay this assignment.", "recoverable": False,
+                    })
+                    await self._db.execute("UPDATE assignments SET state = 'failed', terminal_event_id = ?, writer_lease_id = NULL, updated_at_ms = ? WHERE id = ?", (event.event_id, now, row["id"]))
+                elif exhausted:
                     event = await self._event(session_id, "assignment.failed", "system", {
                         "assignmentId": row["id"], "failureCode": "worker_orphaned",
                         "failureSummary": "Worker stopped before recording a result and retry budget is exhausted.", "recoverable": False,
                     })
                     await self._db.execute("UPDATE assignments SET state = 'failed', terminal_event_id = ?, writer_lease_id = NULL, updated_at_ms = ? WHERE id = ?", (event.event_id, now, row["id"]))
                 else:
+                    await self._event(session_id, "error.created", "system", {
+                        "errorId": f"recovery_{row['attempt_id']}", "code": "worker_recovery_queued",
+                        "summary": "Worker restart recovery retained its checkpoint and queued a scheduler-governed retry.", "recoverable": True,
+                    })
                     await self._db.execute("UPDATE assignments SET state = 'created', writer_lease_id = NULL, updated_at_ms = ? WHERE id = ?", (now, row["id"]))
                 await self._release_assignment_lease(row, "orphaned_recovery")
                 recovered.append(str(row["attempt_id"]))

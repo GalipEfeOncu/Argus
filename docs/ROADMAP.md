@@ -879,7 +879,7 @@ Completion evidence (2026-07-29):
 
 ## Phase 6 — Recovery, observability, and project completion workflow
 
-### 6.1 Crash and reconnect recovery
+### 6.1 Crash and reconnect recovery (✅ Completed)
 
 Deliverables:
 
@@ -892,6 +892,18 @@ Deliverables:
 - Add graceful sidecar idle shutdown only when there is no running session,
   pending command, approval/decision, tool process, lease, or recovery work;
   restart transparently without losing drafts or cached shell navigation.
+
+Completion evidence (2026-07-29):
+
+- Source: this change
+- Verification: recovery/migration tests, frontend type-check/test/build,
+  backend import/test, Cargo check, contract and documentation validation, and
+  full repository verification (results recorded with this change).
+- Artifacts/benchmarks: migration 18; checksummed bounded event snapshots;
+  restart-recovery service; native 60-second sidecar-idle grace probe.
+- Deferred/unavailable: packaged Windows/macOS/Linux crash, suspend/resume, and
+  native credential-store restart smoke tests require Phase 7 target runners;
+  development-host checks do not certify those targets.
 
 ### 6.2 Diff review and acceptance
 

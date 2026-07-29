@@ -457,7 +457,7 @@ class ProjectWorkspaceService:
             await self._audit(session_id, "workspace.cleaned", {})
 
     async def recover_after_restart(self) -> None:
-        """Release expired locks and remove managed directories left before DB commit.
+        """Release all abandoned locks and remove managed directories left before DB commit.
 
         A persisted workspace is intentionally retained across a sidecar restart;
         only an unregistered managed directory can be an interrupted setup.
@@ -465,10 +465,13 @@ class ProjectWorkspaceService:
 
         now = _now_ms()
         async with transaction(self._db):
-            async with self._db.execute("SELECT DISTINCT project_id FROM writer_leases WHERE released_at_ms IS NULL AND expires_at_ms <= ?", (now,)) as cursor:
+            # A process restart means no worker can still own an in-memory
+            # lease.  Waiting for the old TTL would unnecessarily block safe
+            # recovery and could invite a second writer after a crash.
+            async with self._db.execute("SELECT DISTINCT project_id FROM writer_leases WHERE released_at_ms IS NULL", ()) as cursor:
                 project_ids = [row["project_id"] for row in await cursor.fetchall()]
             for project_id in project_ids:
-                await self._recover_expired_leases(project_id, now)
+                await self._recover_expired_leases(project_id, now, force=True)
             async with self._db.execute("SELECT session_id FROM workspaces WHERE cleaned_at_ms IS NULL") as cursor:
                 active_sessions = {row["session_id"] for row in await cursor.fetchall()}
         if self._managed_root.exists():
@@ -488,11 +491,13 @@ class ProjectWorkspaceService:
             raise WorkspaceError("project not found")
         return Path(row["canonical_path"])
 
-    async def _recover_expired_leases(self, project_id: str, now: int) -> None:
-        async with self._db.execute("SELECT id, session_id FROM writer_leases WHERE project_id = ? AND released_at_ms IS NULL AND expires_at_ms <= ?", (project_id, now)) as cursor:
+    async def _recover_expired_leases(self, project_id: str, now: int, *, force: bool = False) -> None:
+        clause = "" if force else " AND expires_at_ms <= ?"
+        args: tuple[object, ...] = (project_id,) if force else (project_id, now)
+        async with self._db.execute(f"SELECT id, session_id FROM writer_leases WHERE project_id = ? AND released_at_ms IS NULL{clause}", args) as cursor:
             expired = await cursor.fetchall()
         for lease in expired:
-            await self._db.execute("UPDATE writer_leases SET released_at_ms = ?, release_reason = 'expired_recovery' WHERE id = ?", (now, lease["id"]))
+            await self._db.execute("UPDATE writer_leases SET released_at_ms = ?, release_reason = 'restart_recovery' WHERE id = ?", (now, lease["id"]))
             await self._audit(lease["session_id"], "writer_lease.recovered", {"leaseId": lease["id"]})
         if expired:
             await self._db.execute("UPDATE projects SET lock_session_id = NULL, lock_acquired_at_ms = NULL, updated_at_ms = ? WHERE id = ?", (now, project_id))
