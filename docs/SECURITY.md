@@ -75,6 +75,19 @@ The backend, not an agent prompt, enforces agent-pool membership, required-role
 eligibility, workspace bounds, command policy, approval state, budgets,
 timeouts, and cancellation. Prompts must not be treated as a security boundary.
 
+## Local skill packages
+
+Local skill package files are untrusted model context, not executable policy.
+Import accepts only a non-symlink local directory, rejects traversal and all
+symbolic links inside it, validates every manifest reference, and copies the
+validated UTF-8 contents into SQLite with content hashes. The runtime never
+uses the source directory after import, so a later filesystem change cannot
+alter a running session. Packages begin disabled and require an explicit trust
+review enablement. Their declared tools and permissions must be subsets of the
+target session agent's already-snapshotted authority; package instructions,
+including prompt-injection text, cannot grant tools, permissions, or alter
+session policy.
+
 Workspace paths are canonicalized before registration and every tool target is
 resolved relative to the selected session workspace. Parent traversal and
 symbolic-link paths are denied. Shell execution accepts an argument vector, not

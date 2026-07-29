@@ -267,6 +267,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/skills/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Skills */
+        get: operations["list_skills_skills__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/skills/{skill_id}/enable": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Enable Skill */
+        post: operations["enable_skill_skills__skill_id__enable_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/skills/import": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Import Skill */
+        post: operations["import_skill_skills_import_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1738,6 +1789,63 @@ export interface components {
              */
             status: "created" | "preparing" | "running" | "paused" | "waiting_approval" | "waiting_decision" | "completed" | "completed_partial" | "cancelled" | "failed";
         };
+        /** SkillEnableRequest */
+        SkillEnableRequest: {
+            /** Enabled */
+            enabled: boolean;
+        };
+        /** SkillImportRequest */
+        SkillImportRequest: {
+            /** Sourcepath */
+            sourcePath: string;
+        };
+        /** SkillManifest */
+        SkillManifest: {
+            /** Description */
+            description: string;
+            /** Id */
+            id: string;
+            /** Instructions */
+            instructions: string;
+            /** Name */
+            name: string;
+            /** References */
+            references?: string[];
+            /** Requestedpermissions */
+            requestedPermissions?: string[];
+            /** Requestedtools */
+            requestedTools?: string[];
+            /**
+             * Schemaversion
+             * @constant
+             */
+            schemaVersion: 1;
+            /** Version */
+            version: string;
+        };
+        /** SkillPackageResponse */
+        SkillPackageResponse: {
+            /** Contenthash */
+            contentHash: string;
+            /** Createdatms */
+            createdAtMs: number;
+            /** Enabled */
+            enabled: boolean;
+            /** Id */
+            id: string;
+            manifest: components["schemas"]["SkillManifest"];
+            /** Requestedpermissions */
+            requestedPermissions: string[];
+            /** Requestedtools */
+            requestedTools: string[];
+            /** Sourcepath */
+            sourcePath: string;
+            /**
+             * Truststate
+             * @enum {string}
+             */
+            trustState: "review_required" | "enabled";
+        };
         /** TimelinePageResponse */
         TimelinePageResponse: {
             /** Events */
@@ -2442,6 +2550,94 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TimelinePageResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_skills_skills__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SkillPackageResponse"][];
+                };
+            };
+        };
+    };
+    enable_skill_skills__skill_id__enable_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                skill_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SkillEnableRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SkillPackageResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    import_skill_skills_import_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SkillImportRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SkillPackageResponse"];
                 };
             };
             /** @description Validation Error */

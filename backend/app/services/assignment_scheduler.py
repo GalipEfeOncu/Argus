@@ -8,6 +8,7 @@ in-memory tasks are deliberately only execution details.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from hashlib import sha256
 import json
 from typing import Any
 import uuid
@@ -260,6 +261,7 @@ class AssignmentScheduler:
                        FROM assignments WHERE id = ?""",
                     (attempt_id, f"worker_{attempt_id}", now, now, row["id"]),
                 )
+                await self._record_skill_snapshot_metadata(attempt_id, str(row["assignee_session_agent_id"]))
                 if capacity_reservation_id is not None:
                     await budgets.consume_reservation(capacity)
                 await self._event(session_id, "assignment.started", "system", {
@@ -267,6 +269,33 @@ class AssignmentScheduler:
                 })
                 started.append(ScheduledAssignment(str(row["id"]), await self._proposal_id(str(row["id"])), attempt_id, str(row["operation_class"]), lease_id, capacity_reservation_id))
             return tuple(started)
+
+    async def _record_skill_snapshot_metadata(self, attempt_id: str, session_agent_id: str) -> None:
+        """Bind the exact stored skill versions to every executable attempt.
+
+        Content itself remains in the immutable session-agent snapshot; attempt
+        metadata intentionally carries identifiers and hashes only so audit
+        records never duplicate prompts or reference text.
+        """
+        async with self._db.execute("SELECT skill_snapshot_json FROM session_agents WHERE id = ?", (session_agent_id,)) as cursor:
+            row = await cursor.fetchone()
+        snapshots = [] if row is None else json.loads(row["skill_snapshot_json"])
+        metadata = [
+            {"id": str(item.get("id", "unknown")), "version": str(item.get("version", "unknown")),
+             "contentHash": str(item.get("contentHash", "unknown"))}
+            for item in snapshots if isinstance(item, dict)
+        ]
+        value = {
+            "selectedEventIds": [], "selectedArtifactIds": [],
+            "includedSections": ["agent_snapshot", "skill_snapshot"], "truncatedSections": [],
+            "characterCount": 0,
+            "selectionFingerprint": sha256(_safe_json(metadata).encode("utf-8")).hexdigest(),
+            "skillSnapshots": metadata,
+        }
+        await self._db.execute(
+            "UPDATE assignment_attempts SET context_selection_json = ? WHERE id = ?",
+            (_safe_json(value), attempt_id),
+        )
 
     async def checkpoint(self, attempt_id: str, checkpoint: dict[str, Any]) -> None:
         # A checkpoint is the worker boundary after one model iteration. Count

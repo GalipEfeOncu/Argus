@@ -43,6 +43,7 @@ function toSessionCreateRequest(
           providerProfileId: configuration.coordinatorModel.providerId, modelId: configuration.coordinatorModel.modelId,
         },
         permissionProfile: configuration.coordinatorPermissionProfile,
+        skillIds: configuration.enabledSkills,
         ...(configuration.coordinatorPromptOverride.trim() ? { systemPrompt: configuration.coordinatorPromptOverride } : {}),
         outputLanguage: configuration.outputLanguage,
       },
@@ -107,6 +108,10 @@ export const SessionSetup: React.FC = () => {
   const [coordinatorDefinitions, setCoordinatorDefinitions] = useState<Array<{ id: string; name: string; permissionProfile: SessionConfiguration['coordinatorPermissionProfile'] }>>([
     { id: 'builtin.coordinator.v1', name: 'Coordinator', permissionProfile: 'balanced' },
   ]);
+  const [localSkills, setLocalSkills] = useState<Array<{
+    id: string; manifest: { name: string; version: string }; enabled: boolean; trustState: string; requestedTools: string[]; requestedPermissions: string[];
+  }>>([]);
+  const [skillError, setSkillError] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -141,6 +146,16 @@ export const SessionSetup: React.FC = () => {
     return () => { active = false; };
   }, []);
 
+  useEffect(() => {
+    let active = true;
+    const listSkills = api.skills?.list;
+    if (listSkills === undefined) return () => { active = false; };
+    void listSkills().then((skills) => { if (active) setLocalSkills(skills); }).catch(() => {
+      if (active) setSkillError('Local skill packages could not be loaded.');
+    });
+    return () => { active = false; };
+  }, []);
+
   const validation = useMemo(() => validateConfiguration(configuration), [configuration]);
   const canStart = projectPath.trim().length > 0 && goal.trim().length > 0 && validation.length === 0;
   const update = (change: (current: SessionConfiguration) => SessionConfiguration) => setConfiguration((current) => markCustom(change(current)));
@@ -154,6 +169,33 @@ export const SessionSetup: React.FC = () => {
       }
     } catch {
       // The native bridge exposes its error state separately; keep the form usable.
+    }
+  };
+
+  const handleImportSkill = async () => {
+    const importSkill = api.skills?.import;
+    if (importSkill === undefined) return;
+    setSkillError(null);
+    try {
+      const sourcePath = await openDirectoryDialog();
+      if (!sourcePath) return;
+      const imported = await importSkill(sourcePath);
+      setLocalSkills((current) => [imported, ...current.filter((skill) => skill.id !== imported.id)]);
+    } catch {
+      setSkillError('This folder is not a valid local skill package. Check its manifest and files.');
+    }
+  };
+
+  const setSkillEnabled = async (skillId: string, enabled: boolean) => {
+    const setEnabled = api.skills?.setEnabled;
+    if (setEnabled === undefined) return;
+    setSkillError(null);
+    try {
+      const updated = await setEnabled(skillId, enabled);
+      setLocalSkills((current) => current.map((skill) => skill.id === skillId ? updated : skill));
+      if (!enabled) update((current) => ({ ...current, enabledSkills: current.enabledSkills.filter((id) => id !== skillId) }));
+    } catch {
+      setSkillError('The local runtime could not update this skill package.');
     }
   };
 
@@ -271,7 +313,7 @@ export const SessionSetup: React.FC = () => {
             <label className="setup-label" htmlFor="coordinator-definition">Definition version</label><select id="coordinator-definition" className="setup-select" value={configuration.coordinatorDefinitionId} onChange={(event) => { const definition = coordinatorDefinitions.find((item) => item.id === event.target.value); update((current) => ({ ...current, coordinatorDefinitionId: event.target.value, coordinatorPermissionProfile: definition?.permissionProfile ?? current.coordinatorPermissionProfile })); }}>{coordinatorDefinitions.map((definition) => <option key={definition.id} value={definition.id}>{definition.name}</option>)}</select>
             <label className="setup-label" htmlFor="coordinator-model">Model</label><select id="coordinator-model" className="setup-select" value={configuration.coordinatorModel ? 'configured' : 'missing'} onChange={(event) => update((current) => ({ ...current, coordinatorModel: event.target.value === 'missing' ? null : defaultRoleModels.coordinator ?? configuration.coordinatorModel }))}><option value="configured">{configuration.coordinatorModel?.displayName ?? 'Configured model'}</option><option value="missing">No model configured</option></select>
             <label className="setup-label" htmlFor="coordinator-prompt">Prompt override <span className="setup-muted">(optional)</span></label><textarea id="coordinator-prompt" className="setup-textarea setup-textarea--compact" value={configuration.coordinatorPromptOverride} onChange={(event) => update((current) => ({ ...current, coordinatorPromptOverride: event.target.value }))} placeholder="Keep routing and handoffs concise…" />
-            <fieldset className="setup-fieldset"><legend>Enabled skills</legend><label className="choice-row"><input type="checkbox" checked={configuration.enabledSkills.includes('workspace-analysis')} onChange={() => update((current) => ({ ...current, enabledSkills: current.enabledSkills.includes('workspace-analysis') ? [] : ['workspace-analysis'] }))} />Workspace analysis</label></fieldset>
+            <fieldset className="setup-fieldset"><legend>Local skills — trust and capability review</legend><p className="setup-static">Packages stay disabled after import. Their declared tools and permissions cannot expand this session’s policy.</p><button type="button" className="setup-secondary-btn" onClick={() => void handleImportSkill()}>Import local skill folder</button>{localSkills.length === 0 ? <p className="setup-muted">No local skill packages imported.</p> : localSkills.map((skill) => <div className="skill-review" key={skill.id}><strong>{skill.manifest.name} {skill.manifest.version}</strong><span className="setup-muted">{skill.trustState === 'enabled' ? 'Enabled after review' : 'Review required — disabled'}</span><span className="agent-capabilities">Tools: {skill.requestedTools.join(', ') || 'none'} · Permissions: {skill.requestedPermissions.join(', ') || 'none'}</span><label className="choice-row"><input type="checkbox" checked={skill.enabled} onChange={(event) => void setSkillEnabled(skill.id, event.target.checked)} />Enable after review</label><label className="choice-row"><input type="checkbox" disabled={!skill.enabled} checked={configuration.enabledSkills.includes(skill.id)} onChange={() => update((current) => ({ ...current, enabledSkills: current.enabledSkills.includes(skill.id) ? current.enabledSkills.filter((id) => id !== skill.id) : [...current.enabledSkills, skill.id] }))} />Use for this Coordinator session</label></div>)}{skillError !== null && <p className="setup-validation" role="alert">{skillError}</p>}</fieldset>
           </section>
 
           <section className="setup-card" aria-labelledby="setup-team">

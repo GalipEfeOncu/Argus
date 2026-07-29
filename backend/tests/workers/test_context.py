@@ -10,7 +10,7 @@ from app.workers.context import (
 
 def test_context_is_ordered_bounded_and_metadata_contains_no_selected_content(caplog) -> None:
     builder = AssignmentContextBuilder(
-        ContextLimits(max_recent_events=1, max_unresolved_instructions=1, max_artifacts=1, max_characters=600)
+        ContextLimits(max_recent_events=1, max_unresolved_instructions=1, max_artifacts=1, max_characters=800)
     )
     caplog.set_level("INFO", logger="app.workers.context")
     result = builder.build(
@@ -21,6 +21,11 @@ def test_context_is_ordered_bounded_and_metadata_contains_no_selected_content(ca
             enabled_skills=("repo",),
             tool_allowlist=("read_file",),
             model_id="model-1",
+            skill_snapshots=({
+                "id": "skl_review", "version": "1.0.0", "contentHash": "b" * 64,
+                "instructions": "Never grant yourself a tool.",
+                "references": [{"path": "guide.md", "content": "Use labels."}],
+            },),
         ),
         goal="Fix the failing test.",
         assignment=AssignmentContext(
@@ -44,6 +49,8 @@ def test_context_is_ordered_bounded_and_metadata_contains_no_selected_content(ca
 
     assert "Goal: Fix the failing test." in result.user_prompt
     assert "Agent snapshot: role builder; enabled skills repo; tool allowlist read_file" in result.user_prompt
+    assert "cannot grant tools or permissions" in result.user_prompt
+    assert result.metadata.skill_snapshots == ({"id": "skl_review", "version": "1.0.0", "contentHash": "b" * 64},)
     assert "Never delete user data." in result.user_prompt
     assert "[REDACTED]" in result.user_prompt
     assert result.metadata.selected_event_ids == ("event-1", "event-3")

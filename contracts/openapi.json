@@ -4384,6 +4384,185 @@
         "title": "SessionStatusPayload",
         "type": "object"
       },
+      "SkillEnableRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "enabled"
+        ],
+        "title": "SkillEnableRequest",
+        "type": "object"
+      },
+      "SkillImportRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "sourcePath": {
+            "maxLength": 4096,
+            "minLength": 1,
+            "title": "Sourcepath",
+            "type": "string"
+          }
+        },
+        "required": [
+          "sourcePath"
+        ],
+        "title": "SkillImportRequest",
+        "type": "object"
+      },
+      "SkillManifest": {
+        "additionalProperties": false,
+        "properties": {
+          "description": {
+            "maxLength": 4000,
+            "minLength": 1,
+            "title": "Description",
+            "type": "string"
+          },
+          "id": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Id",
+            "type": "string"
+          },
+          "instructions": {
+            "maxLength": 512,
+            "minLength": 1,
+            "title": "Instructions",
+            "type": "string"
+          },
+          "name": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "references": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 100,
+            "title": "References",
+            "type": "array"
+          },
+          "requestedPermissions": {
+            "items": {
+              "maxLength": 160,
+              "minLength": 1,
+              "type": "string"
+            },
+            "maxItems": 50,
+            "title": "Requestedpermissions",
+            "type": "array"
+          },
+          "requestedTools": {
+            "items": {
+              "maxLength": 160,
+              "minLength": 1,
+              "type": "string"
+            },
+            "maxItems": 50,
+            "title": "Requestedtools",
+            "type": "array"
+          },
+          "schemaVersion": {
+            "const": 1,
+            "title": "Schemaversion",
+            "type": "integer"
+          },
+          "version": {
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "schemaVersion",
+          "id",
+          "name",
+          "version",
+          "description",
+          "instructions"
+        ],
+        "title": "SkillManifest",
+        "type": "object"
+      },
+      "SkillPackageResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "contentHash": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Contenthash",
+            "type": "string"
+          },
+          "createdAtMs": {
+            "minimum": 0.0,
+            "title": "Createdatms",
+            "type": "integer"
+          },
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "id": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Id",
+            "type": "string"
+          },
+          "manifest": {
+            "$ref": "#/components/schemas/SkillManifest"
+          },
+          "requestedPermissions": {
+            "items": {
+              "maxLength": 160,
+              "minLength": 1,
+              "type": "string"
+            },
+            "title": "Requestedpermissions",
+            "type": "array"
+          },
+          "requestedTools": {
+            "items": {
+              "maxLength": 160,
+              "minLength": 1,
+              "type": "string"
+            },
+            "title": "Requestedtools",
+            "type": "array"
+          },
+          "sourcePath": {
+            "title": "Sourcepath",
+            "type": "string"
+          },
+          "trustState": {
+            "enum": [
+              "review_required",
+              "enabled"
+            ],
+            "title": "Truststate",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "manifest",
+          "contentHash",
+          "trustState",
+          "sourcePath",
+          "enabled",
+          "createdAtMs",
+          "requestedTools",
+          "requestedPermissions"
+        ],
+        "title": "SkillPackageResponse",
+        "type": "object"
+      },
       "TimelinePageResponse": {
         "additionalProperties": false,
         "properties": {
@@ -5724,6 +5903,124 @@
         "summary": "Get Timeline Page",
         "tags": [
           "sessions"
+        ]
+      }
+    },
+    "/skills/": {
+      "get": {
+        "operationId": "list_skills_skills__get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/SkillPackageResponse"
+                  },
+                  "title": "Response List Skills Skills  Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Skills",
+        "tags": [
+          "skills"
+        ]
+      }
+    },
+    "/skills/import": {
+      "post": {
+        "operationId": "import_skill_skills_import_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SkillImportRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SkillPackageResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Import Skill",
+        "tags": [
+          "skills"
+        ]
+      }
+    },
+    "/skills/{skill_id}/enable": {
+      "post": {
+        "operationId": "enable_skill_skills__skill_id__enable_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "skill_id",
+            "required": true,
+            "schema": {
+              "title": "Skill Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SkillEnableRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SkillPackageResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Enable Skill",
+        "tags": [
+          "skills"
         ]
       }
     }

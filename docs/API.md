@@ -464,6 +464,22 @@ hydrates artifact bodies or the complete event log.
 `GET /sessions/{sessionId}/configuration` returns the latest normalized,
 immutable configuration snapshot after process restart.
 
+### Local skills
+
+`POST /skills/import` accepts `{ "sourcePath": "<absolute local directory>" }`.
+The directory must contain a schema-version-1 `skill.json`; the runtime accepts
+only UTF-8 regular files, rejects parent traversal and every symbolic link, and
+copies validated content into SQLite. `GET /skills/` exposes the manifest,
+content hash, requested tools and permissions, and review state. Imported
+packages start as `review_required` and disabled; `POST /skills/{skillId}/enable`
+with `{ "enabled": true }` records explicit enablement.
+
+An enabled skill may be selected in a session agent's `skillIds` only when its
+declared tools are already in that immutable agent's tool allowlist and its
+requested permissions are already in the agent's capabilities. The server
+snapshots the stored package content, version, and hash into `session_agents`;
+it never re-reads the mutable source directory for an active session.
+
 REST schemas are generated from FastAPI OpenAPI. Clients must not hand-maintain duplicate request/response interfaces.
 
 ### Project registration

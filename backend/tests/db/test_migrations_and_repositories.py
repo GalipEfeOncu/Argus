@@ -15,6 +15,7 @@ REQUIRED_TABLES = {
     "artifacts", "provider_profiles", "command_receipts", "event_snapshots", "schema_migrations",
     "workspaces", "writer_leases", "workspace_audit",
     "participant_instructions",
+    "skill_package_files",
     "assignment_proposals", "assignment_handoffs",
     "limit_reservations", "session_runtime_clocks", "loop_signals", "finding_follow_ups", "limit_resolution_requests",
 }
@@ -44,8 +45,33 @@ async def test_fresh_database_has_every_phase_2_1_table_and_migration_metadata(t
         await database.close()
 
     assert REQUIRED_TABLES <= tables
-    assert versions == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
+    assert versions == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
     assert "idx_events_session_sequence" in event_indexes
+
+
+@pytest.mark.asyncio
+async def test_local_skill_validated_content_is_immutable_but_enablement_remains_mutable(temporary_sqlite_db) -> None:
+    database = await get_db()
+    try:
+        await database.execute(
+            """INSERT INTO skills (id, manifest_json, content_hash, trust_state, source_path, enabled, created_at_ms, updated_at_ms)
+               VALUES ('skill_1', '{}', ?, 'review_required', '/package', 0, 1, 1)""", ("a" * 64,)
+        )
+        await database.execute(
+            "INSERT INTO skill_package_files (skill_id, relative_path, content_hash, content) VALUES ('skill_1', 'SKILL.md', ?, 'safe')", ("b" * 64,)
+        )
+        with pytest.raises(aiosqlite.IntegrityError, match="validated skill fields are immutable"):
+            await database.execute("UPDATE skills SET content_hash = ? WHERE id = 'skill_1'", ("c" * 64,))
+        with pytest.raises(aiosqlite.IntegrityError, match="skill package files are immutable"):
+            await database.execute("UPDATE skill_package_files SET content = 'changed' WHERE skill_id = 'skill_1'")
+        await database.execute("UPDATE skills SET enabled = 1, trust_state = 'enabled' WHERE id = 'skill_1'")
+        await database.commit()
+        async with database.execute("SELECT enabled FROM skills WHERE id = 'skill_1'") as cursor:
+            enabled = (await cursor.fetchone())["enabled"]
+    finally:
+        await database.close()
+
+    assert enabled == 1
 
 
 @pytest.mark.asyncio

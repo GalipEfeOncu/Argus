@@ -27,7 +27,9 @@ from the event log.
 Session creation uses progressive disclosure and provides these sections:
 
 1. **Goal and workspace:** project, goal, workspace isolation, output language.
-2. **Coordinator:** selected versioned definition, model, prompt override, and enabled skills.
+2. **Coordinator:** selected versioned definition, model, prompt override, and
+   local-skill trust/capability review. Imported skills visibly start disabled;
+   the user explicitly enables a reviewed package before assigning it.
 3. **Available team:** versioned agent instances (including custom capability-based roles) the Coordinator is permitted to use.
 4. **Required roles:** zero or more completion gates, each with success evidence
    and `always`, `when_changes`, or `when_capability_used` applicability.

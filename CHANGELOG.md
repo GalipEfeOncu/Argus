@@ -19,6 +19,8 @@ All notable user-visible changes to Argus are recorded here. The project follows
   enforced across reconnects and restarts.
 - Versioned built-in agent templates, immutable custom/override role definitions,
   capability/evidence-based routing, and session-safe definition snapshots.
+- Local skill-package import, trust review, explicit enablement, immutable
+  content snapshots, and tool/permission escalation checks.
 
 No stable Argus version has been published yet. The manifest version `0.1.0` is
 the current development baseline, not a stable release claim.

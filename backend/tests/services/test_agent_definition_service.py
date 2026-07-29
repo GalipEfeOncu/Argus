@@ -18,7 +18,7 @@ def _custom_definition(name: str = "Accessibility specialist") -> dict[str, obje
         "systemPrompt": "Inspect UI changes and return structured accessibility evidence.",
         "modelBinding": {"providerProfileId": "builtin", "modelId": "provider-neutral"},
         "capabilities": ["workspace.read"],
-        "skillIds": ["a11y-review"],
+        "skillIds": [],
         "toolAllowlist": ["read_file", "search_files"],
         "permissionProfile": "balanced",
         "evidenceKinds": ["accessibility_review"],
@@ -67,7 +67,7 @@ def test_definitions_seed_all_builtin_templates_and_custom_snapshots_do_not_drif
     assert session.status_code == 200
     custom_snapshot = next(item for item in snapshot.json()["agentSnapshots"] if item["sourceAgentId"] == "a11y")
     assert custom_snapshot["agentDefinitionId"] == definition_id
-    assert custom_snapshot["skillIds"] == ["a11y-review"]
+    assert custom_snapshot["skillIds"] == []
     assert custom_snapshot["evidenceKinds"] == ["accessibility_review"]
     assert custom_snapshot["outputLanguage"] == "tr"
 

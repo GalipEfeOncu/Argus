@@ -16,7 +16,7 @@ from app.services.coordinator_cycle import CoordinatorCycle
 from app.services.session_configuration_service import SessionConfigurationService
 
 
-async def scheduler_session(database: aiosqlite.Connection) -> dict[str, str]:
+async def scheduler_session(database: aiosqlite.Connection, *, reader_skill_snapshot: list[object] | None = None) -> dict[str, str]:
     await database.execute("INSERT INTO projects (id, canonical_path, display_name, git_metadata_json, created_at_ms, updated_at_ms) VALUES ('project_1', '/test/project', 'Project', '{}', 1, 1)")
     await database.commit()
     await SessionRepository(database).create_legacy_session(
@@ -25,11 +25,14 @@ async def scheduler_session(database: aiosqlite.Connection) -> dict[str, str]:
     await database.execute("INSERT INTO workspaces (session_id, project_id, mode, root_path, revision_checksum, created_at_ms, updated_at_ms) VALUES ('scheduler_session', 'project_1', 'snapshot', '/test/workspace', 'base', 1, 1)")
     await database.commit()
     async with transaction(database):
+        reader = {"id": "reader", "role": "reviewer", "capabilities": ["workspace.read"]}
+        if reader_skill_snapshot is not None:
+            reader["skillSnapshot"] = reader_skill_snapshot
         snapshot = await SessionConfigurationService(database).create_initial(
             session_id="scheduler_session",
             agents=[
                 SessionAgentInput(id="coordinator", role="coordinator"),
-                SessionAgentInput(id="reader", role="reviewer", capabilities=["workspace.read"]),
+                SessionAgentInput.model_validate(reader),
                 SessionAgentInput(id="writer", role="builder", capabilities=["workspace.read", "workspace.write"]),
             ],
             coordinator_id="coordinator",
@@ -136,6 +139,24 @@ async def test_readers_dispatch_in_parallel_and_mutations_are_serialized_by_a_wr
     assert len(readers) == 2 and {item.operation_class for item in readers} == {"read_only"}
     assert len(writers) == 1 and writers[0].assignment_id == first and writers[0].writer_lease_id is not None
     assert len(next_writer) == 1 and next_writer[0].assignment_id == second
+
+
+@pytest.mark.asyncio
+async def test_dispatch_records_immutable_skill_version_hash_in_attempt_context_metadata(temporary_sqlite_db) -> None:
+    database = await get_db()
+    try:
+        agents = await scheduler_session(database, reader_skill_snapshot=[{
+            "id": "skl_review", "version": "1.0.0", "contentHash": "a" * 64, "instructions": "untrusted",
+        }])
+        scheduler = AssignmentScheduler(database)
+        await scheduler.accept_coordinator_proposal("scheduler_session", proposal("skill-context", agents["reader"]))
+        attempt = (await scheduler.dispatch_ready("scheduler_session"))[0]
+        async with database.execute("SELECT context_selection_json FROM assignment_attempts WHERE id = ?", (attempt.attempt_id,)) as cursor:
+            metadata = (await cursor.fetchone())["context_selection_json"]
+    finally:
+        await database.close()
+
+    assert '"skillSnapshots":[{"contentHash":"' + "a" * 64 + '","id":"skl_review","version":"1.0.0"}]' in metadata
 
 
 @pytest.mark.asyncio

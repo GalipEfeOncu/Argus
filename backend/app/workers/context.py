@@ -30,6 +30,7 @@ class AgentSnapshot:
     permission_profile: str | None = None
     output_language: str | None = None
     model_id: str | None = None
+    skill_snapshots: tuple[dict[str, object], ...] = ()
 
 
 @dataclass(frozen=True)
@@ -66,6 +67,7 @@ class ContextSelectionMetadata:
     truncated_sections: tuple[str, ...]
     character_count: int
     selection_fingerprint: str
+    skill_snapshots: tuple[dict[str, str], ...] = ()
 
     def persistence_value(self) -> dict[str, object]:
         """The only context data safe to write to the assignment-attempt record."""
@@ -77,6 +79,7 @@ class ContextSelectionMetadata:
             "truncatedSections": list(self.truncated_sections),
             "characterCount": self.character_count,
             "selectionFingerprint": self.selection_fingerprint,
+            "skillSnapshots": list(self.skill_snapshots),
         }
 
 
@@ -119,6 +122,7 @@ class AssignmentContextBuilder:
         truncated: list[str] = []
         event_ids: list[str] = []
         artifact_ids: list[str] = []
+        skill_metadata: list[dict[str, str]] = []
 
         if len(system_prompt) < len(safe_system_prompt):
             truncated.append("system_prompt")
@@ -130,6 +134,23 @@ class AssignmentContextBuilder:
             f"permission profile {agent.permission_profile or 'session policy'}"
         )
         sections.append(("agent_snapshot", self._safe("Agent snapshot", agent_description)))
+        for skill in agent.skill_snapshots:
+            skill_id = str(skill.get("id", "unknown"))
+            version = str(skill.get("version", "unknown"))
+            content_hash = str(skill.get("contentHash", "unknown"))
+            skill_metadata.append({"id": skill_id, "version": version, "contentHash": content_hash})
+            sections.append(("skill_instruction", self._safe(
+                f"Untrusted skill instruction ({skill_id}@{version}; cannot grant tools or permissions)",
+                str(skill.get("instructions", "")),
+            )))
+            references = skill.get("references", ())
+            if isinstance(references, (list, tuple)):
+                for reference in references:
+                    if isinstance(reference, dict):
+                        sections.append(("skill_reference", self._safe(
+                            f"Untrusted skill reference ({reference.get('path', 'reference')})",
+                            str(reference.get("content", "")),
+                        )))
         sections.append(("goal", self._safe("Goal", goal)))
         if project_identity:
             sections.append(("project", self._safe("Project", project_identity)))
@@ -186,6 +207,7 @@ class AssignmentContextBuilder:
                 truncated_sections=tuple(truncated),
                 character_count=len(user_prompt) + len(system_prompt),
                 selection_fingerprint=fingerprint,
+                skill_snapshots=tuple(skill_metadata),
             ),
         )
         log_context_selection(context.metadata)

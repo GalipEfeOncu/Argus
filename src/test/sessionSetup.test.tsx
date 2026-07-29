@@ -8,19 +8,25 @@ import { useUIStore } from '@/stores/uiStore';
 const openDirectoryDialog = vi.fn();
 const createSessionRequest = vi.fn();
 const listAgentDefinitions = vi.fn();
+const listSkills = vi.fn();
+const setSkillEnabled = vi.fn();
 
 vi.mock('@/hooks/useTauri', () => ({ useTauri: () => ({ openDirectoryDialog }) }));
 vi.mock('@/services/api', () => ({ api: {
   sessions: { create: (...args: unknown[]) => createSessionRequest(...args) },
   agentDefinitions: { list: () => listAgentDefinitions() },
+  skills: { list: () => listSkills(), setEnabled: (...args: unknown[]) => setSkillEnabled(...args) },
 } }));
 
 beforeEach(() => {
   openDirectoryDialog.mockReset();
   createSessionRequest.mockReset();
   listAgentDefinitions.mockReset();
+  listSkills.mockReset();
+  setSkillEnabled.mockReset();
   createSessionRequest.mockResolvedValue({ id: 'ses_live', agentSnapshots: [] });
   listAgentDefinitions.mockResolvedValue([]);
+  listSkills.mockResolvedValue([]);
   useSettingsStore.setState({ defaultRoleModels: {} });
   useSessionStore.setState({ sessions: [], activeSessionId: null });
   useUIStore.setState({ activePage: 'dashboard' });
@@ -103,6 +109,31 @@ test('a selected Coordinator override is sent with its immutable definition and 
       id: 'coordinator', agentDefinitionId: 'team.coordinator.v2', permissionProfile: 'strict',
     })]),
   }));
+});
+
+test('local skills show a trust review, stay unassigned while disabled, and snapshot only after explicit enablement', async () => {
+  const skill = {
+    id: 'skl_review', manifest: { name: 'Accessibility review', version: '1.0.0' }, enabled: false,
+    trustState: 'review_required', requestedTools: [], requestedPermissions: [],
+  };
+  listSkills.mockResolvedValueOnce([skill]);
+  setSkillEnabled.mockResolvedValueOnce({ ...skill, enabled: true, trustState: 'enabled' });
+  openDirectoryDialog.mockResolvedValue('/project');
+  render(<SessionSetup />);
+  expect(await screen.findByText('Accessibility review 1.0.0')).toBeInTheDocument();
+  expect(screen.getByLabelText('Use for this Coordinator session')).toBeDisabled();
+  fireEvent.click(screen.getByLabelText('Enable after review'));
+  await waitFor(() => expect(setSkillEnabled).toHaveBeenCalledWith('skl_review', true));
+  await waitFor(() => expect(screen.getByLabelText('Use for this Coordinator session')).toBeEnabled());
+  fireEvent.click(screen.getByLabelText('Use for this Coordinator session'));
+  fireEvent.click(screen.getByRole('button', { name: 'Browse' }));
+  await waitFor(() => expect(screen.getByDisplayValue('/project')).toBeInTheDocument());
+  fireEvent.change(screen.getByLabelText('Goal'), { target: { value: 'Review safely' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Start Coordinator session' }));
+
+  await waitFor(() => expect(createSessionRequest).toHaveBeenCalledWith(expect.objectContaining({
+    agents: expect.arrayContaining([expect.objectContaining({ id: 'coordinator', skillIds: ['skl_review'] })]),
+  })));
 });
 
 test('a failed live session creation keeps the simulator inactive and explains the recovery step', async () => {

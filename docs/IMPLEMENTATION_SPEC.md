@@ -189,7 +189,15 @@ Each imported local skill directory contains `skill.json` and instruction files.
 }
 ```
 
-Import validates the schema, resolves every path inside the package directory, hashes content, displays requested capabilities, and leaves the skill disabled until the user enables it. Marketplace/distribution support is not part of the MVP.
+Import validates the schema, resolves every path inside the package directory,
+rejects traversal and symbolic links, hashes every copied UTF-8 file, displays
+requested capabilities, and leaves the skill disabled until the user enables
+it. The runtime uses only its immutable SQLite copy after validation. A skill
+may be attached to a session agent only if its requested tools and permissions
+are already subsets of that agent's immutable allowlist and capabilities; skill
+text cannot grant authority. Session-agent and assignment-context metadata
+record the copied skill ID, version, and content hash. Marketplace/distribution
+support is not part of the MVP.
 
 ## 6. Workspace and permission matrix
 

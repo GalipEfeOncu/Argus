@@ -66,6 +66,7 @@ _BUILTIN_EVIDENCE = {
     "reviewer": "approved_review", "tester": "passing_test_run",
 }
 _RESERVED_EVIDENCE_KINDS = frozenset(_BUILTIN_EVIDENCE.values())
+_MAX_SESSION_SKILL_SNAPSHOT_BYTES = 4_000_000
 
 
 @dataclass(frozen=True)
@@ -147,6 +148,7 @@ class AgentDefinitionService:
 
         await self.ensure_builtin_templates()
         resolved: list[SessionAgentInput] = []
+        total_skill_snapshot_bytes = 0
         for supplied in inputs:
             definition_id = supplied.agent_definition_id or f"builtin.{supplied.role}.v1"
             stored = await self.get(definition_id)
@@ -155,7 +157,7 @@ class AgentDefinitionService:
             value = stored.value
             if supplied.role != value.get("role"):
                 raise ConfigurationError("agent_role_mismatch", "The supplied role does not match its definition.")
-            for field, label in (("capabilities", "capabilities"), ("skill_ids", "skill ids"), ("tool_allowlist", "tool allowlist")):
+            for field, label in (("capabilities", "capabilities"), ("tool_allowlist", "tool allowlist")):
                 if field in supplied.model_fields_set and not set(getattr(supplied, field)).issubset(set(value[_camel(field)])):
                     raise ConfigurationError("agent_override_escalation", f"A session override cannot expand {label}.")
             if "permission_profile" in supplied.model_fields_set and _PROFILE_RANK[supplied.permission_profile] > _PROFILE_RANK[str(value["permissionProfile"])]:
@@ -169,14 +171,29 @@ class AgentDefinitionService:
                 "systemPrompt": supplied.system_prompt if "system_prompt" in supplied.model_fields_set else value["systemPrompt"],
                 "modelBinding": (supplied.model_binding.model_dump(by_alias=True, mode="json") if supplied.model_binding is not None else _legacy_model_binding(supplied.model_snapshot)) if ("model_binding" in supplied.model_fields_set or supplied.model_snapshot) else value["modelBinding"],
                 "capabilities": supplied.capabilities if "capabilities" in supplied.model_fields_set else value["capabilities"],
+                # Explicit session skill selection is allowed only after the
+                # stored package proves it fits this agent below; unlike a
+                # tool/capability override it cannot itself grant authority.
                 "skillIds": supplied.skill_ids if "skill_ids" in supplied.model_fields_set else value["skillIds"],
                 "toolAllowlist": supplied.tool_allowlist if "tool_allowlist" in supplied.model_fields_set else value["toolAllowlist"],
                 "permissionProfile": supplied.permission_profile if "permission_profile" in supplied.model_fields_set else value["permissionProfile"],
                 "evidenceSchema": value.get("evidenceSchema"), "evidenceKinds": value["evidenceKinds"],
                 "outputLanguage": supplied.output_language if "output_language" in supplied.model_fields_set else value["outputLanguage"],
-                "modelSnapshot": supplied.model_snapshot, "skillSnapshot": supplied.skill_snapshot,
+                "modelSnapshot": supplied.model_snapshot,
             }
-            resolved.append(SessionAgentInput.model_validate(assembled))
+            agent = SessionAgentInput.model_validate(assembled)
+            # Caller-provided skill text is never trusted. Resolve the stored
+            # immutable copy and enforce its declarations against this exact
+            # agent snapshot before it can enter a session.
+            from app.services.skill_package_service import SkillPackageService
+            snapshots = await SkillPackageService(self._db).snapshots_for_agent(
+                agent.skill_ids, tool_allowlist=agent.tool_allowlist, capabilities=agent.capabilities,
+            )
+            snapshot_size = len(_safe_json(snapshots).encode("utf-8"))
+            total_skill_snapshot_bytes += snapshot_size
+            if total_skill_snapshot_bytes > _MAX_SESSION_SKILL_SNAPSHOT_BYTES:
+                raise ConfigurationError("skill_snapshot_too_large", "Enabled skill snapshots exceed the session context size limit.")
+            resolved.append(agent.model_copy(update={"skill_snapshot": snapshots}))
         return resolved
 
     @staticmethod

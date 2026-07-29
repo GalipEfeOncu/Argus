@@ -8,6 +8,7 @@ type SessionCreateResponse = operations['create_session_sessions__post']['respon
 type SessionConfigurationResponse = operations['get_session_configuration_sessions__session_id__configuration_get']['responses'][200]['content']['application/json'];
 type AgentDefinition = components['schemas']['AgentDefinitionResponse'];
 type AgentDefinitionCreate = components['schemas']['AgentDefinitionCreate'];
+type SkillPackage = components['schemas']['SkillPackageResponse'];
 
 async function request<T>(method: RequestMethod, path: string, body?: unknown): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
@@ -40,6 +41,12 @@ export const api = {
   agentDefinitions: {
     list: () => request<AgentDefinition[]>('GET', '/agent-definitions/'),
     create: (definition: AgentDefinitionCreate) => request<AgentDefinition>('POST', '/agent-definitions/', definition),
+  },
+
+  skills: {
+    list: () => request<SkillPackage[]>('GET', '/skills/'),
+    import: (sourcePath: string) => request<SkillPackage>('POST', '/skills/import', { sourcePath }),
+    setEnabled: (id: string, enabled: boolean) => request<SkillPackage>('POST', `/skills/${id}/enable`, { enabled }),
   },
 
   // ── Providers ─────────────────────────────────────────────

@@ -818,7 +818,7 @@ Completion evidence (2026-07-29):
 - Deferred/unavailable: packaged release-shell and platform probes remain
   Phase 7 work; no new release-risk regression introduced.
 
-### 5.2 Local skill packages
+### 5.2 Local skill packages (✅ Completed)
 
 Deliverables:
 
@@ -828,6 +828,18 @@ Deliverables:
 - Prevent traversal, symlink escape, mutable post-validation content, prompt
   injection from gaining tools, and session-policy escalation.
 - Snapshot enabled skill content/version into assignment context metadata.
+
+Completion evidence (2026-07-29):
+
+- Source: this change
+- Verification: `.agents/skills/argus-development/scripts/verify.sh all`
+  (documentation checks, generated contracts, version/type checks, 49 frontend
+  tests/build, 244 backend tests, backend import, and Cargo check passed).
+- Artifacts/benchmarks: migration 16; immutable local package-file store;
+  validated skill REST API and trust review UI; descriptor-scoped path handling;
+  session-agent content snapshots and assignment attempt ID/version/hash metadata.
+- Deferred/unavailable: packaged release-shell and platform probes remain
+  Phase 7 work; no new release-risk regression introduced.
 
 ### 5.3 Native providers and credentials
 

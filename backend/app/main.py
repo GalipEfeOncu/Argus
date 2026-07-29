@@ -5,7 +5,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
-from app.api import agent_definitions, contracts, models_router, projects, providers, sessions, websocket as ws_router
+from app.api import agent_definitions, contracts, models_router, projects, providers, sessions, skills, websocket as ws_router
 from app.db.database import init_db
 from app.db.database import get_db
 from app.services.workspace_service import ProjectWorkspaceService
@@ -48,6 +48,7 @@ app.add_middleware(
 # Routers
 app.include_router(sessions.router, prefix="/sessions", tags=["sessions"])
 app.include_router(agent_definitions.router, prefix="/agent-definitions", tags=["agent-definitions"])
+app.include_router(skills.router, prefix="/skills", tags=["skills"])
 app.include_router(projects.router, prefix="/projects", tags=["projects"])
 app.include_router(providers.router, prefix="/providers", tags=["providers"])
 app.include_router(models_router.router, prefix="/models", tags=["models"])
