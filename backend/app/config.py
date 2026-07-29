@@ -8,6 +8,7 @@ class Settings(BaseSettings):
     debug: bool = True
     db_path: str = str(Path.home() / ".argus" / "argus.db")
     state_db_path: str = str(Path.home() / ".argus" / "argus_state.db")
+    native_bridge_token: str = ""
 
     class Config:
         env_prefix = "ARGUS_"

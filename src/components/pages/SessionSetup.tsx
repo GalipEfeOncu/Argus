@@ -5,6 +5,7 @@ import { useAgentStore } from '@/stores/agentStore';
 import { useUIStore } from '@/stores/uiStore';
 import { useTauri } from '@/hooks/useTauri';
 import { api } from '@/services/api';
+import { tauriCommands } from '@/services/tauri';
 import {
   applyPreset, authoritySummary, createConfiguration, limitDefinitions, markCustom,
   roleEvidence, validateConfiguration,
@@ -95,7 +96,7 @@ function liveAgentInfos(
 }
 
 export const SessionSetup: React.FC = () => {
-  const { defaultRoleModels } = useSettingsStore();
+  const { defaultRoleModels, manualProviderModels } = useSettingsStore();
   const { createSession } = useSessionStore();
   const { initAgents } = useAgentStore();
   const { setActivePage } = useUIStore();
@@ -112,6 +113,20 @@ export const SessionSetup: React.FC = () => {
     id: string; manifest: { name: string; version: string }; enabled: boolean; trustState: string; requestedTools: string[]; requestedPermissions: string[];
   }>>([]);
   const [skillError, setSkillError] = useState<string | null>(null);
+  const [providerModels, setProviderModels] = useState<ModelRef[]>([]);
+
+  useEffect(() => {
+    let active = true;
+    const providerApi = api.providers;
+    if (providerApi === undefined) return () => { active = false; };
+    void providerApi.list().then(async (profiles) => {
+      await Promise.all(profiles.filter((profile) => profile.credentialConfigured).map((profile) => tauriCommands.refreshProviderCredential(profile.id).catch(() => undefined)));
+      const listed = await Promise.all(profiles.map(async (profile) => ({ profile, response: await providerApi.listModels(profile.id) })));
+      if (!active) return;
+      setProviderModels([...listed.flatMap(({ profile, response }) => response.models.map((model) => ({ providerId: profile.id, modelId: model.id, displayName: `${profile.displayName} · ${model.displayName}${model.supportsStructuredOutput === false ? ' · structured output unavailable' : ''}` }))), ...manualProviderModels]);
+    }).catch(() => { if (active) setProviderModels([]); });
+    return () => { active = false; };
+  }, [manualProviderModels]);
 
   useEffect(() => {
     let active = true;
@@ -265,6 +280,9 @@ export const SessionSetup: React.FC = () => {
     const roleConfigs = [{ instanceId: 'coordinator', role: 'coordinator' as const, enabled: true, modelRef: configuration.coordinatorModel!, customSystemPrompt: configuration.coordinatorPromptOverride || undefined },
       ...configuration.availableAgents.filter((agent) => configuration.availableAgentIds.includes(agent.id)).map((agent) => ({ instanceId: agent.id, role: agent.role, enabled: true, modelRef: agent.modelRef!, }))];
     try {
+      const configuredProfileIds = new Set(providerModels.map((model) => model.providerId));
+      const profileIds = new Set([configuration.coordinatorModel, ...configuration.availableAgents.map((agent) => agent.modelRef)].flatMap((model) => model !== null && configuredProfileIds.has(model.providerId) ? [model.providerId] : []));
+      await Promise.all([...profileIds].map((profileId) => tauriCommands.refreshProviderCredential(profileId)));
       const created = await api.sessions.create(toSessionCreateRequest(projectPath, goal.trim(), configuration));
       // The local store only retains render metadata.  The canonical snapshot
       // and every timeline entry arrive through the live transport.
@@ -311,7 +329,7 @@ export const SessionSetup: React.FC = () => {
             <h2 id="setup-coordinator" className="setup-card-label">2 — Coordinator</h2>
             <p className="setup-static">Coordinator is mandatory and receives messages without an @mention.</p>
             <label className="setup-label" htmlFor="coordinator-definition">Definition version</label><select id="coordinator-definition" className="setup-select" value={configuration.coordinatorDefinitionId} onChange={(event) => { const definition = coordinatorDefinitions.find((item) => item.id === event.target.value); update((current) => ({ ...current, coordinatorDefinitionId: event.target.value, coordinatorPermissionProfile: definition?.permissionProfile ?? current.coordinatorPermissionProfile })); }}>{coordinatorDefinitions.map((definition) => <option key={definition.id} value={definition.id}>{definition.name}</option>)}</select>
-            <label className="setup-label" htmlFor="coordinator-model">Model</label><select id="coordinator-model" className="setup-select" value={configuration.coordinatorModel ? 'configured' : 'missing'} onChange={(event) => update((current) => ({ ...current, coordinatorModel: event.target.value === 'missing' ? null : defaultRoleModels.coordinator ?? configuration.coordinatorModel }))}><option value="configured">{configuration.coordinatorModel?.displayName ?? 'Configured model'}</option><option value="missing">No model configured</option></select>
+            <label className="setup-label" htmlFor="coordinator-model">Model</label><select id="coordinator-model" className="setup-select" value={configuration.coordinatorModel ? `${configuration.coordinatorModel.providerId}:${configuration.coordinatorModel.modelId}` : 'missing'} onChange={(event) => { const selected = providerModels.find((model) => `${model.providerId}:${model.modelId}` === event.target.value); update((current) => ({ ...current, coordinatorModel: event.target.value === 'missing' ? null : selected ?? defaultRoleModels.coordinator ?? current.coordinatorModel })); }}><option value="missing">No model configured</option>{configuration.coordinatorModel && !providerModels.some((model) => model.providerId === configuration.coordinatorModel?.providerId && model.modelId === configuration.coordinatorModel.modelId) && <option value={`${configuration.coordinatorModel.providerId}:${configuration.coordinatorModel.modelId}`}>{configuration.coordinatorModel.displayName}</option>}{providerModels.map((model) => <option key={`${model.providerId}:${model.modelId}`} value={`${model.providerId}:${model.modelId}`}>{model.displayName}</option>)}</select>
             <label className="setup-label" htmlFor="coordinator-prompt">Prompt override <span className="setup-muted">(optional)</span></label><textarea id="coordinator-prompt" className="setup-textarea setup-textarea--compact" value={configuration.coordinatorPromptOverride} onChange={(event) => update((current) => ({ ...current, coordinatorPromptOverride: event.target.value }))} placeholder="Keep routing and handoffs concise…" />
             <fieldset className="setup-fieldset"><legend>Local skills — trust and capability review</legend><p className="setup-static">Packages stay disabled after import. Their declared tools and permissions cannot expand this session’s policy.</p><button type="button" className="setup-secondary-btn" onClick={() => void handleImportSkill()}>Import local skill folder</button>{localSkills.length === 0 ? <p className="setup-muted">No local skill packages imported.</p> : localSkills.map((skill) => <div className="skill-review" key={skill.id}><strong>{skill.manifest.name} {skill.manifest.version}</strong><span className="setup-muted">{skill.trustState === 'enabled' ? 'Enabled after review' : 'Review required — disabled'}</span><span className="agent-capabilities">Tools: {skill.requestedTools.join(', ') || 'none'} · Permissions: {skill.requestedPermissions.join(', ') || 'none'}</span><label className="choice-row"><input type="checkbox" checked={skill.enabled} onChange={(event) => void setSkillEnabled(skill.id, event.target.checked)} />Enable after review</label><label className="choice-row"><input type="checkbox" disabled={!skill.enabled} checked={configuration.enabledSkills.includes(skill.id)} onChange={() => update((current) => ({ ...current, enabledSkills: current.enabledSkills.includes(skill.id) ? current.enabledSkills.filter((id) => id !== skill.id) : [...current.enabledSkills, skill.id] }))} />Use for this Coordinator session</label></div>)}{skillError !== null && <p className="setup-validation" role="alert">{skillError}</p>}</fieldset>
           </section>

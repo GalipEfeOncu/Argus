@@ -2712,6 +2712,22 @@
         "title": "LimitWarningEvent",
         "type": "object"
       },
+      "ManualModelRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "modelId": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Modelid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "modelId"
+        ],
+        "title": "ManualModelRequest",
+        "type": "object"
+      },
       "MessageCompletedEvent": {
         "additionalProperties": false,
         "properties": {
@@ -3023,33 +3039,69 @@
         "title": "MessageDeltaPayload",
         "type": "object"
       },
-      "ModelsListRequest": {
+      "ModelCapability": {
+        "additionalProperties": false,
         "properties": {
-          "api_key": {
-            "title": "Api Key",
-            "type": "string"
-          },
-          "base_url": {
+          "contextWindow": {
             "anyOf": [
               {
-                "type": "string"
+                "minimum": 1.0,
+                "type": "integer"
               },
               {
                 "type": "null"
               }
             ],
-            "title": "Base Url"
+            "title": "Contextwindow"
           },
-          "type": {
-            "title": "Type",
+          "displayName": {
+            "title": "Displayname",
             "type": "string"
+          },
+          "id": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Id",
+            "type": "string"
+          },
+          "source": {
+            "enum": [
+              "discovered",
+              "catalog",
+              "manual"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
+          "supportsStructuredOutput": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Supportsstructuredoutput"
+          },
+          "supportsTools": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Supportstools"
           }
         },
         "required": [
-          "type",
-          "api_key"
+          "id",
+          "displayName",
+          "source"
         ],
-        "title": "ModelsListRequest",
+        "title": "ModelCapability",
         "type": "object"
       },
       "ParticipantStatusChangedEvent": {
@@ -3246,51 +3298,23 @@
         "title": "ProjectResponse",
         "type": "object"
       },
-      "ProviderTestRequest": {
+      "ProviderModelListResponse": {
+        "additionalProperties": false,
         "properties": {
-          "api_key": {
-            "title": "Api Key",
+          "discoveryStatus": {
+            "enum": [
+              "available",
+              "credential_required",
+              "unavailable"
+            ],
+            "title": "Discoverystatus",
             "type": "string"
           },
-          "base_url": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Base Url"
-          },
-          "model_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Model Id"
-          },
-          "type": {
-            "title": "Type",
-            "type": "string"
-          }
-        },
-        "required": [
-          "type",
-          "api_key"
-        ],
-        "title": "ProviderTestRequest",
-        "type": "object"
-      },
-      "ProviderTestResponse": {
-        "properties": {
           "error": {
             "anyOf": [
               {
+                "maxLength": 4000,
+                "minLength": 1,
                 "type": "string"
               },
               {
@@ -3299,26 +3323,131 @@
             ],
             "title": "Error"
           },
-          "latency_ms": {
+          "models": {
+            "items": {
+              "$ref": "#/components/schemas/ModelCapability"
+            },
+            "title": "Models",
+            "type": "array"
+          }
+        },
+        "required": [
+          "models",
+          "discoveryStatus"
+        ],
+        "title": "ProviderModelListResponse",
+        "type": "object"
+      },
+      "ProviderProfileCreate": {
+        "additionalProperties": false,
+        "properties": {
+          "credentialReference": {
             "anyOf": [
               {
-                "type": "integer"
+                "maxLength": 256,
+                "minLength": 8,
+                "type": "string"
               },
               {
                 "type": "null"
               }
             ],
-            "title": "Latency Ms"
+            "title": "Credentialreference"
           },
-          "valid": {
-            "title": "Valid",
-            "type": "boolean"
+          "displayName": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Displayname",
+            "type": "string"
+          },
+          "endpoint": {
+            "anyOf": [
+              {
+                "maxLength": 2000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Endpoint"
+          },
+          "providerKind": {
+            "enum": [
+              "openai",
+              "anthropic",
+              "google",
+              "openai_compat"
+            ],
+            "title": "Providerkind",
+            "type": "string"
           }
         },
         "required": [
-          "valid"
+          "providerKind",
+          "displayName"
         ],
-        "title": "ProviderTestResponse",
+        "title": "ProviderProfileCreate",
+        "type": "object"
+      },
+      "ProviderProfileResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "createdAtMs": {
+            "minimum": 0.0,
+            "title": "Createdatms",
+            "type": "integer"
+          },
+          "credentialConfigured": {
+            "title": "Credentialconfigured",
+            "type": "boolean"
+          },
+          "displayName": {
+            "title": "Displayname",
+            "type": "string"
+          },
+          "endpoint": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Endpoint"
+          },
+          "id": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Id",
+            "type": "string"
+          },
+          "providerKind": {
+            "enum": [
+              "openai",
+              "anthropic",
+              "google",
+              "openai_compat"
+            ],
+            "title": "Providerkind",
+            "type": "string"
+          },
+          "updatedAtMs": {
+            "minimum": 0.0,
+            "title": "Updatedatms",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "providerKind",
+          "displayName",
+          "credentialConfigured",
+          "createdAtMs",
+          "updatedAtMs"
+        ],
+        "title": "ProviderProfileResponse",
         "type": "object"
       },
       "RequiredRoleRule": {
@@ -3687,6 +3816,16 @@
             "minLength": 1,
             "title": "Id",
             "type": "string"
+          },
+          "modelBinding": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AgentModelBinding"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "name": {
             "anyOf": [
@@ -5509,25 +5648,49 @@
         ]
       }
     },
-    "/providers/models": {
+    "/providers/": {
+      "get": {
+        "operationId": "list_profiles_providers__get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ProviderProfileResponse"
+                  },
+                  "title": "Response List Profiles Providers  Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Profiles",
+        "tags": [
+          "providers"
+        ]
+      },
       "post": {
-        "description": "Fetch available models from a provider.\nFor OpenAI-compat, calls /models endpoint.\nFor Anthropic/Google, returns known model list.",
-        "operationId": "list_models_providers_models_post",
+        "operationId": "create_profile_providers__post",
         "requestBody": {
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/ModelsListRequest"
+                "$ref": "#/components/schemas/ProviderProfileCreate"
               }
             }
           },
           "required": true
         },
         "responses": {
-          "200": {
+          "201": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/ProviderProfileResponse"
+                }
               }
             },
             "description": "Successful Response"
@@ -5543,31 +5706,84 @@
             "description": "Validation Error"
           }
         },
-        "summary": "List Models",
+        "summary": "Create Profile",
         "tags": [
           "providers"
         ]
       }
     },
-    "/providers/test": {
+    "/providers/{profile_id}": {
+      "delete": {
+        "operationId": "delete_profile_providers__profile_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "profile_id",
+            "required": true,
+            "schema": {
+              "title": "Profile Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Profile",
+        "tags": [
+          "providers"
+        ]
+      }
+    },
+    "/providers/{profile_id}/models": {
       "post": {
-        "operationId": "test_provider_endpoint_providers_test_post",
+        "operationId": "discover_models_providers__profile_id__models_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "profile_id",
+            "required": true,
+            "schema": {
+              "title": "Profile Id",
+              "type": "string"
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/ProviderTestRequest"
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/ManualModelRequest"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Manual"
               }
             }
-          },
-          "required": true
+          }
         },
         "responses": {
           "200": {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ProviderTestResponse"
+                  "$ref": "#/components/schemas/ProviderModelListResponse"
                 }
               }
             },
@@ -5584,7 +5800,7 @@
             "description": "Validation Error"
           }
         },
-        "summary": "Test Provider Endpoint",
+        "summary": "Discover Models",
         "tags": [
           "providers"
         ]

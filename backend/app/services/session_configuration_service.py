@@ -198,6 +198,7 @@ class SessionConfigurationService:
              "capabilities": agent.capabilities, "evidenceSchema": agent.evidence_schema,
              "agentDefinitionId": agent.agent_definition_id, "definitionVersion": _definition_version(agent),
              "name": agent.name, "skillIds": agent.skill_ids, "toolAllowlist": agent.tool_allowlist,
+             "modelBinding": _model_dump(agent.model_binding) if agent.model_binding is not None else None,
              "permissionProfile": agent.permission_profile, "evidenceKinds": _evidence_kinds(agent),
              "outputLanguage": agent.output_language}
             for agent in agents
@@ -390,6 +391,7 @@ def _agent_snapshot_wire(snapshot_id: str, role: str, raw: dict[str, Any]) -> di
         "capabilities": agent.capabilities, "evidenceSchema": agent.evidence_schema,
         "agentDefinitionId": agent.agent_definition_id, "definitionVersion": _definition_version(agent),
         "name": agent.name, "skillIds": agent.skill_ids, "toolAllowlist": agent.tool_allowlist,
+        "modelBinding": _model_dump(agent.model_binding) if agent.model_binding is not None else None,
         "permissionProfile": agent.permission_profile, "evidenceKinds": _evidence_kinds(agent),
         "outputLanguage": agent.output_language,
     }

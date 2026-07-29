@@ -1,60 +1,29 @@
-// ============================================================
-// ARGUS — Provider & Model Type Definitions
-// ============================================================
+// Non-secret provider settings. Credentials are held only by the native OS store.
+export type ProviderType = 'openai' | 'anthropic' | 'openai_compat' | 'google';
 
-export type ProviderType = 'anthropic' | 'openai_compat' | 'google';
-
-export interface ProviderConfig {
+export interface ProviderProfile {
   id: string;
-  name: string;
-  type: ProviderType;
-  apiKey: string;
-  baseUrl?: string;       // Custom endpoint (OpenRouter, Ollama, etc.)
-  isBuiltin?: boolean;    // Built-in free models
-  isValid?: boolean;      // Last validation result
-  models?: ModelInfo[];   // Fetched model list
-  createdAt: number;
+  providerKind: ProviderType;
+  displayName: string;
+  endpoint?: string | null;
+  credentialConfigured: boolean;
+  createdAtMs: number;
+  updatedAtMs: number;
 }
 
 export interface ModelInfo {
   id: string;
   displayName: string;
-  contextWindow?: number;
-  supportsTools?: boolean;
-  pricing?: {
-    inputPerMillion: number;
-    outputPerMillion: number;
-  };
+  contextWindow?: number | null;
+  supportsTools?: boolean | null;
+  supportsStructuredOutput?: boolean | null;
+  source: 'discovered' | 'catalog' | 'manual';
 }
 
-// Known built-in providers (for UI suggestions)
-export const BUILTIN_PROVIDERS: Pick<ProviderConfig, 'name' | 'type' | 'baseUrl'>[] = [
-  { name: 'Anthropic', type: 'anthropic' },
-  { name: 'OpenAI', type: 'openai_compat' },
-  { name: 'Google AI', type: 'google' },
-  {
-    name: 'OpenRouter',
-    type: 'openai_compat',
-    baseUrl: 'https://openrouter.ai/api/v1',
-  },
-  {
-    name: 'Ollama (Local)',
-    type: 'openai_compat',
-    baseUrl: 'http://localhost:11434/v1',
-  },
-  {
-    name: 'LM Studio (Local)',
-    type: 'openai_compat',
-    baseUrl: 'http://localhost:1234/v1',
-  },
-];
-
-// Free built-in models (no API key required)
-export const FREE_BUILTIN_MODELS: ModelInfo[] = [
-  {
-    id: 'gemini-2.0-flash',
-    displayName: 'Gemini 2.0 Flash (Free)',
-    contextWindow: 1_000_000,
-    supportsTools: true,
-  },
+export const BUILTIN_PROVIDERS: Pick<ProviderProfile, 'displayName' | 'providerKind' | 'endpoint'>[] = [
+  { displayName: 'OpenAI', providerKind: 'openai' },
+  { displayName: 'Anthropic', providerKind: 'anthropic' },
+  { displayName: 'Google AI', providerKind: 'google' },
+  { displayName: 'OpenRouter', providerKind: 'openai_compat', endpoint: 'https://openrouter.ai/api/v1' },
+  { displayName: 'Ollama (Local)', providerKind: 'openai_compat', endpoint: 'http://localhost:11434/v1' },
 ];

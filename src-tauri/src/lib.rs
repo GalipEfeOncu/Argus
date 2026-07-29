@@ -57,6 +57,10 @@ pub fn run() {
             commands::stop_backend,
             commands::get_backend_status,
             commands::select_directory,
+            commands::store_provider_credential,
+            commands::refresh_provider_credential,
+            commands::delete_provider_credential,
+            commands::remove_provider_credential,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

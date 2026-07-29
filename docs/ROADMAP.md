@@ -841,7 +841,7 @@ Completion evidence (2026-07-29):
 - Deferred/unavailable: packaged release-shell and platform probes remain
   Phase 7 work; no new release-risk regression introduced.
 
-### 5.3 Native providers and credentials
+### 5.3 Native providers and credentials (✅ Completed)
 
 Deliverables:
 
@@ -862,6 +862,20 @@ Acceptance:
 
 Phase 5 exit: users can customize roles and local skills and execute equivalent
 Coordinator flows across supported providers without credential leakage.
+
+Completion evidence (2026-07-29):
+
+- Source: this change
+- Verification: provider conformance and credential-profile tests, generated
+  contracts, frontend type-check/test/build, backend import/test, Cargo check,
+  documentation validation, and full repository verification (results recorded
+  with this change).
+- Artifacts/benchmarks: migration 17; generated OpenAPI/TypeScript provider
+  profiles; Tauri OS credential-store commands and authenticated ephemeral
+  sidecar leases; synthetic four-provider conformance fixtures.
+- Deferred/unavailable: signed/installable Alpha shell and Windows/macOS/Linux
+  native credential-store smoke probes require Phase 7 release runners. This
+  development-host check does not certify those targets.
 
 ## Phase 6 — Recovery, observability, and project completion workflow
 

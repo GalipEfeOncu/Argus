@@ -51,6 +51,16 @@ allowlist, permission profile, evidence contract, and output language before
 the session starts; session-only overrides may narrow those declarations but
 cannot expand them.
 
+## Provider settings
+
+Provider settings list only a provider name, kind, endpoint, and whether a
+credential is configured. Adding a provider uses a masked, non-autocompleted
+field; after saving, the typed value is cleared and never appears in application
+state or browser storage. Model discovery is optional and may report that a
+credential is unavailable or that a capability is unknown. Users can enter an
+explicit model ID, but the UI must present unknown tools/structured-output
+support as unsupported until the runtime can confirm it.
+
 Presets (`Quick`, `Balanced`, `Thorough`, and `Custom`) populate fields but do
 not hide their resolved values. Changing any resolved value marks the preset as
 Custom.

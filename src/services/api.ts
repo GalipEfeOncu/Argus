@@ -9,6 +9,9 @@ type SessionConfigurationResponse = operations['get_session_configuration_sessio
 type AgentDefinition = components['schemas']['AgentDefinitionResponse'];
 type AgentDefinitionCreate = components['schemas']['AgentDefinitionCreate'];
 type SkillPackage = components['schemas']['SkillPackageResponse'];
+type ProviderProfile = components['schemas']['ProviderProfileResponse'];
+type ProviderProfileCreate = components['schemas']['ProviderProfileCreate'];
+type ProviderModels = components['schemas']['ProviderModelListResponse'];
 
 async function request<T>(method: RequestMethod, path: string, body?: unknown): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
@@ -51,7 +54,9 @@ export const api = {
 
   // ── Providers ─────────────────────────────────────────────
   providers: {
-    test: (config: unknown) => request<{ valid: boolean; error?: string }>('POST', '/providers/test', config),
-    listModels: (config: unknown) => request<{ models: unknown[] }>('POST', '/providers/models', config),
+    list: () => request<ProviderProfile[]>('GET', '/providers/'),
+    create: (profile: ProviderProfileCreate) => request<ProviderProfile>('POST', '/providers/', profile),
+    remove: (id: string) => request<void>('DELETE', `/providers/${id}`),
+    listModels: (id: string, manualModelId?: string) => request<ProviderModels>('POST', `/providers/${id}/models`, manualModelId ? { modelId: manualModelId } : undefined),
   },
 };

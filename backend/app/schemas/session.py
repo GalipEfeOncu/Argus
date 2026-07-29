@@ -210,6 +210,7 @@ class SessionAgentSnapshotResponse(CamelModel):
     agent_definition_id: Identifier | None = None
     definition_version: str | None = None
     name: str | None = None
+    model_binding: AgentModelBinding | None = None
     skill_ids: list[Identifier] = Field(default_factory=list)
     tool_allowlist: list[Identifier] = Field(default_factory=list)
     permission_profile: PermissionProfile = "balanced"

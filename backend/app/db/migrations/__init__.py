@@ -32,6 +32,7 @@ from app.db.migrations import (
     v0014_approval_grants,
     v0015_agent_definition_immutability,
     v0016_local_skill_packages,
+    v0017_provider_profiles,
 )
 
 
@@ -71,6 +72,7 @@ MIGRATIONS: tuple[Migration, ...] = (
     Migration(14, "scoped_approval_grants", v0014_approval_grants.apply),
     Migration(15, "versioned_agent_definition_immutability", v0015_agent_definition_immutability.apply),
     Migration(16, "local_skill_packages", v0016_local_skill_packages.apply),
+    Migration(17, "provider_profiles", v0017_provider_profiles.apply),
 )
 
 

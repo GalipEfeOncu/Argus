@@ -132,29 +132,25 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/providers/models": {
+    "/providers/": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /** List Profiles */
+        get: operations["list_profiles_providers__get"];
         put?: never;
-        /**
-         * List Models
-         * @description Fetch available models from a provider.
-         *     For OpenAI-compat, calls /models endpoint.
-         *     For Anthropic/Google, returns known model list.
-         */
-        post: operations["list_models_providers_models_post"];
+        /** Create Profile */
+        post: operations["create_profile_providers__post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/providers/test": {
+    "/providers/{profile_id}": {
         parameters: {
             query?: never;
             header?: never;
@@ -163,8 +159,25 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Test Provider Endpoint */
-        post: operations["test_provider_endpoint_providers_test_post"];
+        post?: never;
+        /** Delete Profile */
+        delete: operations["delete_profile_providers__profile_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/providers/{profile_id}/models": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Discover Models */
+        post: operations["discover_models_providers__profile_id__models_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1263,6 +1276,11 @@ export interface components {
              */
             version: 1;
         };
+        /** ManualModelRequest */
+        ManualModelRequest: {
+            /** Modelid */
+            modelId: string;
+        };
         /** MessageCompletedEvent */
         MessageCompletedEvent: {
             /** Actorid */
@@ -1383,14 +1401,23 @@ export interface components {
             /** Messageid */
             messageId: string;
         };
-        /** ModelsListRequest */
-        ModelsListRequest: {
-            /** Api Key */
-            api_key: string;
-            /** Base Url */
-            base_url?: string | null;
-            /** Type */
-            type: string;
+        /** ModelCapability */
+        ModelCapability: {
+            /** Contextwindow */
+            contextWindow?: number | null;
+            /** Displayname */
+            displayName: string;
+            /** Id */
+            id: string;
+            /**
+             * Source
+             * @enum {string}
+             */
+            source: "discovered" | "catalog" | "manual";
+            /** Supportsstructuredoutput */
+            supportsStructuredOutput?: boolean | null;
+            /** Supportstools */
+            supportsTools?: boolean | null;
         };
         /** ParticipantStatusChangedEvent */
         ParticipantStatusChangedEvent: {
@@ -1459,25 +1486,51 @@ export interface components {
             /** Updatedatms */
             updatedAtMs: number;
         };
-        /** ProviderTestRequest */
-        ProviderTestRequest: {
-            /** Api Key */
-            api_key: string;
-            /** Base Url */
-            base_url?: string | null;
-            /** Model Id */
-            model_id?: string | null;
-            /** Type */
-            type: string;
-        };
-        /** ProviderTestResponse */
-        ProviderTestResponse: {
+        /** ProviderModelListResponse */
+        ProviderModelListResponse: {
+            /**
+             * Discoverystatus
+             * @enum {string}
+             */
+            discoveryStatus: "available" | "credential_required" | "unavailable";
             /** Error */
             error?: string | null;
-            /** Latency Ms */
-            latency_ms?: number | null;
-            /** Valid */
-            valid: boolean;
+            /** Models */
+            models: components["schemas"]["ModelCapability"][];
+        };
+        /** ProviderProfileCreate */
+        ProviderProfileCreate: {
+            /** Credentialreference */
+            credentialReference?: string | null;
+            /** Displayname */
+            displayName: string;
+            /** Endpoint */
+            endpoint?: string | null;
+            /**
+             * Providerkind
+             * @enum {string}
+             */
+            providerKind: "openai" | "anthropic" | "google" | "openai_compat";
+        };
+        /** ProviderProfileResponse */
+        ProviderProfileResponse: {
+            /** Createdatms */
+            createdAtMs: number;
+            /** Credentialconfigured */
+            credentialConfigured: boolean;
+            /** Displayname */
+            displayName: string;
+            /** Endpoint */
+            endpoint?: string | null;
+            /** Id */
+            id: string;
+            /**
+             * Providerkind
+             * @enum {string}
+             */
+            providerKind: "openai" | "anthropic" | "google" | "openai_compat";
+            /** Updatedatms */
+            updatedAtMs: number;
         };
         /** RequiredRoleRule */
         RequiredRoleRule: {
@@ -1581,6 +1634,7 @@ export interface components {
             } | null;
             /** Id */
             id: string;
+            modelBinding?: components["schemas"]["AgentModelBinding"] | null;
             /** Name */
             name?: string | null;
             /** Outputlanguage */
@@ -2283,7 +2337,27 @@ export interface operations {
             };
         };
     };
-    list_models_providers_models_post: {
+    list_profiles_providers__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProviderProfileResponse"][];
+                };
+            };
+        };
+    };
+    create_profile_providers__post: {
         parameters: {
             query?: never;
             header?: never;
@@ -2292,17 +2366,17 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["ModelsListRequest"];
+                "application/json": components["schemas"]["ProviderProfileCreate"];
             };
         };
         responses: {
             /** @description Successful Response */
-            200: {
+            201: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["ProviderProfileResponse"];
                 };
             };
             /** @description Validation Error */
@@ -2316,16 +2390,47 @@ export interface operations {
             };
         };
     };
-    test_provider_endpoint_providers_test_post: {
+    delete_profile_providers__profile_id__delete: {
         parameters: {
             query?: never;
             header?: never;
-            path?: never;
+            path: {
+                profile_id: string;
+            };
             cookie?: never;
         };
-        requestBody: {
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    discover_models_providers__profile_id__models_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                profile_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
             content: {
-                "application/json": components["schemas"]["ProviderTestRequest"];
+                "application/json": components["schemas"]["ManualModelRequest"] | null;
             };
         };
         responses: {
@@ -2335,7 +2440,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ProviderTestResponse"];
+                    "application/json": components["schemas"]["ProviderModelListResponse"];
                 };
             };
             /** @description Validation Error */

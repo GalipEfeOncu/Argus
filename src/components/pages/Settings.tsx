@@ -1,150 +1,97 @@
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
+import { api } from '@/services/api';
+import { tauriCommands } from '@/services/tauri';
 import { useSettingsStore } from '@/stores/settingsStore';
+import type { ModelInfo, ProviderProfile, ProviderType } from '@/types/provider';
 import './Settings.css';
 
 export const Settings: React.FC = () => {
-  const { providers, addProvider, removeProvider } = useSettingsStore();
+  const [providers, setProviders] = useState<ProviderProfile[]>([]);
+  const addManualProviderModel = useSettingsStore((state) => state.addManualProviderModel);
+  const [models, setModels] = useState<Record<string, ModelInfo[]>>({});
+  const [manualModels, setManualModels] = useState<Record<string, string>>({});
+  const [providerType, setProviderType] = useState<ProviderType>('openai');
+  const [displayName, setDisplayName] = useState('');
+  const [credential, setCredential] = useState('');
+  const [endpoint, setEndpoint] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
 
-  const [newProviderType, setNewProviderType] = useState('openai_compat');
-  const [newProviderName, setNewProviderName] = useState('');
-  const [newApiKey, setNewApiKey] = useState('');
-  const [newBaseUrl, setNewBaseUrl] = useState('');
+  const load = useCallback(async () => {
+    try {
+      const profiles = await api.providers.list();
+      setProviders(profiles);
+      await Promise.all(profiles.filter((profile) => profile.credentialConfigured).map((profile) => tauriCommands.refreshProviderCredential(profile.id).catch(() => undefined)));
+      const discovered = await Promise.all(profiles.map(async (profile) => [profile.id, (await api.providers.listModels(profile.id)).models] as const));
+      setModels(Object.fromEntries(discovered));
+    } catch {
+      setError('Provider listesi şu anda yüklenemedi.');
+    }
+  }, []);
+  useEffect(() => { void load(); }, [load]);
 
-  const handleAddProvider = () => {
-    if (!newProviderName || !newApiKey) return;
-    addProvider({
-      name: newProviderName,
-      type: newProviderType as any,
-      apiKey: newApiKey,
-      baseUrl: newBaseUrl || undefined,
-    });
-    setNewProviderName('');
-    setNewApiKey('');
-    setNewBaseUrl('');
+  const addProvider = async () => {
+    if (!displayName || !credential || busy) return;
+    setBusy(true); setError(null);
+    let credentialReference: string | null = null;
+    let createdProfileId: string | null = null;
+    try {
+      credentialReference = await tauriCommands.storeProviderCredential(credential);
+      const profile = await api.providers.create({
+        providerKind: providerType,
+        displayName,
+        endpoint: endpoint || null,
+        credentialReference,
+      });
+      createdProfileId = profile.id;
+      await tauriCommands.refreshProviderCredential(profile.id);
+      setProviders((current) => [...current, profile]);
+      setDisplayName(''); setCredential(''); setEndpoint('');
+    } catch {
+      if (credentialReference) {
+        if (createdProfileId) await api.providers.remove(createdProfileId).catch(() => undefined);
+        await tauriCommands.deleteProviderCredential(credentialReference).catch(() => undefined);
+      }
+      setError('Provider kaydedilemedi. Kimlik bilgisi veya bağlantıyı kontrol edin.');
+    } finally { setBusy(false); }
   };
 
-  return (
-    <div className="settings-page">
-      <div className="settings-inner">
+  const removeProvider = async (provider: ProviderProfile) => {
+    setBusy(true); setError(null);
+    try {
+      const cleanupFailed = await tauriCommands.removeProviderCredential(provider.id).then(() => false).catch(() => true);
+      await api.providers.remove(provider.id);
+      setProviders((current) => current.filter((item) => item.id !== provider.id));
+      if (cleanupFailed) setError('Provider kaldırıldı; işletim sistemi kimlik bilgisi daha sonra temizlenemedi.');
+    } catch { setError('Provider kaldırılamadı.'); }
+    finally { setBusy(false); }
+  };
 
-        {/* ── Header ──────────────────────────────────────── */}
-        <div className="settings-header">
-          <div className="settings-header-icon">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="12" cy="12" r="3" />
-              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9" />
-            </svg>
-          </div>
-          <div>
-            <h1 className="settings-title">Settings</h1>
-            <p className="settings-subtitle">Manage providers and agent configuration</p>
-          </div>
-        </div>
+  const addManualModel = async (profile: ProviderProfile) => {
+    const modelId = manualModels[profile.id]?.trim();
+    if (!modelId) return;
+    try {
+      const response = await api.providers.listModels(profile.id, modelId);
+      setModels((current) => ({ ...current, [profile.id]: response.models }));
+      const model = response.models[0];
+      if (model) addManualProviderModel({ providerId: profile.id, modelId: model.id, displayName: `${profile.displayName} · ${model.displayName} (manual; capabilities reviewed at runtime)` });
+      setManualModels((current) => ({ ...current, [profile.id]: '' }));
+    } catch { setError('Model kimliği doğrulanamadı.'); }
+  };
 
-        {/* ── API Providers ────────────────────────────────── */}
-        <div className="settings-card">
-          <div className="settings-card-label">API PROVIDERS</div>
-          <p className="settings-description">
-            Add your API keys to power the agents. Keys are stored locally in your app storage.
-          </p>
-
-          {/* Provider list */}
-          <div className="providers-list">
-            {providers.length === 0 ? (
-              <div className="providers-empty">
-                No providers configured yet.
-              </div>
-            ) : (
-              providers.map(p => (
-                <div key={p.id} className="provider-row">
-                  <div className="provider-info">
-                    <div className="provider-name-row">
-                      <span className="provider-name">{p.name}</span>
-                      <span className="provider-type-badge">{p.type}</span>
-                    </div>
-                    {p.baseUrl && <div className="provider-url">{p.baseUrl}</div>}
-                  </div>
-                  <button
-                    className="provider-remove-btn"
-                    onClick={() => removeProvider(p.id)}
-                    title="Remove provider"
-                  >
-                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <polyline points="3 6 5 6 21 6" />
-                      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
-                    </svg>
-                    Remove
-                  </button>
-                </div>
-              ))
-            )}
-          </div>
-
-          {/* Add new provider */}
-          <div className="add-provider-form">
-            <div className="add-provider-form-label">ADD NEW PROVIDER</div>
-
-            <div className="add-provider-grid">
-              <div className="settings-field">
-                <label className="settings-label">Provider Type</label>
-                <select
-                  className="argus-select"
-                  value={newProviderType}
-                  onChange={(e) => setNewProviderType(e.target.value)}
-                >
-                  <option value="openai_compat">OpenAI Compatible (OpenRouter, LM Studio)</option>
-                  <option value="anthropic">Anthropic</option>
-                  <option value="google">Google Gemini</option>
-                </select>
-              </div>
-
-              <div className="settings-field">
-                <label className="settings-label">Display Name</label>
-                <input
-                  className="argus-input"
-                  value={newProviderName}
-                  onChange={(e) => setNewProviderName(e.target.value)}
-                  placeholder="e.g. OpenRouter"
-                />
-              </div>
-
-              <div className="settings-field settings-field--full">
-                <label className="settings-label">API Key</label>
-                <input
-                  className="argus-input"
-                  type="password"
-                  value={newApiKey}
-                  onChange={(e) => setNewApiKey(e.target.value)}
-                  placeholder="sk-…"
-                />
-              </div>
-
-              {newProviderType === 'openai_compat' && (
-                <div className="settings-field settings-field--full">
-                  <label className="settings-label">Base URL <span className="settings-optional">(optional)</span></label>
-                  <input
-                    className="argus-input"
-                    value={newBaseUrl}
-                    onChange={(e) => setNewBaseUrl(e.target.value)}
-                    placeholder="e.g. https://openrouter.ai/api/v1"
-                  />
-                </div>
-              )}
-            </div>
-
-            <div className="add-provider-actions">
-              <button
-                className="settings-add-btn"
-                onClick={handleAddProvider}
-                disabled={!newProviderName || !newApiKey}
-              >
-                Add Provider
-              </button>
-            </div>
-          </div>
-        </div>
-
-      </div>
-    </div>
-  );
+  return <div className="settings-page"><div className="settings-inner">
+    <div className="settings-header"><div><h1 className="settings-title">Settings</h1><p className="settings-subtitle">Manage providers and agent configuration</p></div></div>
+    <section className="settings-card" aria-labelledby="providers-heading">
+      <div id="providers-heading" className="settings-card-label">API PROVIDERS</div>
+      <p className="settings-description">API keys are saved in your operating system’s credential store. Argus only retains a non-secret reference.</p>
+      {error && <p className="settings-error" role="alert">{error}</p>}
+      <div className="providers-list">{providers.length === 0 ? <div className="providers-empty">No providers configured yet.</div> : providers.map((provider) => <div key={provider.id} className="provider-row"><div className="provider-info"><div className="provider-name-row"><span className="provider-name">{provider.displayName}</span><span className="provider-type-badge">{provider.providerKind}</span></div>{provider.endpoint && <div className="provider-url">{provider.endpoint}</div>}<span className="provider-status">Credential {provider.credentialConfigured ? 'configured' : 'required'}</span><div className="provider-models">{(models[provider.id] ?? []).map((model) => <span key={model.id} className="provider-status">{model.displayName} · tools {model.supportsTools === true ? 'supported' : 'unknown'}</span>)}</div><div className="provider-manual-model"><input className="argus-input" aria-label={`${provider.displayName} manual model ID`} value={manualModels[provider.id] ?? ''} onChange={(event) => setManualModels((current) => ({ ...current, [provider.id]: event.target.value }))} placeholder="Manual model ID" /><button className="provider-remove-btn" onClick={() => void addManualModel(provider)}>Use model</button></div></div><button className="provider-remove-btn" onClick={() => void removeProvider(provider)} disabled={busy}>Remove</button></div>)}</div>
+      <div className="add-provider-form"><div className="add-provider-form-label">ADD NEW PROVIDER</div><div className="add-provider-grid">
+        <div className="settings-field"><label className="settings-label" htmlFor="provider-kind">Provider Type</label><select id="provider-kind" className="argus-select" value={providerType} onChange={(event) => setProviderType(event.target.value as ProviderType)}><option value="openai">OpenAI</option><option value="anthropic">Anthropic</option><option value="google">Google Gemini</option><option value="openai_compat">OpenAI Compatible</option></select></div>
+        <div className="settings-field"><label className="settings-label" htmlFor="provider-name">Display Name</label><input id="provider-name" className="argus-input" value={displayName} onChange={(event) => setDisplayName(event.target.value)} /></div>
+        <div className="settings-field settings-field--full"><label className="settings-label" htmlFor="provider-key">API Key</label><input id="provider-key" className="argus-input" type="password" autoComplete="off" value={credential} onChange={(event) => setCredential(event.target.value)} /></div>
+        {providerType === 'openai_compat' && <div className="settings-field settings-field--full"><label className="settings-label" htmlFor="provider-endpoint">Base URL</label><input id="provider-endpoint" className="argus-input" value={endpoint} onChange={(event) => setEndpoint(event.target.value)} placeholder="https://provider.example/v1" /></div>}
+      </div><div className="add-provider-actions"><button className="settings-add-btn" onClick={() => void addProvider()} disabled={!displayName || !credential || busy}>Add Provider</button></div></div>
+    </section>
+  </div></div>;
 };

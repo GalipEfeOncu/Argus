@@ -8,7 +8,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from app.providers.adapters import ProviderDependencyUnavailable, create_chat_model, create_provider
+from app.providers.adapters import ProviderDependencyUnavailable, ResilientProvider, create_chat_model, create_provider
 from app.providers.protocol import (
     Cancelled,
     Finished,
@@ -310,3 +310,44 @@ async def test_worker_pool_records_context_metadata_before_streaming() -> None:
     )
 
     assert recorded == [metadata]
+
+
+@pytest.mark.asyncio
+async def test_all_provider_kinds_share_the_same_synthetic_stream_conformance() -> None:
+    constructors = {
+        "openai": ("langchain_openai", "ChatOpenAI"),
+        "openai_compat": ("langchain_openai", "ChatOpenAI"),
+        "anthropic": ("langchain_anthropic", "ChatAnthropic"),
+        "google": ("langchain_google_genai", "ChatGoogleGenerativeAI"),
+    }
+
+    for kind, (module_name, constructor) in constructors.items():
+        class Model:
+            def bind_tools(self, _: list[object]) -> "Model":
+                return self
+
+            def with_structured_output(self, _: dict[str, object], *, include_raw: bool) -> "Model":
+                assert include_raw is True
+                return self
+
+            async def astream(self, _: list[object]):
+                yield SimpleNamespace(content="ok", tool_calls=[{"id": "tool", "name": "read_file", "args": {"path": "README.md"}}], additional_kwargs={"parsed": {"action": "wait"}}, usage_metadata={"input_tokens": 1, "output_tokens": 1, "total_tokens": 2}, response_metadata={"finish_reason": "stop"})
+
+        provider = create_provider(kind, model_id="synthetic", api_key="runtime-only", module_loader=lambda name, c=constructor: SimpleNamespace(**{c: lambda **_: Model()}))
+        events = [event async for event in provider.stream(ProviderRequest(request_id=f"{kind}-request", model_id="synthetic", messages=({"role": "user", "content": "x"},), tools=({"name": "read_file"},), response_schema={"type": "object"}))]
+        assert events == [TextDelta("ok"), ToolCall("tool", "read_file", {"path": "README.md"}), StructuredOutput({"action": "wait"}), Usage(input_tokens=1, output_tokens=1, total_tokens=2), Finished()]
+
+
+@pytest.mark.asyncio
+async def test_structured_output_has_json_text_fallback_and_retries_only_before_visible_events() -> None:
+    class TextJsonModel:
+        async def astream(self, _: list[object]):
+            yield SimpleNamespace(content='{"action":"wait"}', tool_calls=[], additional_kwargs={}, usage_metadata={}, response_metadata={"finish_reason": "stop"})
+
+    fallback = create_provider("openai", model_id="synthetic", api_key="runtime-only", module_loader=lambda _: SimpleNamespace(ChatOpenAI=lambda **_: TextJsonModel()))
+    fallback_events = [event async for event in fallback.stream(ProviderRequest(request_id="fallback", model_id="x", messages=({"role": "user", "content": "x"},), response_schema={"type": "object"}))]
+    assert StructuredOutput({"action": "wait"}) in fallback_events
+
+    retries = ResilientProvider(ScriptedProvider(((RetryableError("rate_limited", "safe", 0),), (TextDelta("only once"), Finished()))), minimum_interval_ms=0)
+    events = [event async for event in retries.stream(request("retry"))]
+    assert events == [TextDelta("only once"), Finished()]

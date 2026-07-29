@@ -88,6 +88,18 @@ target session agent's already-snapshotted authority; package instructions,
 including prompt-injection text, cannot grant tools, permissions, or alter
 session policy.
 
+## Provider credentials
+
+The Settings webview may submit a newly typed credential only to a Tauri command
+that writes it to the operating-system credential service. It never stores a
+provider key in Zustand, browser storage, SQLite, agent/session snapshots, or
+the public provider REST contract. SQLite holds an opaque credential reference
+only. A random token is injected into the sidecar process at launch; the Tauri
+process uses it to resolve the OS-store entry and pass a five-minute in-memory
+credential lease to that exact local sidecar. Neither the webview nor a normal
+REST caller can resolve a reference. Provider failures and discovery errors are
+normalized summaries, never SDK or HTTP exception bodies.
+
 Workspace paths are canonicalized before registration and every tool target is
 resolved relative to the selected session workspace. Parent traversal and
 symbolic-link paths are denied. Shell execution accepts an argument vector, not

@@ -21,6 +21,9 @@ All notable user-visible changes to Argus are recorded here. The project follows
   capability/evidence-based routing, and session-safe definition snapshots.
 - Local skill-package import, trust review, explicit enablement, immutable
   content snapshots, and tool/permission escalation checks.
+- Native provider profiles for OpenAI, Anthropic, Google, and OpenAI-compatible
+  services, including model discovery, manual model IDs, normalized streaming
+  behavior, and OS credential-store references instead of browser-stored keys.
 
 No stable Argus version has been published yet. The manifest version `0.1.0` is
 the current development baseline, not a stable release claim.

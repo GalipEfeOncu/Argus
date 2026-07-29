@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import asyncio
 import importlib
+import json
 from collections.abc import AsyncIterator, Callable, Mapping
 from typing import TYPE_CHECKING, Literal
 
@@ -41,13 +43,16 @@ class LangChainProvider(Provider):
 
     async def stream(self, request: ProviderRequest) -> AsyncIterator[ProviderEvent]:
         finish_reason = "unknown"
+        fallback_text: list[str] = []
         try:
-            model = self._prepared_model(request)
+            model, structured_fallback = self._prepared_model(request)
             async for chunk in model.astream(list(request.messages)):
                 if request.request_id in self._cancelled_request_ids:
                     yield Cancelled()
                     return
                 for event in self._chunk_events(chunk):
+                    if structured_fallback and isinstance(event, TextDelta):
+                        fallback_text.append(event.text)
                     yield event
                 response_metadata = getattr(chunk, "response_metadata", {}) or {}
                 candidate = response_metadata.get("finish_reason")
@@ -56,6 +61,16 @@ class LangChainProvider(Provider):
             if request.request_id in self._cancelled_request_ids:
                 yield Cancelled()
                 return
+            if structured_fallback:
+                try:
+                    parsed = json.loads("".join(fallback_text))
+                except json.JSONDecodeError:
+                    yield TerminalError("structured_output_invalid", "The provider returned invalid structured output.")
+                    return
+                if not _is_json_value(parsed):
+                    yield TerminalError("structured_output_invalid", "The provider returned invalid structured output.")
+                    return
+                yield StructuredOutput(parsed)
             yield Finished(reason=_finish_reason(finish_reason))
         except ProviderRequestUnsupported:
             yield TerminalError("provider_request_unsupported", "The configured provider cannot satisfy this request.")
@@ -106,21 +121,64 @@ class LangChainProvider(Provider):
             ))
         return tuple(events)
 
-    def _prepared_model(self, request: ProviderRequest) -> object:
+    def _prepared_model(self, request: ProviderRequest) -> tuple[object, bool]:
         model: object = self._model
         if request.tools:
             bind_tools = getattr(model, "bind_tools", None)
             if not callable(bind_tools):
                 raise ProviderRequestUnsupported
             model = bind_tools(list(request.tools))
+        structured_fallback = False
         if request.response_schema is not None:
             structured_output = getattr(model, "with_structured_output", None)
-            if not callable(structured_output):
-                raise ProviderRequestUnsupported
-            model = structured_output(dict(request.response_schema), include_raw=True)
+            if callable(structured_output):
+                model = structured_output(dict(request.response_schema), include_raw=True)
+            else:
+                # All adapters share a bounded JSON-text fallback. The caller
+                # still validates the resulting value against its own schema.
+                structured_fallback = True
         if not callable(getattr(model, "astream", None)):
             raise ProviderRequestUnsupported
-        return model
+        return model, structured_fallback
+
+
+class ResilientProvider(Provider):
+    """Apply bounded retry/backoff and a per-provider dispatch interval.
+
+    Retrying is deliberately limited to failures before any visible event: replaying
+    a partially streamed model response would violate timeline ordering.
+    """
+
+    def __init__(self, inner: Provider, *, max_attempts: int = 3, minimum_interval_ms: int = 50) -> None:
+        self._inner = inner
+        self._max_attempts = max_attempts
+        self._minimum_interval_seconds = minimum_interval_ms / 1000
+        self._next_start = 0.0
+        self._lock = asyncio.Lock()
+
+    async def stream(self, request: ProviderRequest) -> AsyncIterator[ProviderEvent]:
+        for attempt in range(self._max_attempts):
+            async with self._lock:
+                delay = self._next_start - asyncio.get_running_loop().time()
+                if delay > 0:
+                    await asyncio.sleep(delay)
+                self._next_start = asyncio.get_running_loop().time() + self._minimum_interval_seconds
+            emitted = False
+            retry: RetryableError | None = None
+            async for event in self._inner.stream(request):
+                if isinstance(event, RetryableError):
+                    retry = event
+                    break
+                emitted = True
+                yield event
+            if retry is None or emitted or attempt + 1 == self._max_attempts:
+                if retry is not None:
+                    yield retry
+                return
+            await asyncio.sleep(max(0, retry.retry_after_ms or 0) / 1000)
+
+    async def cancel(self, request_id: str) -> None:
+        await self._inner.cancel(request_id)
 
 
 def create_chat_model(
@@ -162,13 +220,13 @@ def create_provider(
 ) -> Provider:
     """Create the production provider used directly by in-process workers."""
 
-    return LangChainProvider(create_chat_model(
+    return ResilientProvider(LangChainProvider(create_chat_model(
         provider_kind,
         model_id=model_id,
         api_key=api_key,
         base_url=base_url,
         module_loader=module_loader,
-    ))
+    )))
 
 
 def _chunk_text(content: object) -> str:

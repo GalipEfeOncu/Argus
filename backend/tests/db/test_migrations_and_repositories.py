@@ -45,7 +45,7 @@ async def test_fresh_database_has_every_phase_2_1_table_and_migration_metadata(t
         await database.close()
 
     assert REQUIRED_TABLES <= tables
-    assert versions == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
+    assert versions == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17]
     assert "idx_events_session_sequence" in event_indexes
 
 
@@ -72,6 +72,19 @@ async def test_local_skill_validated_content_is_immutable_but_enablement_remains
         await database.close()
 
     assert enabled == 1
+
+
+@pytest.mark.asyncio
+async def test_provider_profile_metadata_rejects_credential_like_persistence(temporary_sqlite_db) -> None:
+    database = await get_db()
+    try:
+        with pytest.raises(aiosqlite.IntegrityError, match="must not contain credentials"):
+            await database.execute(
+                """INSERT INTO provider_profiles (id, provider_kind, display_name, metadata_json, created_at_ms, updated_at_ms)
+                   VALUES ('prv_1', 'openai', 'OpenAI', '{\"api_key\":\"no\"}', 1, 1)"""
+            )
+    finally:
+        await database.close()
 
 
 @pytest.mark.asyncio

@@ -8,6 +8,7 @@ provider SDK or touching the original project.
 
 from __future__ import annotations
 
+from collections.abc import Awaitable, Callable
 from pathlib import Path
 import uuid
 
@@ -15,7 +16,7 @@ import aiosqlite
 
 from app.db.repositories import EventRepository, _now_ms, _safe_json
 from app.db.database import transaction
-from app.providers.protocol import ProviderRequest, StructuredOutput
+from app.providers.protocol import Provider, ProviderRequest, StructuredOutput
 from app.providers.scripted import ScriptedProvider
 from app.services.assignment_scheduler import AssignmentScheduler, ScheduledAssignment
 from app.services.coordinator_cycle import CoordinatorCycle
@@ -27,10 +28,14 @@ from app.services.workspace_service import ProjectWorkspaceService, ScopedToolSe
 class FirstVerticalTaskRunner:
     """Execute one fake Coordinator → Builder write against the session workspace."""
 
-    def __init__(self, db: aiosqlite.Connection, *, managed_root: Path) -> None:
+    def __init__(
+        self, db: aiosqlite.Connection, *, managed_root: Path,
+        provider_resolver: Callable[[str, str], Awaitable[Provider]] | None = None,
+    ) -> None:
         self._db = db
         self._events = EventRepository(db)
         self._managed_root = managed_root
+        self._provider_resolver = provider_resolver
 
     async def request_scoped_write_grant(self, session_id: str) -> str | None:
         """Request a grant, returning an approval ID only when user input is needed.
@@ -113,16 +118,43 @@ class FirstVerticalTaskRunner:
                 "reasonSummary": "The Builder has the approved workspace write capability.",
             }],
         }
+        coordinator = next((agent for agent in snapshot.agent_snapshots if agent["role"] == "coordinator"), None)
+        if coordinator is None:
+            raise ValueError("The vertical task requires the mandatory Coordinator.")
+        provider, model_id = await self._coordinator_provider(coordinator, action)
         result = await CoordinatorCycle(self._db).execute(
-            session_id, ScriptedProvider(((StructuredOutput(action),),)),
-            ProviderRequest(f"vertical_coordinator_{uuid.uuid4().hex}", "fake-provider", (
+            session_id, provider,
+            ProviderRequest(f"vertical_coordinator_{uuid.uuid4().hex}", model_id, (
                 {"role": "user", "content": "Complete the isolated reference change."},
-            )),
+            ), response_schema={"type": "object"}),
         )
         if result.action is None:
             raise RuntimeError(result.error_summary or "Coordinator did not create the Builder assignment.")
         scheduled = await self._running_builder_attempt(session_id)
         return await self._write_and_complete(session_id, scheduled)
+
+    async def _coordinator_provider(self, coordinator: dict[str, object], action: dict[str, object]) -> tuple[Provider, str]:
+        """Resolve the Coordinator's immutable model binding at execution time.
+
+        The built-in provider-neutral binding remains the deterministic test
+        fixture. Every configured profile is resolved through the durable
+        profile/short-lived credential boundary before it reaches the worker.
+        """
+        binding = coordinator.get("modelBinding")
+        if binding is None:
+            # Pre-provider-profile sessions remain reproducible after upgrade.
+            return ScriptedProvider(((StructuredOutput(action),),)), "provider-neutral"
+        if not isinstance(binding, dict):
+            raise ValueError("Coordinator model binding is unavailable.")
+        profile_id, model_id = binding.get("providerProfileId"), binding.get("modelId")
+        if not isinstance(profile_id, str) or not isinstance(model_id, str):
+            raise ValueError("Coordinator model binding is invalid.")
+        if profile_id == "builtin":
+            return ScriptedProvider(((StructuredOutput(action),),)), model_id
+        if self._provider_resolver is not None:
+            return await self._provider_resolver(profile_id, model_id), model_id
+        from app.services.provider_profile_service import ProviderProfileService
+        return await ProviderProfileService(self._db).runtime_provider(profile_id, model_id), model_id
 
     async def _running_builder_attempt(self, session_id: str) -> ScheduledAssignment:
         async with self._db.execute(

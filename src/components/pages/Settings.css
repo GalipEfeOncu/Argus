@@ -154,6 +154,16 @@
   white-space: nowrap;
 }
 
+.provider-status, .settings-error {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.provider-models, .provider-manual-model { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.provider-manual-model .argus-input { min-width: 180px; }
+
+.settings-error { color: var(--status-error); margin: 0; }
+
 .provider-remove-btn {
   display: inline-flex;
   align-items: center;

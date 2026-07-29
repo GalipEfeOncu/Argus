@@ -17,7 +17,7 @@ from app.main import app
 from app.providers.protocol import ProviderRequest, StructuredOutput
 from app.providers.scripted import ScriptedProvider
 from app.schemas.project import WorkspaceMode
-from app.schemas.session import ApprovalPolicy, SessionAgentInput, SessionConfigurationInput
+from app.schemas.session import ApprovalPolicy, RequiredRoleRule, SessionAgentInput, SessionConfigurationInput
 from app.services.first_vertical_task import FirstVerticalTaskRunner
 from app.services.coordinator_cycle import CoordinatorCycle
 from app.services.session_configuration_service import SessionConfigurationService
@@ -86,7 +86,8 @@ async def _events(session_id: str) -> list[object]:
 
 
 async def _preauthorized_runner_session(
-    database, project: Path, *, tool_allowlist: list[str],
+    database, project: Path, *, tool_allowlist: list[str], model_binding: dict[str, str] | None = None,
+    provider_resolver=None, require_review: bool = False,
 ) -> tuple[str, FirstVerticalTaskRunner]:
     session_id = str(uuid.uuid4())
     workspaces = ProjectWorkspaceService(
@@ -106,26 +107,27 @@ async def _preauthorized_runner_session(
         await SessionConfigurationService(database).create_initial(
             session_id=session_id,
             agents=[
-                SessionAgentInput(id="coordinator", role="coordinator"),
+                SessionAgentInput.model_validate({"id": "coordinator", "role": "coordinator", **({"modelBinding": model_binding} if model_binding is not None else {})}),
                 SessionAgentInput.model_validate({
                     "id": "builder", "role": "builder", "capabilities": ["workspace.write"],
                     "toolAllowlist": tool_allowlist,
                 }),
-            ],
+            ] + ([SessionAgentInput.model_validate({"id": "reviewer", "role": "reviewer", "capabilities": ["workspace.read"], "toolAllowlist": ["read_file"]})] if require_review else []),
             coordinator_id="coordinator",
             configuration=SessionConfigurationInput(
-                availableAgentIds=["builder"],
+                availableAgentIds=["builder", "reviewer"] if require_review else ["builder"],
                 approvalPolicy=ApprovalPolicy(
                     permissionProfile="autonomous", behavior="preauthorize_session",
                     preauthorizedCapabilities=["workspace.write"],
                 ),
                 acknowledgements=["autonomous_permissions"],
+                requiredRoleRules=[RequiredRoleRule(id="review", role="reviewer", applicability="when_changes", successEvidence="approved_review")] if require_review else [],
             ),
             workspace_mode="snapshot", acknowledged_direct_write=False,
         )
     await SessionRepository(database).set_status(session_id, "preparing")
     return session_id, FirstVerticalTaskRunner(
-        database, managed_root=Path(settings.db_path).parent / "workspaces",
+        database, managed_root=Path(settings.db_path).parent / "workspaces", provider_resolver=provider_resolver,
     )
 
 
@@ -233,6 +235,52 @@ async def test_preauthorized_vertical_task_continues_without_an_approval_prompt(
     statuses = [event.payload["status"] for event in events if event.event_type == "session.status_changed"]
     assert "completed" in statuses
     assert "waiting_approval" not in statuses
+
+
+@pytest.mark.asyncio
+async def test_profile_backed_coordinator_keeps_the_same_scheduler_and_permission_flow(
+    temporary_sqlite_db, tmp_path: Path,
+) -> None:
+    class RecordedProvider:
+        def __init__(self, builder_id: str) -> None:
+            self._builder_id = builder_id
+        async def stream(self, _: ProviderRequest):
+            yield StructuredOutput({"type": "assignments", "routingSummary": "Profile-backed Coordinator assigned the Builder.", "assignments": [{"proposalId": "profile-backed", "assigneeAgentId": self._builder_id, "objective": "Create one reviewable file in the isolated workspace.", "acceptanceCriteria": ["Write the requested file", "Record a reviewable diff artifact"], "operationClass": "mutating", "requestedBudget": {}, "requestedCapabilities": ["workspace.write"], "requestedTools": ["write_file"], "reasonSummary": "The Builder has the approved workspace write capability."}]})
+        async def cancel(self, _: str) -> None: return None
+
+    seen: list[tuple[str, str]] = []
+    builder_snapshot_id = ""
+    async def resolve(profile_id: str, model_id: str) -> RecordedProvider:
+        seen.append((profile_id, model_id))
+        return RecordedProvider(builder_snapshot_id)
+
+    database = await get_db()
+    try:
+        async def run(profile_id: str, model_id: str) -> list[object]:
+            nonlocal builder_snapshot_id
+            project = tmp_path / f"profile-backed-{model_id}"
+            project.mkdir()
+            session_id, runner = await _preauthorized_runner_session(
+                database, project, tool_allowlist=["write_file"],
+                model_binding={"providerProfileId": profile_id, "modelId": model_id}, provider_resolver=resolve, require_review=True,
+            )
+            configuration = await SessionConfigurationService(database).current(session_id)
+            builder_snapshot_id = next(agent["id"] for agent in configuration.agent_snapshots if agent["role"] == "builder")
+            assert await runner.request_scoped_write_grant(session_id) is None
+            await runner.run_after_grant(session_id)
+            return await EventRepository(database).list_for_session(session_id)
+
+        first_events = await run("prv_alpha", "recorded-model-a")
+        second_events = await run("prv_beta", "recorded-model-b")
+    finally:
+        await database.close()
+
+    assert seen == [("prv_alpha", "recorded-model-a"), ("prv_beta", "recorded-model-b")]
+    assert [event.event_type for event in first_events] == [event.event_type for event in second_events]
+    assert [event.payload.get("status") for event in first_events if event.event_type == "gate.status_changed"] == [event.payload.get("status") for event in second_events if event.event_type == "gate.status_changed"]
+    assert [event.payload.get("status") for event in first_events if event.event_type == "approval.resolved"] == [event.payload.get("status") for event in second_events if event.event_type == "approval.resolved"]
+    assert any(event.event_type == "assignment.created" for event in first_events)
+    assert any(event.event_type == "gate.status_changed" for event in first_events)
 
 
 @pytest.mark.asyncio

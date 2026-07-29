@@ -3,9 +3,19 @@ use tauri::State;
 use tauri_plugin_shell::ShellExt;
 
 /// Holds the sidecar child process handle.
-#[derive(Default)]
 pub struct SidecarState {
     child: Mutex<Option<tauri_plugin_shell::process::CommandChild>>,
+    bridge_token: String,
+}
+
+impl Default for SidecarState {
+    fn default() -> Self {
+        Self { child: Mutex::new(None), bridge_token: uuid::Uuid::new_v4().to_string() }
+    }
+}
+
+pub fn bridge_token(state: &SidecarState) -> &str {
+    &state.bridge_token
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -103,7 +113,7 @@ pub async fn start(
     };
 
     #[cfg(debug_assertions)]
-    let cmd = {
+    let mut cmd = {
         if !backend_dir.exists() {
             return Err(format!(
                 "Backend directory not found at: {}",
@@ -131,10 +141,14 @@ pub async fn start(
     };
 
     #[cfg(not(debug_assertions))]
-    let cmd = app
+    let mut cmd = app
         .shell()
         .sidecar("argus-backend")
         .map_err(|e| format!("Sidecar not found: {e}"))?;
+
+    // Only the native shell knows this random token. It authorizes a
+    // credential handoff into the sidecar's short-lived memory, never SQLite.
+    cmd = cmd.env("ARGUS_NATIVE_BRIDGE_TOKEN", bridge_token(&state));
 
     // ── 3. Spawn the process (sync) ───────────────────────────────────────────
     let (mut rx, child) = cmd

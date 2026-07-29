@@ -1,58 +1,37 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { ProviderConfig } from '@/types/provider';
 import type { AgentRole, ModelRef } from '@/types/agent';
 
 interface SettingsState {
-  providers: ProviderConfig[];
   defaultRoleModels: Partial<Record<AgentRole, ModelRef>>;
+  manualProviderModels: ModelRef[];
   useBuiltinFreeModels: boolean;
-  addProvider: (config: Omit<ProviderConfig, 'id' | 'createdAt'>) => string;
-  updateProvider: (id: string, updates: Partial<ProviderConfig>) => void;
-  removeProvider: (id: string) => void;
   setDefaultRoleModel: (role: AgentRole, modelRef: ModelRef) => void;
+  addManualProviderModel: (modelRef: ModelRef) => void;
   setUseBuiltinFreeModels: (val: boolean) => void;
-  getProviderById: (id: string) => ProviderConfig | undefined;
 }
 
 export const useSettingsStore = create<SettingsState>()(
   persist(
-    (set, get) => ({
-      providers: [],
+    (set) => ({
       defaultRoleModels: {},
+      manualProviderModels: [],
       useBuiltinFreeModels: true,
-
-      addProvider: (config) => {
-        const id = crypto.randomUUID();
-        const provider: ProviderConfig = { ...config, id, createdAt: Date.now() };
-        set((s) => ({ providers: [...s.providers, provider] }));
-        return id;
-      },
-
-      updateProvider: (id, updates) => {
-        set((s) => ({
-          providers: s.providers.map((p) => (p.id === id ? { ...p, ...updates } : p)),
-        }));
-      },
-
-      removeProvider: (id) => {
-        set((s) => ({ providers: s.providers.filter((p) => p.id !== id) }));
-      },
 
       setDefaultRoleModel: (role, modelRef) => {
         set((s) => ({ defaultRoleModels: { ...s.defaultRoleModels, [role]: modelRef } }));
       },
+      addManualProviderModel: (modelRef) => set((state) => ({ manualProviderModels: state.manualProviderModels.some((item) => item.providerId === modelRef.providerId && item.modelId === modelRef.modelId) ? state.manualProviderModels : [...state.manualProviderModels, modelRef] })),
 
       setUseBuiltinFreeModels: (val) => set({ useBuiltinFreeModels: val }),
 
-      getProviderById: (id) => get().providers.find((p) => p.id === id),
     }),
     {
       name: 'argus-settings',
-      // Don't persist API keys in plaintext in production - this is MVP, encrypt later
+      // Provider profiles live in the sidecar; credentials never enter this store.
       partialize: (state) => ({
-        providers: state.providers,
         defaultRoleModels: state.defaultRoleModels,
+        manualProviderModels: state.manualProviderModels,
         useBuiltinFreeModels: state.useBuiltinFreeModels,
       }),
     }
