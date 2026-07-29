@@ -17,6 +17,7 @@
     "requestedCapabilities": [
       "workspace.write"
     ],
+    "requestedTools": [],
     "reasonSummary": "The Builder owns this slice."
   }
 }

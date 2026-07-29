@@ -1,6 +1,305 @@
 {
   "components": {
     "schemas": {
+      "AgentDefinitionCreate": {
+        "additionalProperties": false,
+        "description": "The immutable, versioned source for a session agent.",
+        "properties": {
+          "baseRole": {
+            "anyOf": [
+              {
+                "maxLength": 160,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Baserole"
+          },
+          "capabilities": {
+            "items": {
+              "maxLength": 160,
+              "minLength": 1,
+              "type": "string"
+            },
+            "maxItems": 50,
+            "title": "Capabilities",
+            "type": "array"
+          },
+          "evidenceKinds": {
+            "items": {
+              "maxLength": 160,
+              "minLength": 1,
+              "type": "string"
+            },
+            "maxItems": 20,
+            "title": "Evidencekinds",
+            "type": "array"
+          },
+          "evidenceSchema": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Evidenceschema"
+          },
+          "kind": {
+            "enum": [
+              "builtin",
+              "builtin_override",
+              "custom"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "modelBinding": {
+            "$ref": "#/components/schemas/AgentModelBinding"
+          },
+          "name": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "outputLanguage": {
+            "default": "en",
+            "maxLength": 16,
+            "minLength": 2,
+            "title": "Outputlanguage",
+            "type": "string"
+          },
+          "permissionProfile": {
+            "default": "balanced",
+            "enum": [
+              "strict",
+              "balanced",
+              "autonomous",
+              "expert_unrestricted"
+            ],
+            "title": "Permissionprofile",
+            "type": "string"
+          },
+          "role": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Role",
+            "type": "string"
+          },
+          "skillIds": {
+            "items": {
+              "maxLength": 160,
+              "minLength": 1,
+              "type": "string"
+            },
+            "maxItems": 50,
+            "title": "Skillids",
+            "type": "array"
+          },
+          "systemPrompt": {
+            "maxLength": 16000,
+            "minLength": 1,
+            "title": "Systemprompt",
+            "type": "string"
+          },
+          "toolAllowlist": {
+            "items": {
+              "maxLength": 160,
+              "minLength": 1,
+              "type": "string"
+            },
+            "maxItems": 50,
+            "title": "Toolallowlist",
+            "type": "array"
+          }
+        },
+        "required": [
+          "name",
+          "kind",
+          "role",
+          "systemPrompt",
+          "modelBinding"
+        ],
+        "title": "AgentDefinitionCreate",
+        "type": "object"
+      },
+      "AgentDefinitionResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "baseRole": {
+            "anyOf": [
+              {
+                "maxLength": 160,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Baserole"
+          },
+          "capabilities": {
+            "items": {
+              "maxLength": 160,
+              "minLength": 1,
+              "type": "string"
+            },
+            "maxItems": 50,
+            "title": "Capabilities",
+            "type": "array"
+          },
+          "createdAtMs": {
+            "minimum": 0.0,
+            "title": "Createdatms",
+            "type": "integer"
+          },
+          "evidenceKinds": {
+            "items": {
+              "maxLength": 160,
+              "minLength": 1,
+              "type": "string"
+            },
+            "maxItems": 20,
+            "title": "Evidencekinds",
+            "type": "array"
+          },
+          "evidenceSchema": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Evidenceschema"
+          },
+          "id": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "builtin",
+              "builtin_override",
+              "custom"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "modelBinding": {
+            "$ref": "#/components/schemas/AgentModelBinding"
+          },
+          "name": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "outputLanguage": {
+            "default": "en",
+            "maxLength": 16,
+            "minLength": 2,
+            "title": "Outputlanguage",
+            "type": "string"
+          },
+          "permissionProfile": {
+            "default": "balanced",
+            "enum": [
+              "strict",
+              "balanced",
+              "autonomous",
+              "expert_unrestricted"
+            ],
+            "title": "Permissionprofile",
+            "type": "string"
+          },
+          "role": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Role",
+            "type": "string"
+          },
+          "skillIds": {
+            "items": {
+              "maxLength": 160,
+              "minLength": 1,
+              "type": "string"
+            },
+            "maxItems": 50,
+            "title": "Skillids",
+            "type": "array"
+          },
+          "systemPrompt": {
+            "maxLength": 16000,
+            "minLength": 1,
+            "title": "Systemprompt",
+            "type": "string"
+          },
+          "templateVersion": {
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Templateversion",
+            "type": "string"
+          },
+          "toolAllowlist": {
+            "items": {
+              "maxLength": 160,
+              "minLength": 1,
+              "type": "string"
+            },
+            "maxItems": 50,
+            "title": "Toolallowlist",
+            "type": "array"
+          }
+        },
+        "required": [
+          "name",
+          "kind",
+          "role",
+          "systemPrompt",
+          "modelBinding",
+          "id",
+          "templateVersion",
+          "createdAtMs"
+        ],
+        "title": "AgentDefinitionResponse",
+        "type": "object"
+      },
+      "AgentModelBinding": {
+        "additionalProperties": false,
+        "description": "A non-secret provider/model reference, never provider credentials.",
+        "properties": {
+          "modelId": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Modelid",
+            "type": "string"
+          },
+          "providerProfileId": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Providerprofileid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "providerProfileId",
+          "modelId"
+        ],
+        "title": "AgentModelBinding",
+        "type": "object"
+      },
       "ApprovalPolicy": {
         "additionalProperties": false,
         "properties": {
@@ -1148,6 +1447,16 @@
             },
             "maxItems": 50,
             "title": "Requestedcapabilities",
+            "type": "array"
+          },
+          "requestedTools": {
+            "items": {
+              "maxLength": 160,
+              "minLength": 1,
+              "type": "string"
+            },
+            "maxItems": 50,
+            "title": "Requestedtools",
             "type": "array"
           }
         },
@@ -3059,6 +3368,16 @@
             "title": "Minimumcompletions",
             "type": "integer"
           },
+          "requiredCapabilities": {
+            "items": {
+              "maxLength": 160,
+              "minLength": 1,
+              "type": "string"
+            },
+            "maxItems": 20,
+            "title": "Requiredcapabilities",
+            "type": "array"
+          },
           "role": {
             "maxLength": 160,
             "minLength": 1,
@@ -3160,6 +3479,29 @@
             "title": "Capabilities",
             "type": "array"
           },
+          "definitionVersion": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Definitionversion"
+          },
+          "evidenceKinds": {
+            "items": {
+              "maxLength": 160,
+              "minLength": 1,
+              "type": "string"
+            },
+            "maxItems": 20,
+            "title": "Evidencekinds",
+            "type": "array"
+          },
           "evidenceSchema": {
             "anyOf": [
               {
@@ -3178,10 +3520,57 @@
             "title": "Id",
             "type": "string"
           },
+          "modelBinding": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AgentModelBinding"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "modelSnapshot": {
             "additionalProperties": true,
             "title": "Modelsnapshot",
             "type": "object"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "maxLength": 160,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "outputLanguage": {
+            "anyOf": [
+              {
+                "maxLength": 16,
+                "minLength": 2,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Outputlanguage"
+          },
+          "permissionProfile": {
+            "default": "balanced",
+            "enum": [
+              "strict",
+              "balanced",
+              "autonomous",
+              "expert_unrestricted"
+            ],
+            "title": "Permissionprofile",
+            "type": "string"
           },
           "role": {
             "maxLength": 160,
@@ -3189,10 +3578,43 @@
             "title": "Role",
             "type": "string"
           },
+          "skillIds": {
+            "items": {
+              "maxLength": 160,
+              "minLength": 1,
+              "type": "string"
+            },
+            "maxItems": 50,
+            "title": "Skillids",
+            "type": "array"
+          },
           "skillSnapshot": {
             "items": {},
             "maxItems": 50,
             "title": "Skillsnapshot",
+            "type": "array"
+          },
+          "systemPrompt": {
+            "anyOf": [
+              {
+                "maxLength": 16000,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Systemprompt"
+          },
+          "toolAllowlist": {
+            "items": {
+              "maxLength": 160,
+              "minLength": 1,
+              "type": "string"
+            },
+            "maxItems": 50,
+            "title": "Toolallowlist",
             "type": "array"
           }
         },
@@ -3206,6 +3628,19 @@
       "SessionAgentSnapshotResponse": {
         "additionalProperties": false,
         "properties": {
+          "agentDefinitionId": {
+            "anyOf": [
+              {
+                "maxLength": 160,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Agentdefinitionid"
+          },
           "capabilities": {
             "items": {
               "maxLength": 160,
@@ -3213,6 +3648,26 @@
               "type": "string"
             },
             "title": "Capabilities",
+            "type": "array"
+          },
+          "definitionVersion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Definitionversion"
+          },
+          "evidenceKinds": {
+            "items": {
+              "maxLength": 160,
+              "minLength": 1,
+              "type": "string"
+            },
+            "title": "Evidencekinds",
             "type": "array"
           },
           "evidenceSchema": {
@@ -3233,17 +3688,68 @@
             "title": "Id",
             "type": "string"
           },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "outputLanguage": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Outputlanguage"
+          },
+          "permissionProfile": {
+            "default": "balanced",
+            "enum": [
+              "strict",
+              "balanced",
+              "autonomous",
+              "expert_unrestricted"
+            ],
+            "title": "Permissionprofile",
+            "type": "string"
+          },
           "role": {
             "maxLength": 160,
             "minLength": 1,
             "title": "Role",
             "type": "string"
           },
+          "skillIds": {
+            "items": {
+              "maxLength": 160,
+              "minLength": 1,
+              "type": "string"
+            },
+            "title": "Skillids",
+            "type": "array"
+          },
           "sourceAgentId": {
             "maxLength": 160,
             "minLength": 1,
             "title": "Sourceagentid",
             "type": "string"
+          },
+          "toolAllowlist": {
+            "items": {
+              "maxLength": 160,
+              "minLength": 1,
+              "type": "string"
+            },
+            "title": "Toolallowlist",
+            "type": "array"
           }
         },
         "required": [
@@ -4571,6 +5077,112 @@
   },
   "openapi": "3.1.0",
   "paths": {
+    "/agent-definitions/": {
+      "get": {
+        "operationId": "list_agent_definitions_agent_definitions__get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/AgentDefinitionResponse"
+                  },
+                  "title": "Response List Agent Definitions Agent Definitions  Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Agent Definitions",
+        "tags": [
+          "agent-definitions"
+        ]
+      },
+      "post": {
+        "operationId": "create_agent_definition_agent_definitions__post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AgentDefinitionCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentDefinitionResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Agent Definition",
+        "tags": [
+          "agent-definitions"
+        ]
+      }
+    },
+    "/agent-definitions/{definition_id}": {
+      "get": {
+        "operationId": "get_agent_definition_agent_definitions__definition_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "definition_id",
+            "required": true,
+            "schema": {
+              "title": "Definition Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentDefinitionResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Agent Definition",
+        "tags": [
+          "agent-definitions"
+        ]
+      }
+    },
     "/contracts/session-commands": {
       "get": {
         "description": "Expose the versioned WebSocket command schema for local development tools.",

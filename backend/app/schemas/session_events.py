@@ -150,6 +150,7 @@ class AssignmentProposedPayload(CamelModel):
     acceptance_criteria: list[Summary] = Field(min_length=1, max_length=50)
     operation_class: Literal["read_only", "mutating"]
     requested_capabilities: list[Identifier] = Field(default_factory=list, max_length=50)
+    requested_tools: list[Identifier] = Field(default_factory=list, max_length=50)
     reason_summary: Summary
     finding_fingerprint: Annotated[str, Field(pattern=r"^[0-9a-f]{64}$")] | None = None
 

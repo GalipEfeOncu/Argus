@@ -24,8 +24,10 @@ class AgentSnapshot:
     agent_id: str
     role: str
     system_prompt: str
+    definition_version: str | None = None
     enabled_skills: tuple[str, ...] = ()
     tool_allowlist: tuple[str, ...] = ()
+    permission_profile: str | None = None
     output_language: str | None = None
     model_id: str | None = None
 
@@ -123,7 +125,9 @@ class AssignmentContextBuilder:
         agent_description = (
             f"role {agent.role}; enabled skills {', '.join(agent.enabled_skills) or 'none'}; "
             f"tool allowlist {', '.join(agent.tool_allowlist) or 'none'}; "
-            f"output language {agent.output_language or 'default'}; model {agent.model_id or 'default'}"
+            f"output language {agent.output_language or 'default'}; model {agent.model_id or 'default'}; "
+            f"definition version {agent.definition_version or 'legacy'}; "
+            f"permission profile {agent.permission_profile or 'session policy'}"
         )
         sections.append(("agent_snapshot", self._safe("Agent snapshot", agent_description)))
         sections.append(("goal", self._safe("Goal", goal)))

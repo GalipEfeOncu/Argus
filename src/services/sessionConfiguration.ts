@@ -33,12 +33,17 @@ export const limitDefinitions: ReadonlyArray<{ key: keyof ExecutionLimits; label
 ];
 
 export function createAgentInstances(defaultRoleModels: Partial<Record<AgentRole, ModelRef>>): AgentInstance[] {
-  return (Object.keys(agentLabels) as AgentInstance['role'][]).map((role) => ({
+  return (Object.keys(agentLabels) as Array<keyof typeof agentLabels>).map((role) => ({
     id: `builtin-${role}`,
     role,
     label: agentLabels[role],
     modelRef: defaultRoleModels[role] ?? fallbackModel,
     capabilities: agentCapabilities[role],
+    agentDefinitionId: `builtin.${role}.v1`,
+    evidenceKinds: [roleEvidence(role)],
+    toolAllowlist: [],
+    permissionProfile: 'balanced',
+    outputLanguage: 'en',
   }));
 }
 
@@ -59,7 +64,8 @@ export function createConfiguration(
   const availableAgents = createAgentInstances(defaultRoleModels);
   const base: SessionConfiguration = {
     preset: 'custom', workspaceMode: 'worktree', outputLanguage: 'en',
-    coordinatorModel: defaultRoleModels.coordinator ?? fallbackModel, coordinatorPromptOverride: '', enabledSkills: [], directWriteAcknowledged: false,
+    coordinatorModel: defaultRoleModels.coordinator ?? fallbackModel, coordinatorDefinitionId: 'builtin.coordinator.v1',
+    coordinatorPermissionProfile: 'balanced', coordinatorPromptOverride: '', enabledSkills: [], directWriteAcknowledged: false,
     preauthorizationAcknowledged: false, preauthorizationScope: '', availableAgents,
     availableAgentIds: availableAgents.map((agent) => agent.id), requiredRoleRules: [],
     executionLimits: balancedLimits,
@@ -71,7 +77,7 @@ export function createConfiguration(
 export function applyPreset(configuration: SessionConfiguration, preset: Exclude<SessionPreset, 'custom'>): SessionConfiguration {
   const idsFor = (roles: AgentInstance['role'][]) => configuration.availableAgents
     .filter((agent) => roles.includes(agent.role)).map((agent) => agent.id);
-  const presets: Record<Exclude<SessionPreset, 'custom'>, Omit<SessionConfiguration, 'availableAgents' | 'coordinatorModel' | 'coordinatorPromptOverride' | 'enabledSkills' | 'outputLanguage' | 'directWriteAcknowledged' | 'preauthorizationAcknowledged' | 'preauthorizationScope'>> = {
+  const presets: Record<Exclude<SessionPreset, 'custom'>, Omit<SessionConfiguration, 'availableAgents' | 'coordinatorModel' | 'coordinatorDefinitionId' | 'coordinatorPermissionProfile' | 'coordinatorPromptOverride' | 'enabledSkills' | 'outputLanguage' | 'directWriteAcknowledged' | 'preauthorizationAcknowledged' | 'preauthorizationScope'>> = {
     quick: {
       preset: 'quick', workspaceMode: 'worktree', availableAgentIds: idsFor(['builder']), requiredRoleRules: [],
       executionLimits: { ...balancedLimits, maxRevisionsPerFinding: 0, maxAssignmentAttempts: 3, maxModelIterationsPerAssignment: 8, maxToolCallsPerAssignment: 30, maxSessionTokens: 100_000, maxWallClockSeconds: 3_600, maxParallelReadOnlyAssignments: 1 },
@@ -96,7 +102,7 @@ export function markCustom(configuration: SessionConfiguration): SessionConfigur
   return { ...configuration, preset: 'custom' };
 }
 
-export function roleEvidence(role: AgentInstance['role']): string {
+export function roleEvidence(role: string): string {
   return role === 'reviewer' ? 'approved_review' : role === 'tester' ? 'passing_test_run' : role === 'planner' ? 'accepted_plan' : 'verified_change';
 }
 
@@ -113,7 +119,9 @@ export function validateConfiguration(configuration: SessionConfiguration): stri
     const eligible = configuration.availableAgents.some((agent) => agent.role === required.role && available.has(agent.id));
     if (!eligible) errors.push(`${required.role} is required but no eligible instance is available.`);
     if (!required.successEvidence.trim()) errors.push(`${required.role} needs a success evidence requirement.`);
-    if (!supportedEvidence.has(required.successEvidence)) errors.push(`${required.role} uses an unsupported success evidence type.`);
+    const declaredEvidence = configuration.availableAgents.some((agent) => available.has(agent.id)
+      && agent.evidenceKinds.includes(required.successEvidence));
+    if (!supportedEvidence.has(required.successEvidence) && !declaredEvidence) errors.push(`${required.role} uses an unsupported success evidence type.`);
     if (required.minimumCompletions < 1 || !Number.isInteger(required.minimumCompletions)) errors.push(`${required.role} must require at least one completion.`);
     if (required.applicability === 'when_capability_used' && !required.capability?.trim()) errors.push(`${required.role} requires a capability when using capability-based applicability.`);
     if (required.applicability === 'when_capability_used' && required.capability !== undefined && !configuration.availableAgents.some((agent) => available.has(agent.id) && agent.capabilities.includes(required.capability!))) errors.push(`${required.role} gate references a capability no available agent can use.`);

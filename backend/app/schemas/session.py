@@ -31,14 +31,58 @@ class RoleConfigSchema(CamelModel):
     custom_system_prompt: str | None = None
 
 
+PermissionProfile = Literal["strict", "balanced", "autonomous", "expert_unrestricted"]
+AgentDefinitionKind = Literal["builtin", "builtin_override", "custom"]
+
+
+class AgentModelBinding(CamelModel):
+    """A non-secret provider/model reference, never provider credentials."""
+
+    provider_profile_id: Identifier
+    model_id: Identifier
+
+
+class AgentDefinitionCreate(CamelModel):
+    """The immutable, versioned source for a session agent."""
+
+    name: str = Field(min_length=1, max_length=160)
+    kind: AgentDefinitionKind
+    base_role: Identifier | None = None
+    role: Identifier
+    system_prompt: str = Field(min_length=1, max_length=16_000)
+    model_binding: AgentModelBinding
+    capabilities: list[Identifier] = Field(default_factory=list, max_length=50)
+    skill_ids: list[Identifier] = Field(default_factory=list, max_length=50)
+    tool_allowlist: list[Identifier] = Field(default_factory=list, max_length=50)
+    permission_profile: PermissionProfile = "balanced"
+    evidence_schema: dict[str, Any] | None = None
+    evidence_kinds: list[Identifier] = Field(default_factory=list, max_length=20)
+    output_language: str = Field(default="en", min_length=2, max_length=16)
+
+
+class AgentDefinitionResponse(AgentDefinitionCreate):
+    id: Identifier
+    template_version: str = Field(min_length=1, max_length=64)
+    created_at_ms: int = Field(ge=0)
+
+
 class SessionAgentInput(CamelModel):
     id: Identifier
     role: Identifier
     capabilities: list[Identifier] = Field(default_factory=list, max_length=50)
     agent_definition_id: Identifier | None = None
+    definition_version: str | None = Field(default=None, min_length=1, max_length=64)
+    name: str | None = Field(default=None, min_length=1, max_length=160)
+    system_prompt: str | None = Field(default=None, min_length=1, max_length=16_000)
+    model_binding: AgentModelBinding | None = None
+    skill_ids: list[Identifier] = Field(default_factory=list, max_length=50)
+    tool_allowlist: list[Identifier] = Field(default_factory=list, max_length=50)
+    permission_profile: PermissionProfile = "balanced"
     model_snapshot: dict[str, object] = Field(default_factory=dict)
     skill_snapshot: list[object] = Field(default_factory=list, max_length=50)
     evidence_schema: dict[str, Any] | None = None
+    evidence_kinds: list[Identifier] = Field(default_factory=list, max_length=20)
+    output_language: str | None = Field(default=None, min_length=2, max_length=16)
 
 
 class RequiredRoleRule(CamelModel):
@@ -49,6 +93,7 @@ class RequiredRoleRule(CamelModel):
     success_evidence: Identifier
     minimum_completions: int = Field(default=1, ge=1)
     acceptance_fields: list[Identifier] = Field(default_factory=list, max_length=20)
+    required_capabilities: list[Identifier] = Field(default_factory=list, max_length=20)
 
     @model_validator(mode="after")
     def validate_capability(self) -> "RequiredRoleRule":
@@ -86,7 +131,7 @@ class ExecutionLimitsPatch(CamelModel):
 
 
 class ApprovalPolicy(CamelModel):
-    permission_profile: Literal["strict", "balanced", "autonomous", "expert_unrestricted"] = "balanced"
+    permission_profile: PermissionProfile = "balanced"
     behavior: Literal["ask_each_time", "ask_by_policy", "preauthorize_session", "deny_interactive"] = "ask_by_policy"
     preauthorized_capabilities: list[Identifier] = Field(default_factory=list, max_length=50)
     capability_overrides: dict[Identifier, Literal["allow", "ask", "deny"]] = Field(default_factory=dict, max_length=50)
@@ -162,6 +207,14 @@ class SessionAgentSnapshotResponse(CamelModel):
     role: Identifier
     capabilities: list[Identifier]
     evidence_schema: dict[str, Any] | None = None
+    agent_definition_id: Identifier | None = None
+    definition_version: str | None = None
+    name: str | None = None
+    skill_ids: list[Identifier] = Field(default_factory=list)
+    tool_allowlist: list[Identifier] = Field(default_factory=list)
+    permission_profile: PermissionProfile = "balanced"
+    evidence_kinds: list[Identifier] = Field(default_factory=list)
+    output_language: str | None = None
 
 
 class SessionCreateResponse(SessionConfigurationResponse):

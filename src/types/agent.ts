@@ -82,7 +82,7 @@ export interface DiffBlock {
 
 export interface RoleConfig {
   instanceId?: string;
-  role: AgentRole;
+  role: string;
   enabled: boolean;
   modelRef: ModelRef;
   customSystemPrompt?: string;
@@ -133,3 +133,9 @@ export const AGENT_ROLE_META: Record<AgentRole, {
     colorVar: '--agent-ui',
   },
 };
+
+export function agentRoleMeta(role: string): { label: string; emoji: string; description: string; colorVar: string } {
+  return AGENT_ROLE_META[role as AgentRole] ?? {
+    label: role.replaceAll('_', ' '), emoji: '◈', description: 'Custom capability-based role', colorVar: '--accent-secondary',
+  };
+}

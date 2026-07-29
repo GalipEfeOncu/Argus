@@ -109,7 +109,7 @@ class FirstVerticalTaskRunner:
                 "objective": "Create one reviewable file in the isolated workspace.",
                 "acceptanceCriteria": ["Write the requested file", "Record a reviewable diff artifact"],
                 "operationClass": "mutating", "requestedBudget": {},
-                "requestedCapabilities": ["workspace.write"],
+                "requestedCapabilities": ["workspace.write"], "requestedTools": ["write_file"],
                 "reasonSummary": "The Builder has the approved workspace write capability.",
             }],
         }
@@ -146,6 +146,14 @@ class FirstVerticalTaskRunner:
 
     async def _write_and_complete(self, session_id: str, scheduled: ScheduledAssignment) -> str:
         scheduler = AssignmentScheduler(self._db)
+        try:
+            await self._require_assignment_tool_allowed(scheduled.assignment_id, "write_file")
+        except PermissionError as error:
+            await scheduler.fail_attempt(
+                session_id, scheduled.attempt_id, code="tool_not_allowed",
+                summary=str(error), recoverable=False,
+            )
+            raise
         from app.services.budget_counter_service import BudgetCounterService
         budgets = BudgetCounterService(self._db)
         # Reserve both the tool and the resulting revision before requesting a
@@ -257,3 +265,19 @@ class FirstVerticalTaskRunner:
             session_id, capability="workspace.write", scope_path=".", operation_class="mutating", consume_once=False,
         )
         return decision.outcome == "allow"
+
+    async def _require_assignment_tool_allowed(self, assignment_id: str, tool_name: str) -> None:
+        """Fence the currently executable worker path to its session snapshot."""
+
+        async with self._db.execute(
+            """SELECT agent.snapshot_json FROM assignments assignment
+               JOIN session_agents agent ON agent.id = assignment.assignee_session_agent_id
+               WHERE assignment.id = ?""",
+            (assignment_id,),
+        ) as cursor:
+            row = await cursor.fetchone()
+        if row is None:
+            raise PermissionError("The assignment agent snapshot is unavailable.")
+        import json
+        if tool_name not in json.loads(row["snapshot_json"]).get("toolAllowlist", []):
+            raise PermissionError("The session agent definition does not allow this tool.")

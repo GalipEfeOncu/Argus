@@ -27,8 +27,8 @@ from the event log.
 Session creation uses progressive disclosure and provides these sections:
 
 1. **Goal and workspace:** project, goal, workspace isolation, output language.
-2. **Coordinator:** model, prompt override, and enabled skills.
-3. **Available team:** agent instances the Coordinator is permitted to use.
+2. **Coordinator:** selected versioned definition, model, prompt override, and enabled skills.
+3. **Available team:** versioned agent instances (including custom capability-based roles) the Coordinator is permitted to use.
 4. **Required roles:** zero or more completion gates, each with success evidence
    and `always`, `when_changes`, or `when_capability_used` applicability.
 5. **Limits:** revision, assignment attempt, model iteration, tool call, token,
@@ -42,6 +42,12 @@ Session creation uses progressive disclosure and provides these sections:
 Coordinator cannot be disabled. Selecting a required role automatically prompts
 the user to add an eligible agent to the available team. Invalid or internally
 contradictory configurations cannot start.
+
+Role editing creates a new definition version rather than mutating a running
+session. The runtime snapshots the selected definition's capabilities, tool
+allowlist, permission profile, evidence contract, and output language before
+the session starts; session-only overrides may narrow those declarations but
+cannot expand them.
 
 Presets (`Quick`, `Balanced`, `Thorough`, and `Custom`) populate fields but do
 not hide their resolved values. Changing any resolved value marks the preset as

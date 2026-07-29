@@ -136,6 +136,11 @@ workspace revision.
 
 Built-in roles are versioned templates: Coordinator, Planner, Builder, Reviewer, Tester, and UI Agent. A custom role uses the same schema and cannot gain capabilities that its selected session policy disallows.
 
+Definitions are append-only. Creating a built-in override or custom role produces
+a new version; every session resolves that version into an immutable session
+agent before the workspace is provisioned. Later definition edits therefore
+affect only newly created sessions.
+
 ### Agent definition fields
 
 ```json
@@ -144,14 +149,27 @@ Built-in roles are versioned templates: Coordinator, Planner, Builder, Reviewer,
   "name": "Security reviewer",
   "kind": "builtin_override | custom",
   "baseRole": "reviewer | null",
+  "role": "reviewer | custom_security_review",
   "systemPrompt": "...",
   "modelBinding": { "providerProfileId": "uuid", "modelId": "..." },
+  "capabilities": ["workspace.read"],
   "skillIds": ["uuid"],
   "toolAllowlist": ["read_file", "search_files"],
   "permissionProfile": "balanced",
+  "evidenceKinds": ["approved_review"],
+  "evidenceSchema": { "type": "object", "...": "custom roles only" },
   "outputLanguage": "en"
 }
 ```
+
+The scheduler uses capabilities plus an evidence kind (and optional required
+capabilities on a gate) to choose eligible participants. Built-in role names
+provide UX defaults only and do not grant tools, permissions, or gate authority.
+Built-in overrides retain their deterministic evidence validator; custom roles
+must use their own declared, non-built-in evidence kind and schema. The runtime
+rejects an assignment that asks for a tool outside its session agent's immutable
+allowlist, and applies the agent permission profile as a ceiling in addition to
+the session-wide approval policy.
 
 ### Local skill manifest
 

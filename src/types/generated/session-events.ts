@@ -286,6 +286,10 @@ export type Reasonsummary1 = string;
  * @maxItems 50
  */
 export type Requestedcapabilities = string[];
+/**
+ * @maxItems 50
+ */
+export type Requestedtools = string[];
 export type Sequence7 = number;
 export type Sessionid7 = string;
 export type Timestamp7 = string;
@@ -718,6 +722,7 @@ export interface AssignmentProposedPayload {
   proposalId: Proposalid;
   reasonSummary: Reasonsummary1;
   requestedCapabilities?: Requestedcapabilities;
+  requestedTools?: Requestedtools;
 }
 export interface AssignmentCreatedEvent {
   actorId: Actorid8;

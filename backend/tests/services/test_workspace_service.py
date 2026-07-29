@@ -158,6 +158,23 @@ async def test_scoped_mutating_tool_uses_writer_lease_and_persists_revision_arti
 
 
 @pytest.mark.asyncio
+async def test_scoped_tools_apply_the_session_agent_allowlist(temporary_sqlite_db, tmp_path: Path) -> None:
+    project = tmp_path / "plain"
+    project.mkdir()
+    database = await get_db()
+    try:
+        await _session(database, "tool-allowlist")
+        service = ProjectWorkspaceService(database, managed_root=tmp_path / "managed")
+        registered = await service.register_project(str(project))
+        workspace = await service.prepare_workspace(session_id="tool-allowlist", project_id=registered["id"], mode=WorkspaceMode.snapshot)
+        names = {tool.name for tool in create_scoped_tools(workspace, tool_allowlist=["read_file", "search_files"])}
+    finally:
+        await database.close()
+
+    assert names == {"read_file", "search_files"}
+
+
+@pytest.mark.asyncio
 async def test_workspace_tools_reject_escape_symlink_shell_injection_secrets_and_destructive_commands(temporary_sqlite_db, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     project = tmp_path / "plain"
     project.mkdir()

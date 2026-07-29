@@ -70,6 +70,7 @@ class AssignmentScheduler:
                     **({"parentId": parent_id} if parent_id is not None else {}),
                     "objective": proposal.objective, "acceptanceCriteria": proposal.acceptance_criteria,
                     "operationClass": proposal.operation_class, "requestedCapabilities": proposal.requested_capabilities,
+                    "requestedTools": proposal.requested_tools,
                     "reasonSummary": proposal.reason_summary,
                     **({"findingFingerprint": proposal.finding_fingerprint} if proposal.finding_fingerprint is not None else {}),
                 },
@@ -475,15 +476,18 @@ class AssignmentScheduler:
             raise SchedulerRejected("unknown_agent", "The proposed agent does not belong to this session.")
         if set(proposal.requested_capabilities) - set(agent["capabilities"]):
             raise SchedulerRejected("missing_capability", "The proposed agent lacks a requested capability.")
+        if set(proposal.requested_tools) - set(agent.get("toolAllowlist", [])):
+            raise SchedulerRejected("tool_not_allowed", "The proposed agent does not allow one or more requested tools.")
         if proposal.operation_class == "mutating" and "workspace.write" not in proposal.requested_capabilities:
             raise SchedulerRejected("writer_capability_required", "Mutating work must explicitly request workspace.write.")
         if proposal.requested_capabilities and not await self._has_grant(
-            session_id, snapshot, proposal.requested_capabilities, proposal.operation_class,
+            session_id, snapshot, proposal.requested_capabilities, proposal.operation_class, str(agent.get("permissionProfile", "balanced")),
         ):
             raise SchedulerRejected("permission_grant_required", "The requested capabilities do not have an active policy grant.")
 
     async def _has_grant(
         self, session_id: str, snapshot: ConfigurationSnapshot, capabilities: list[str], operation_class: str,
+        agent_permission_profile: str,
     ) -> bool:
         from app.services.approval_grant_service import ApprovalGrantService
         service = ApprovalGrantService(self._db)
@@ -494,6 +498,10 @@ class AssignmentScheduler:
             )
             if decision.outcome != "allow":
                 return False
+            from app.services.approval_grant_service import _profile_outcome
+            if _profile_outcome(agent_permission_profile, capability) == "ask":
+                if await service._matching_grant(session_id, snapshot.policy_hash, capability, ".", consume_once=False) is None:
+                    return False
         return True
 
     async def _acquire_writer_lease(self, session_id: str, assignment_id: str) -> str:

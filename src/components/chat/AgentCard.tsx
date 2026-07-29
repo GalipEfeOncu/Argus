@@ -1,6 +1,6 @@
 import React from 'react';
 import type { AgentInfo } from '@/types/agent';
-import { AGENT_ROLE_META } from '@/types/agent';
+import { agentRoleMeta } from '@/types/agent';
 import { AgentAvatar } from './AgentAvatar';
 import './AgentCard.css';
 
@@ -10,7 +10,7 @@ interface AgentCardProps {
 }
 
 export const AgentCard: React.FC<AgentCardProps> = ({ agent, onClick }) => {
-  const meta = AGENT_ROLE_META[agent.role];
+  const meta = agentRoleMeta(agent.role);
   const isActive = agent.status !== 'idle' && agent.status !== 'done';
 
   return (

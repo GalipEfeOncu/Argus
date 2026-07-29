@@ -512,6 +512,16 @@
           "title": "Minimumcompletions",
           "type": "integer"
         },
+        "requiredCapabilities": {
+          "items": {
+            "maxLength": 160,
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 20,
+          "title": "Requiredcapabilities",
+          "type": "array"
+        },
         "role": {
           "maxLength": 160,
           "minLength": 1,

@@ -104,10 +104,10 @@ class SessionConfigurationService:
             if not config.get("enabled", True):
                 continue
             role = str(config["role"])
-            result.append(SessionAgentInput(
-                id=f"legacy_{index}_{role}", role=role, capabilities=[],
-                model_snapshot={key: config[key] for key in ("providerId", "modelId") if config.get(key) is not None},
-            ))
+            result.append(SessionAgentInput.model_validate({
+                "id": f"legacy_{index}_{role}", "role": role, "capabilities": [],
+                "modelSnapshot": {key: config[key] for key in ("providerId", "modelId") if config.get(key) is not None},
+            }))
         return result
 
     @staticmethod
@@ -144,15 +144,14 @@ class SessionConfigurationService:
         if unknown:
             raise ConfigurationError("unknown_available_agent", "Available agents must be immutable session-agent snapshots.")
         for rule in configuration.required_role_rules:
-            eligible = [by_id[agent_id] for agent_id in available if by_id[agent_id].role == rule.role]
+            eligible = [by_id[agent_id] for agent_id in available if _rule_can_use_agent(rule, by_id[agent_id])]
             if not eligible:
-                raise ConfigurationError("required_role_unavailable", f"Required role '{rule.role}' has no eligible available agent.")
-            expected_evidence = _EVIDENCE_BY_ROLE.get(rule.role)
-            if expected_evidence is not None and rule.success_evidence != expected_evidence:
-                raise ConfigurationError("unsupported_evidence", f"Role '{rule.role}' requires '{expected_evidence}' evidence.")
-            if expected_evidence is None and any(agent.evidence_schema is None for agent in eligible):
+                raise ConfigurationError("required_role_unavailable", f"Required role '{rule.role}' has no eligible available agent for '{rule.success_evidence}' evidence.")
+            if rule.role in _EVIDENCE_BY_ROLE and rule.success_evidence != _EVIDENCE_BY_ROLE[rule.role]:
+                raise ConfigurationError("unsupported_evidence", f"Built-in role '{rule.role}' requires '{_EVIDENCE_BY_ROLE[rule.role]}' evidence.")
+            if rule.role not in _EVIDENCE_BY_ROLE and any(agent.evidence_schema is None for agent in eligible):
                 raise ConfigurationError("custom_evidence_schema_required", "Custom required roles need a registered evidence schema.")
-            if expected_evidence is None and any(not is_supported_json_schema(agent.evidence_schema) for agent in eligible):
+            if rule.role not in _EVIDENCE_BY_ROLE and any(not is_supported_json_schema(agent.evidence_schema) for agent in eligible):
                 raise ConfigurationError("unsupported_custom_evidence_schema", "Custom evidence schemas use the supported JSON-Schema subset only.")
             if rule.applicability == "when_capability_used" and not any(rule.capability in agent.capabilities for agent in eligible):
                 raise ConfigurationError("required_role_capability_unavailable", "An eligible required-role agent must have the configured capability.")
@@ -196,7 +195,11 @@ class SessionConfigurationService:
         snapshot_ids = {agent.id: str(uuid.uuid5(namespace, agent.id)) for agent in agents}
         agent_snapshots = [
             {"id": snapshot_ids[agent.id], "sourceAgentId": agent.id, "role": agent.role,
-             "capabilities": agent.capabilities, "evidenceSchema": agent.evidence_schema}
+             "capabilities": agent.capabilities, "evidenceSchema": agent.evidence_schema,
+             "agentDefinitionId": agent.agent_definition_id, "definitionVersion": _definition_version(agent),
+             "name": agent.name, "skillIds": agent.skill_ids, "toolAllowlist": agent.tool_allowlist,
+             "permissionProfile": agent.permission_profile, "evidenceKinds": _evidence_kinds(agent),
+             "outputLanguage": agent.output_language}
             for agent in agents
         ]
         for agent in agents:
@@ -234,10 +237,7 @@ class SessionConfigurationService:
             agent_rows = await cursor.fetchall()
         for agent in agent_rows:
             raw = json.loads(agent["snapshot_json"])
-            agent_snapshots.append({
-                "id": agent["id"], "sourceAgentId": raw["id"], "role": agent["role"],
-                "capabilities": raw.get("capabilities", []), "evidenceSchema": raw.get("evidenceSchema"),
-            })
+            agent_snapshots.append(_agent_snapshot_wire(agent["id"], agent["role"], raw))
         return ConfigurationSnapshot(
             row["id"], row["session_id"], row["version"], json.loads(row["available_agent_ids_json"]),
             json.loads(row["required_role_rules_json"]), json.loads(row["execution_limits_json"]),
@@ -373,3 +373,31 @@ class SessionConfigurationService:
             agent_snapshots=current.agent_snapshots,
         )
         return snapshot, consequences
+
+
+def _evidence_kinds(agent: SessionAgentInput) -> list[str]:
+    return list(agent.evidence_kinds) or ([ _EVIDENCE_BY_ROLE[agent.role] ] if agent.role in _EVIDENCE_BY_ROLE else [])
+
+
+def _definition_version(agent: SessionAgentInput) -> str | None:
+    return agent.definition_version
+
+
+def _agent_snapshot_wire(snapshot_id: str, role: str, raw: dict[str, Any]) -> dict[str, Any]:
+    agent = SessionAgentInput.model_validate({**raw, "id": raw["id"], "role": role})
+    return {
+        "id": snapshot_id, "sourceAgentId": raw["id"], "role": role,
+        "capabilities": agent.capabilities, "evidenceSchema": agent.evidence_schema,
+        "agentDefinitionId": agent.agent_definition_id, "definitionVersion": _definition_version(agent),
+        "name": agent.name, "skillIds": agent.skill_ids, "toolAllowlist": agent.tool_allowlist,
+        "permissionProfile": agent.permission_profile, "evidenceKinds": _evidence_kinds(agent),
+        "outputLanguage": agent.output_language,
+    }
+
+
+def _rule_can_use_agent(rule: RequiredRoleRule, agent: SessionAgentInput) -> bool:
+    kinds = _evidence_kinds(agent)
+    return (
+        set(rule.required_capabilities).issubset(agent.capabilities)
+        and (rule.success_evidence in kinds or (not kinds and agent.role == rule.role))
+    )

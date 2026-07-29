@@ -6,6 +6,8 @@ type RequestMethod = 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
 type SessionCreateRequest = components['schemas']['SessionCreateRequest'];
 type SessionCreateResponse = operations['create_session_sessions__post']['responses'][200]['content']['application/json'];
 type SessionConfigurationResponse = operations['get_session_configuration_sessions__session_id__configuration_get']['responses'][200]['content']['application/json'];
+type AgentDefinition = components['schemas']['AgentDefinitionResponse'];
+type AgentDefinitionCreate = components['schemas']['AgentDefinitionCreate'];
 
 async function request<T>(method: RequestMethod, path: string, body?: unknown): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
@@ -33,6 +35,11 @@ export const api = {
     get: (id: string) => request<unknown>('GET', `/sessions/${id}`),
     configuration: (id: string) => request<SessionConfigurationResponse>('GET', `/sessions/${id}/configuration`),
     delete: (id: string) => request<void>('DELETE', `/sessions/${id}`),
+  },
+
+  agentDefinitions: {
+    list: () => request<AgentDefinition[]>('GET', '/agent-definitions/'),
+    create: (definition: AgentDefinitionCreate) => request<AgentDefinition>('POST', '/agent-definitions/', definition),
   },
 
   // ── Providers ─────────────────────────────────────────────

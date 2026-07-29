@@ -476,5 +476,5 @@ export class EventSimulator {
 export const eventSimulator = new EventSimulator();
 
 function toSimulatorAgent(agent: AgentInstance): SimulatorAgent {
-  return { id: agent.id, role: agent.role };
+  return { id: agent.id, role: agent.role as AgentRole };
 }

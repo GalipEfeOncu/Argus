@@ -22,6 +22,7 @@ class CoordinatorAssignment(CamelModel):
     operation_class: Literal["read_only", "mutating"]
     requested_budget: dict[str, int | float | None] = Field(max_length=20)
     requested_capabilities: list[Identifier] = Field(default_factory=list, max_length=20)
+    requested_tools: list[Identifier] = Field(default_factory=list, max_length=20)
     reason_summary: ConciseSummary
     finding_fingerprint: FindingFingerprint | None = None
 

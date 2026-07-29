@@ -795,7 +795,7 @@ Completion evidence (2026-07-26):
 
 ## Phase 5 — Roles, skills, models, and provider breadth
 
-### 5.1 Agent definitions and capability routing
+### 5.1 Agent definitions and capability routing (✅ Completed)
 
 Deliverables:
 
@@ -806,6 +806,17 @@ Deliverables:
 - Snapshot definitions into sessions so later edits do not alter active work.
 - Route by capabilities and evidence requirements, using role names only for
   built-in UX defaults.
+
+Completion evidence (2026-07-29):
+
+- Source: this change
+- Verification: `.agents/skills/argus-development/scripts/verify.sh docs`,
+  `frontend`, and `backend` (documentation checks, generated contracts,
+  type-check, 48 frontend tests/build, and 235 backend tests passed).
+- Artifacts/benchmarks: migration 15, immutable agent-definition API and
+  session snapshots, regenerated OpenAPI and TypeScript REST client types.
+- Deferred/unavailable: packaged release-shell and platform probes remain
+  Phase 7 work; no new release-risk regression introduced.
 
 ### 5.2 Local skill packages
 

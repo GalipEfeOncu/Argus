@@ -7,14 +7,20 @@ import { useUIStore } from '@/stores/uiStore';
 
 const openDirectoryDialog = vi.fn();
 const createSessionRequest = vi.fn();
+const listAgentDefinitions = vi.fn();
 
 vi.mock('@/hooks/useTauri', () => ({ useTauri: () => ({ openDirectoryDialog }) }));
-vi.mock('@/services/api', () => ({ api: { sessions: { create: (...args: unknown[]) => createSessionRequest(...args) } } }));
+vi.mock('@/services/api', () => ({ api: {
+  sessions: { create: (...args: unknown[]) => createSessionRequest(...args) },
+  agentDefinitions: { list: () => listAgentDefinitions() },
+} }));
 
 beforeEach(() => {
   openDirectoryDialog.mockReset();
   createSessionRequest.mockReset();
+  listAgentDefinitions.mockReset();
   createSessionRequest.mockResolvedValue({ id: 'ses_live', agentSnapshots: [] });
+  listAgentDefinitions.mockResolvedValue([]);
   useSettingsStore.setState({ defaultRoleModels: {} });
   useSessionStore.setState({ sessions: [], activeSessionId: null });
   useUIStore.setState({ activePage: 'dashboard' });
@@ -72,6 +78,31 @@ test('direct write and Autonomous no-interruption require their visible acknowle
   fireEvent.click(screen.getByRole('button', { name: 'Browse' }));
   await waitFor(() => expect(screen.getByDisplayValue('/next-project')).toBeInTheDocument());
   expect(screen.getByLabelText('I explicitly acknowledge these capabilities for this workspace.')).not.toBeChecked();
+});
+
+test('a selected Coordinator override is sent with its immutable definition and permission profile', async () => {
+  listAgentDefinitions.mockResolvedValueOnce([{
+    id: 'team.coordinator.v2', name: 'Focused Coordinator', kind: 'builtin_override',
+    role: 'coordinator', baseRole: 'coordinator', templateVersion: '2.0.0',
+    systemPrompt: 'Route narrowly.', modelBinding: { providerProfileId: 'local', modelId: 'model' },
+    capabilities: ['coordination.route'], skillIds: [], toolAllowlist: [], evidenceKinds: ['coordination_summary'],
+    permissionProfile: 'strict', outputLanguage: 'en', createdAtMs: 1,
+  }]);
+  openDirectoryDialog.mockResolvedValue('/project');
+  render(<SessionSetup />);
+  await waitFor(() => expect(screen.getByRole('option', { name: 'Focused Coordinator' })).toBeInTheDocument());
+  fireEvent.change(screen.getByLabelText('Definition version'), { target: { value: 'team.coordinator.v2' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Browse' }));
+  await waitFor(() => expect(screen.getByDisplayValue('/project')).toBeInTheDocument());
+  fireEvent.change(screen.getByLabelText('Goal'), { target: { value: 'Use the selected Coordinator' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Start Coordinator session' }));
+
+  await waitFor(() => expect(createSessionRequest).toHaveBeenCalledOnce());
+  expect(createSessionRequest).toHaveBeenCalledWith(expect.objectContaining({
+    agents: expect.arrayContaining([expect.objectContaining({
+      id: 'coordinator', agentDefinitionId: 'team.coordinator.v2', permissionProfile: 'strict',
+    })]),
+  }));
 });
 
 test('a failed live session creation keeps the simulator inactive and explains the recovery step', async () => {

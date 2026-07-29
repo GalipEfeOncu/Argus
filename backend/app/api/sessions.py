@@ -13,6 +13,7 @@ from pathlib import Path
 from app.db.database import transaction
 from app.services.session_configuration_service import ConfigurationError, SessionConfigurationService
 from app.schemas.session import SessionAgentInput
+from app.services.agent_definition_service import AgentDefinitionService
 
 router = APIRouter()
 
@@ -47,6 +48,7 @@ async def create_session(req: SessionCreateRequest):
         coordinator_id = req.coordinator_agent_id or next((agent.id for agent in agents if agent.role == "coordinator"), "coordinator")
         if not any(agent.id == coordinator_id for agent in agents):
             agents.append(SessionAgentInput(id=coordinator_id, role="coordinator"))
+        agents = await AgentDefinitionService(db).resolve_session_agents(agents)
         # Validate before provisioning an isolated workspace so invalid input
         # never leaves a worktree/snapshot behind.
         SessionConfigurationService._validate(

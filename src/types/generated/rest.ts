@@ -5,6 +5,41 @@
  */
 
 export interface paths {
+    "/agent-definitions/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Agent Definitions */
+        get: operations["list_agent_definitions_agent_definitions__get"];
+        put?: never;
+        /** Create Agent Definition */
+        post: operations["create_agent_definition_agent_definitions__post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/agent-definitions/{definition_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Agent Definition */
+        get: operations["get_agent_definition_agent_definitions__definition_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/contracts/session-commands": {
         parameters: {
             query?: never;
@@ -236,6 +271,105 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /**
+         * AgentDefinitionCreate
+         * @description The immutable, versioned source for a session agent.
+         */
+        AgentDefinitionCreate: {
+            /** Baserole */
+            baseRole?: string | null;
+            /** Capabilities */
+            capabilities?: string[];
+            /** Evidencekinds */
+            evidenceKinds?: string[];
+            /** Evidenceschema */
+            evidenceSchema?: {
+                [key: string]: unknown;
+            } | null;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "builtin" | "builtin_override" | "custom";
+            modelBinding: components["schemas"]["AgentModelBinding"];
+            /** Name */
+            name: string;
+            /**
+             * Outputlanguage
+             * @default en
+             */
+            outputLanguage: string;
+            /**
+             * Permissionprofile
+             * @default balanced
+             * @enum {string}
+             */
+            permissionProfile: "strict" | "balanced" | "autonomous" | "expert_unrestricted";
+            /** Role */
+            role: string;
+            /** Skillids */
+            skillIds?: string[];
+            /** Systemprompt */
+            systemPrompt: string;
+            /** Toolallowlist */
+            toolAllowlist?: string[];
+        };
+        /** AgentDefinitionResponse */
+        AgentDefinitionResponse: {
+            /** Baserole */
+            baseRole?: string | null;
+            /** Capabilities */
+            capabilities?: string[];
+            /** Createdatms */
+            createdAtMs: number;
+            /** Evidencekinds */
+            evidenceKinds?: string[];
+            /** Evidenceschema */
+            evidenceSchema?: {
+                [key: string]: unknown;
+            } | null;
+            /** Id */
+            id: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "builtin" | "builtin_override" | "custom";
+            modelBinding: components["schemas"]["AgentModelBinding"];
+            /** Name */
+            name: string;
+            /**
+             * Outputlanguage
+             * @default en
+             */
+            outputLanguage: string;
+            /**
+             * Permissionprofile
+             * @default balanced
+             * @enum {string}
+             */
+            permissionProfile: "strict" | "balanced" | "autonomous" | "expert_unrestricted";
+            /** Role */
+            role: string;
+            /** Skillids */
+            skillIds?: string[];
+            /** Systemprompt */
+            systemPrompt: string;
+            /** Templateversion */
+            templateVersion: string;
+            /** Toolallowlist */
+            toolAllowlist?: string[];
+        };
+        /**
+         * AgentModelBinding
+         * @description A non-secret provider/model reference, never provider credentials.
+         */
+        AgentModelBinding: {
+            /** Modelid */
+            modelId: string;
+            /** Providerprofileid */
+            providerProfileId: string;
+        };
         /** ApprovalPolicy */
         ApprovalPolicy: {
             /**
@@ -643,6 +777,8 @@ export interface components {
             reasonSummary: string;
             /** Requestedcapabilities */
             requestedCapabilities?: string[];
+            /** Requestedtools */
+            requestedTools?: string[];
         };
         /** AssignmentStartedEvent */
         AssignmentStartedEvent: {
@@ -1310,6 +1446,8 @@ export interface components {
              * @default 1
              */
             minimumCompletions: number;
+            /** Requiredcapabilities */
+            requiredCapabilities?: string[];
             /** Role */
             role: string;
             /** Successevidence */
@@ -1340,35 +1478,76 @@ export interface components {
             agentDefinitionId?: string | null;
             /** Capabilities */
             capabilities?: string[];
+            /** Definitionversion */
+            definitionVersion?: string | null;
+            /** Evidencekinds */
+            evidenceKinds?: string[];
             /** Evidenceschema */
             evidenceSchema?: {
                 [key: string]: unknown;
             } | null;
             /** Id */
             id: string;
+            modelBinding?: components["schemas"]["AgentModelBinding"] | null;
             /** Modelsnapshot */
             modelSnapshot?: {
                 [key: string]: unknown;
             };
+            /** Name */
+            name?: string | null;
+            /** Outputlanguage */
+            outputLanguage?: string | null;
+            /**
+             * Permissionprofile
+             * @default balanced
+             * @enum {string}
+             */
+            permissionProfile: "strict" | "balanced" | "autonomous" | "expert_unrestricted";
             /** Role */
             role: string;
+            /** Skillids */
+            skillIds?: string[];
             /** Skillsnapshot */
             skillSnapshot?: unknown[];
+            /** Systemprompt */
+            systemPrompt?: string | null;
+            /** Toolallowlist */
+            toolAllowlist?: string[];
         };
         /** SessionAgentSnapshotResponse */
         SessionAgentSnapshotResponse: {
+            /** Agentdefinitionid */
+            agentDefinitionId?: string | null;
             /** Capabilities */
             capabilities: string[];
+            /** Definitionversion */
+            definitionVersion?: string | null;
+            /** Evidencekinds */
+            evidenceKinds?: string[];
             /** Evidenceschema */
             evidenceSchema?: {
                 [key: string]: unknown;
             } | null;
             /** Id */
             id: string;
+            /** Name */
+            name?: string | null;
+            /** Outputlanguage */
+            outputLanguage?: string | null;
+            /**
+             * Permissionprofile
+             * @default balanced
+             * @enum {string}
+             */
+            permissionProfile: "strict" | "balanced" | "autonomous" | "expert_unrestricted";
             /** Role */
             role: string;
+            /** Skillids */
+            skillIds?: string[];
             /** Sourceagentid */
             sourceAgentId: string;
+            /** Toolallowlist */
+            toolAllowlist?: string[];
         };
         /** SessionConfigurationInput */
         SessionConfigurationInput: {
@@ -1775,6 +1954,90 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    list_agent_definitions_agent_definitions__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentDefinitionResponse"][];
+                };
+            };
+        };
+    };
+    create_agent_definition_agent_definitions__post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AgentDefinitionCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentDefinitionResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_agent_definition_agent_definitions__definition_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                definition_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentDefinitionResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_session_command_contract_contracts_session_commands_get: {
         parameters: {
             query?: never;

@@ -17,6 +17,8 @@ All notable user-visible changes to Argus are recorded here. The project follows
 - Durable approval and grant enforcement: permission profiles, capability
   overrides, expiring exact-scope grants, and no-interruption denial now remain
   enforced across reconnects and restarts.
+- Versioned built-in agent templates, immutable custom/override role definitions,
+  capability/evidence-based routing, and session-safe definition snapshots.
 
 No stable Argus version has been published yet. The manifest version `0.1.0` is
 the current development baseline, not a stable release claim.

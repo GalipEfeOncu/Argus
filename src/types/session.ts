@@ -53,15 +53,20 @@ export type LimitResolution = 'ask_user' | 'coordinator_decides' | 'stop';
 
 export interface AgentInstance {
   id: string;
-  role: Exclude<AgentRole, 'coordinator'>;
+  role: string;
   label: string;
   modelRef: ModelRef | null;
   capabilities: string[];
+  agentDefinitionId: string;
+  evidenceKinds: string[];
+  toolAllowlist: string[];
+  permissionProfile: PermissionProfile;
+  outputLanguage: string;
 }
 
 export interface RequiredRoleRule {
   id: string;
-  role: AgentInstance['role'];
+  role: string;
   applicability: RequiredRoleApplicability;
   successEvidence: string;
   minimumCompletions: number;
@@ -94,6 +99,8 @@ export interface SessionConfiguration {
   workspaceMode: WorkspaceMode;
   outputLanguage: OutputLanguage;
   coordinatorModel: ModelRef | null;
+  coordinatorDefinitionId: string;
+  coordinatorPermissionProfile: PermissionProfile;
   coordinatorPromptOverride: string;
   enabledSkills: string[];
   directWriteAcknowledged: boolean;

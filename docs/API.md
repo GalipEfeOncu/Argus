@@ -135,7 +135,7 @@ be omitted or set to `null` where the schema allows.
 | `message.delta` | `messageId`, `delta` | — |
 | `message.completed` | `messageId` | — |
 | `session.configuration_updated` | `configurationVersion`, `previousPolicyHash`, `policyHash`, `changedFields` | — |
-| `assignment.proposed` | `proposalId`, `assigneeAgentId`, `objective`, `acceptanceCriteria`, `operationClass`, `reasonSummary` | `parentId`, `requestedCapabilities` |
+| `assignment.proposed` | `proposalId`, `assigneeAgentId`, `objective`, `acceptanceCriteria`, `operationClass`, `reasonSummary` | `parentId`, `requestedCapabilities`, `requestedTools` |
 | `assignment.created` | `assignmentId`, `proposalId`, `assigneeAgentId`, `configurationVersion`, `policyHash`, `operationClass` | — |
 | `assignment.started` | `assignmentId`, `assigneeAgentId` | — |
 | `assignment.completed` | `assignmentId`, `status`, `outputSummary` | `evidence` |
@@ -214,7 +214,10 @@ grant.
 ## Session configuration contract
 
 `POST /sessions` accepts durable configuration. IDs below reference existing
-project and agent-definition resources; secrets are never accepted here.
+project and agent-definition resources; secrets are never accepted here. Agent
+definitions are resolved before the session is created, so each session agent
+contains a complete immutable copy rather than a live reference to editable
+role settings.
 The backend stores a fresh immutable session-agent snapshot for every supplied
 agent and returns those session-snapshot IDs in normalized `availableAgentIds`.
 
@@ -224,10 +227,10 @@ agent and returns those session-snapshot IDs in normalized `availableAgentIds`.
   "goal": "Add rate limiting and verify it",
   "coordinatorAgentId": "agd_coordinator",
   "agents": [
-    { "id": "agd_coordinator", "role": "coordinator" },
-    { "id": "agd_builder", "role": "builder", "capabilities": ["workspace.write"] },
-    { "id": "agd_reviewer", "role": "reviewer", "capabilities": ["workspace.read"] },
-    { "id": "agd_tester", "role": "tester", "capabilities": ["test.run"] }
+    { "id": "agd_coordinator", "role": "coordinator", "agentDefinitionId": "builtin.coordinator.v1" },
+    { "id": "agd_builder", "role": "builder", "agentDefinitionId": "builtin.builder.v1" },
+    { "id": "agd_reviewer", "role": "reviewer", "agentDefinitionId": "builtin.reviewer.v1" },
+    { "id": "agd_tester", "role": "tester", "agentDefinitionId": "builtin.tester.v1" }
   ],
   "configuration": {
     "availableAgentIds": ["agd_builder", "agd_reviewer", "agd_tester"],
@@ -252,6 +255,32 @@ agent and returns those session-snapshot IDs in normalized `availableAgentIds`.
   }
 }
 ```
+
+### Agent definitions
+
+`GET /agent-definitions/` returns the versioned built-in Coordinator, Planner,
+Builder, Reviewer, Tester, and UI Agent templates plus immutable user-created
+definitions. `POST /agent-definitions/` creates either a `builtin_override` or
+a `custom` definition; definitions are append-only, so editing means creating
+a new version and can never change an active session.
+
+Every definition declares its `role`, `systemPrompt`, non-secret
+`modelBinding`, `capabilities`, `skillIds`, `toolAllowlist`,
+`permissionProfile`, `evidenceKinds`, `evidenceSchema`, and `outputLanguage`.
+Custom definitions require an evidence schema from the restricted subset
+described below. Built-in template identities are runtime-managed and cannot be
+overwritten. Built-in overrides inherit their base role's deterministic evidence
+validator; custom roles must declare at least one non-built-in evidence kind and
+a supported schema. A session may narrow capabilities, skills, tools, or the
+role permission profile, but it cannot expand any of them or replace an
+evidence contract. Requested assignment tools outside the session-agent
+allowlist are rejected before dispatch; the current executable reference worker
+also checks its immutable assignment snapshot immediately before tool use.
+
+Routing checks declared capabilities and the evidence kinds a session agent can
+produce. A role name is a built-in display/default convenience, not an
+authorization grant: required-gate routing additionally matches each rule's
+`requiredCapabilities` and `successEvidence`.
 
 Every numeric maximum except `maxSessionCost` is an integer greater than or
 equal to zero or `null`; `maxSessionCost` is a non-negative decimal amount or
@@ -302,6 +331,7 @@ and `acknowledgement_required`.
 Capability-based rules also include `capability`. `successEvidence` is a
 versioned role-specific evidence kind such as `approved_review`,
 `passing_test_run`, `accepted_plan`, or a registered custom-role evidence kind.
+`requiredCapabilities` optionally narrows eligible evidence providers further.
 The scheduler alone changes a gate to satisfied after validating assignment
 evidence.
 
@@ -340,7 +370,7 @@ any scheduler work.
 
 | Action | Required visible fields | Runtime effect |
 | --- | --- | --- |
-| `assignments` | concise `routingSummary`, one or more proposals with ID, optional parent, objective, criteria, operation class, requested budget/capabilities, and reason | Proposes dynamic specialist work; every assignee and requested capability is validated against the current available pool. |
+| `assignments` | concise `routingSummary`, one or more proposals with ID, optional parent, objective, criteria, operation class, requested budget/capabilities/tools, and reason | Proposes dynamic specialist work; every assignee, capability, and tool is validated against the current available pool and immutable agent allowlist. |
 | `wait` | concise `routingSummary` | Leaves the session waiting for relevant work or evidence. |
 | `ask_user` | concise `routingSummary` and `question` | Requests a visible human decision. |
 | `final` | concise `finalSummary` and non-empty `evidenceReferences` | May finish only after deterministic required-gate validation. |

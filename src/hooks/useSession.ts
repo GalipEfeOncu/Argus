@@ -5,6 +5,7 @@ import { useAgentStore } from '@/stores/agentStore';
 import { api } from '@/services/api';
 import type { SessionConfig } from '@/types/session';
 import type { AgentInfo } from '@/types/agent';
+import type { AgentRole } from '@/types/agent';
 import type { components } from '@/types/generated/rest';
 
 export function useSession() {
@@ -27,7 +28,7 @@ export function useSession() {
       .filter((rc) => rc.enabled)
       .map((rc) => ({
         instanceId: rc.instanceId,
-        role: rc.role,
+        role: rc.role as AgentRole,
         status: 'idle',
         modelRef: rc.modelRef,
         tokenCount: 0,
@@ -94,8 +95,11 @@ function toSessionCreateRequest(config: SessionConfig): components['schemas']['S
     return {
       id,
       role: roleConfig.role,
+      agentDefinitionId: `builtin.${roleConfig.role}.v1`,
       capabilities: capabilitiesById.get(id) ?? [],
-      modelSnapshot: { providerId: roleConfig.modelRef.providerId, modelId: roleConfig.modelRef.modelId },
+      modelBinding: { providerProfileId: roleConfig.modelRef.providerId, modelId: roleConfig.modelRef.modelId },
+      permissionProfile: 'balanced' as const,
+      ...(roleConfig.customSystemPrompt === undefined ? {} : { systemPrompt: roleConfig.customSystemPrompt }),
     };
   });
   const coordinatorAgentId = agents.find((agent) => agent.role === 'coordinator')?.id ?? 'coordinator';

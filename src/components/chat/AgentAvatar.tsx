@@ -1,6 +1,6 @@
 import React from 'react';
 import type { AgentRole } from '@/types/agent';
-import { AGENT_ROLE_META } from '@/types/agent';
+import { agentRoleMeta } from '@/types/agent';
 import './AgentAvatar.css';
 
 interface AgentAvatarProps {
@@ -10,7 +10,7 @@ interface AgentAvatarProps {
 }
 
 export const AgentAvatar: React.FC<AgentAvatarProps> = ({ role, size = 'md', isPulsing = false }) => {
-  const meta = AGENT_ROLE_META[role];
+  const meta = agentRoleMeta(role);
 
   return (
     <div

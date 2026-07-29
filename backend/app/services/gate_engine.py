@@ -91,7 +91,7 @@ class GateEngine:
         agent_snapshot = json.loads(agent["snapshot_json"])
         snapshot = await SessionConfigurationService(self._db).current(session_id)
         for rule in snapshot.required_role_rules:
-            if rule["role"] != agent["role"]:
+            if not _rule_matches_agent(rule, agent_snapshot):
                 continue
             for item in evidence:
                 if item.get("kind") != rule["successEvidence"]:
@@ -136,13 +136,16 @@ class GateEngine:
             if state.status != "pending":
                 continue
             needed = max(0, state.rule["minimumCompletions"] - state.valid_completions - await self._active_gate_assignment_count(session_id, state.rule))
-            candidates = [agent for agent in snapshot.agent_snapshots if agent["id"] in snapshot.available_agent_ids and agent["role"] == state.rule["role"]]
+            candidates = [
+                agent for agent in snapshot.agent_snapshots
+                if agent["id"] in snapshot.available_agent_ids and _rule_matches_agent(state.rule, agent)
+            ]
             for index in range(needed):
                 agent = candidates[index % len(candidates)]
                 proposal = CoordinatorAssignment.model_validate({
                     "proposalId": f"gate_{state.rule['id']}_{uuid.uuid4().hex}", "assigneeAgentId": agent["id"],
                     "objective": f"Produce validated {state.rule['role']} gate evidence.",
-                    "acceptanceCriteria": [f"Return structured {state.rule['successEvidence']} evidence.", "Use the current workspace revision when applicable."],
+                    "acceptanceCriteria": [f"Gate {state.rule['id']}: return structured {state.rule['successEvidence']} evidence.", "Use the current workspace revision when applicable."],
                     "operationClass": "read_only", "requestedBudget": {}, "requestedCapabilities": [],
                     "reasonSummary": f"Required gate '{state.rule['id']}' is still pending.",
                 })
@@ -197,20 +200,19 @@ class GateEngine:
         async with self._db.execute(
             """SELECT COUNT(DISTINCT evidence.assignment_id) AS total FROM gate_evidence evidence
                JOIN assignments assignment ON assignment.id = evidence.assignment_id
-               JOIN session_agents agent ON agent.id = assignment.assignee_session_agent_id
                WHERE evidence.session_id = ? AND evidence.rule_id = ? AND evidence.evidence_kind = ?
-                 AND evidence.validation_state = 'valid' AND evidence.invalidated_at_ms IS NULL AND agent.role = ?""",
-            (session_id, rule["id"], rule["successEvidence"], rule["role"]),
+                 AND evidence.validation_state = 'valid' AND evidence.invalidated_at_ms IS NULL""",
+            (session_id, rule["id"], rule["successEvidence"]),
         ) as cursor:
             return int((await cursor.fetchone())["total"])
 
     async def _active_gate_assignment_count(self, session_id: str, rule: dict[str, Any]) -> int:
-        marker = f"Return structured {rule['successEvidence']} evidence."
+        marker = f"Gate {rule['id']}: return structured {rule['successEvidence']} evidence."
         async with self._db.execute(
-            """SELECT COUNT(*) AS total FROM assignments assignment JOIN session_agents agent ON agent.id = assignment.assignee_session_agent_id
-               WHERE assignment.session_id = ? AND assignment.state IN ('created', 'running') AND agent.role = ?
+            """SELECT COUNT(*) AS total FROM assignments assignment
+               WHERE assignment.session_id = ? AND assignment.state IN ('created', 'running')
                  AND json_extract(assignment.acceptance_criteria_json, '$[0]') = ?""",
-            (session_id, rule["role"], marker),
+            (session_id, marker),
         ) as cursor:
             return int((await cursor.fetchone())["total"])
 
@@ -230,3 +232,13 @@ def _string_or_none(value: object) -> str | None:
 
 def _nonempty(value: object) -> bool:
     return bool(value) and (not isinstance(value, str) or bool(value.strip()))
+
+
+def _rule_matches_agent(rule: dict[str, Any], agent: dict[str, Any]) -> bool:
+    """Use declared evidence/capabilities; role is a display default, never authority."""
+
+    kinds = agent.get("evidenceKinds") or [_BUILTIN_EVIDENCE.get(agent.get("role"), "")]
+    return (
+        (rule["successEvidence"] in kinds or (not agent.get("evidenceKinds") and rule["role"] == agent.get("role")))
+        and set(rule.get("requiredCapabilities", [])).issubset(set(agent.get("capabilities", [])))
+    )

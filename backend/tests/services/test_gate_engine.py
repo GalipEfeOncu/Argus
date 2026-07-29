@@ -141,6 +141,21 @@ async def test_capability_gate_uses_accepted_proposals_not_rejected_model_output
 
 
 @pytest.mark.asyncio
+async def test_distinct_pending_gates_with_the_same_evidence_each_receive_work(temporary_sqlite_db) -> None:
+    database = await get_db()
+    try:
+        await gate_session(database, [
+            RequiredRoleRule(id="review_one", role="reviewer", applicability="always", successEvidence="approved_review"),
+            RequiredRoleRule(id="review_two", role="reviewer", applicability="always", successEvidence="approved_review"),
+        ])
+        queued = await GateEngine(database).route_unsatisfied("gate_session")
+    finally:
+        await database.close()
+
+    assert len(queued) == 2
+
+
+@pytest.mark.asyncio
 async def test_invalid_model_prose_and_stale_review_evidence_do_not_satisfy_gate(temporary_sqlite_db) -> None:
     database = await get_db()
     try:

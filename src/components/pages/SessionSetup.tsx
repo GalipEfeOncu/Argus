@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useSessionStore } from '@/stores/sessionStore';
 import { useAgentStore } from '@/stores/agentStore';
@@ -37,8 +37,21 @@ function toSessionCreateRequest(
     goal,
     coordinatorAgentId: 'coordinator',
     agents: [
-      { id: 'coordinator', role: 'coordinator' },
-      ...configuration.availableAgents.map((agent) => ({ id: agent.id, role: agent.role, capabilities: agent.capabilities })),
+      {
+        id: 'coordinator', role: 'coordinator', agentDefinitionId: configuration.coordinatorDefinitionId,
+        modelBinding: configuration.coordinatorModel === null ? undefined : {
+          providerProfileId: configuration.coordinatorModel.providerId, modelId: configuration.coordinatorModel.modelId,
+        },
+        permissionProfile: configuration.coordinatorPermissionProfile,
+        ...(configuration.coordinatorPromptOverride.trim() ? { systemPrompt: configuration.coordinatorPromptOverride } : {}),
+        outputLanguage: configuration.outputLanguage,
+      },
+      ...configuration.availableAgents.map((agent) => ({
+        id: agent.id, role: agent.role, agentDefinitionId: agent.agentDefinitionId, capabilities: agent.capabilities,
+        ...(agent.modelRef === null ? {} : { modelBinding: { providerProfileId: agent.modelRef.providerId, modelId: agent.modelRef.modelId } }),
+        permissionProfile: agent.permissionProfile,
+        outputLanguage: configuration.outputLanguage,
+      })),
     ],
     configuration: {
       availableAgentIds: configuration.availableAgentIds,
@@ -48,6 +61,7 @@ function toSessionCreateRequest(
         applicability: rule.applicability,
         successEvidence: rule.successEvidence,
         minimumCompletions: rule.minimumCompletions,
+        requiredCapabilities: [],
         ...(rule.capability === undefined ? {} : { capability: rule.capability }),
       })),
       executionLimits: configuration.executionLimits,
@@ -90,6 +104,42 @@ export const SessionSetup: React.FC = () => {
   const [configuration, setConfiguration] = useState(() => createConfiguration(defaultRoleModels));
   const [startError, setStartError] = useState<string | null>(null);
   const [isStarting, setIsStarting] = useState(false);
+  const [coordinatorDefinitions, setCoordinatorDefinitions] = useState<Array<{ id: string; name: string; permissionProfile: SessionConfiguration['coordinatorPermissionProfile'] }>>([
+    { id: 'builtin.coordinator.v1', name: 'Coordinator', permissionProfile: 'balanced' },
+  ]);
+
+  useEffect(() => {
+    let active = true;
+    const listDefinitions = api.agentDefinitions?.list;
+    if (listDefinitions === undefined) return () => { active = false; };
+    void listDefinitions().then((definitions) => {
+      if (!active) return;
+      const customAgents: AgentInstance[] = definitions
+        .filter((definition) => definition.kind !== 'builtin' && definition.role !== 'coordinator')
+        .map((definition) => ({
+          id: `definition-${definition.id}`,
+          role: definition.role,
+          label: definition.name,
+          modelRef: { providerId: definition.modelBinding.providerProfileId, modelId: definition.modelBinding.modelId, displayName: definition.modelBinding.modelId },
+          capabilities: definition.capabilities ?? [],
+          agentDefinitionId: definition.id,
+          evidenceKinds: definition.evidenceKinds ?? [],
+          toolAllowlist: definition.toolAllowlist ?? [],
+          permissionProfile: definition.permissionProfile,
+          outputLanguage: definition.outputLanguage,
+        }));
+      setConfiguration((current) => ({
+        ...current,
+        availableAgents: [...current.availableAgents.filter((agent) => !agent.id.startsWith('definition-')), ...customAgents],
+      }));
+      setCoordinatorDefinitions([
+        { id: 'builtin.coordinator.v1', name: 'Coordinator', permissionProfile: 'balanced' },
+        ...definitions.filter((definition) => definition.role === 'coordinator' && definition.id !== 'builtin.coordinator.v1')
+          .map((definition) => ({ id: definition.id, name: definition.name, permissionProfile: definition.permissionProfile })),
+      ]);
+    }).catch(() => { /* The setup remains usable while the local catalogue starts. */ });
+    return () => { active = false; };
+  }, []);
 
   const validation = useMemo(() => validateConfiguration(configuration), [configuration]);
   const canStart = projectPath.trim().length > 0 && goal.trim().length > 0 && validation.length === 0;
@@ -127,7 +177,7 @@ export const SessionSetup: React.FC = () => {
     if (matching) return { ...current, requiredRoleRules: current.requiredRoleRules.filter((rule) => rule.id !== matching.id) };
     const newRule: RequiredRoleRule = {
       id: `gate-${agent.role}`, role: agent.role, applicability: agent.role === 'reviewer' || agent.role === 'tester' ? 'when_changes' : 'always',
-      successEvidence: roleEvidence(agent.role), minimumCompletions: 1,
+      successEvidence: agent.evidenceKinds[0] ?? roleEvidence(agent.role), minimumCompletions: 1,
     };
     return {
       ...current,
@@ -218,6 +268,7 @@ export const SessionSetup: React.FC = () => {
           <section className="setup-card" aria-labelledby="setup-coordinator">
             <h2 id="setup-coordinator" className="setup-card-label">2 — Coordinator</h2>
             <p className="setup-static">Coordinator is mandatory and receives messages without an @mention.</p>
+            <label className="setup-label" htmlFor="coordinator-definition">Definition version</label><select id="coordinator-definition" className="setup-select" value={configuration.coordinatorDefinitionId} onChange={(event) => { const definition = coordinatorDefinitions.find((item) => item.id === event.target.value); update((current) => ({ ...current, coordinatorDefinitionId: event.target.value, coordinatorPermissionProfile: definition?.permissionProfile ?? current.coordinatorPermissionProfile })); }}>{coordinatorDefinitions.map((definition) => <option key={definition.id} value={definition.id}>{definition.name}</option>)}</select>
             <label className="setup-label" htmlFor="coordinator-model">Model</label><select id="coordinator-model" className="setup-select" value={configuration.coordinatorModel ? 'configured' : 'missing'} onChange={(event) => update((current) => ({ ...current, coordinatorModel: event.target.value === 'missing' ? null : defaultRoleModels.coordinator ?? configuration.coordinatorModel }))}><option value="configured">{configuration.coordinatorModel?.displayName ?? 'Configured model'}</option><option value="missing">No model configured</option></select>
             <label className="setup-label" htmlFor="coordinator-prompt">Prompt override <span className="setup-muted">(optional)</span></label><textarea id="coordinator-prompt" className="setup-textarea setup-textarea--compact" value={configuration.coordinatorPromptOverride} onChange={(event) => update((current) => ({ ...current, coordinatorPromptOverride: event.target.value }))} placeholder="Keep routing and handoffs concise…" />
             <fieldset className="setup-fieldset"><legend>Enabled skills</legend><label className="choice-row"><input type="checkbox" checked={configuration.enabledSkills.includes('workspace-analysis')} onChange={() => update((current) => ({ ...current, enabledSkills: current.enabledSkills.includes('workspace-analysis') ? [] : ['workspace-analysis'] }))} />Workspace analysis</label></fieldset>
@@ -225,7 +276,7 @@ export const SessionSetup: React.FC = () => {
 
           <section className="setup-card" aria-labelledby="setup-team">
             <h2 id="setup-team" className="setup-card-label">3 — Available team</h2><p className="setup-static">These are agent instances the Coordinator may select; roles are not a fixed pipeline.</p>
-            <div className="agent-config-list">{configuration.availableAgents.map((agent) => { const selected = configuration.availableAgentIds.includes(agent.id); const required = configuration.requiredRoleRules.some((rule) => rule.role === agent.role); return <div className="agent-config-row" key={agent.id}><label><input type="checkbox" checked={selected} disabled={required} onChange={() => toggleAgent(agent)} /> <strong>{agent.label}</strong><span>{agent.modelRef?.displayName ?? 'Model missing'}</span></label><span className="agent-capabilities">{agent.capabilities.join(' · ')}</span>{required && <span className="required-lock">Required gate</span>}</div>; })}</div>
+            <div className="agent-config-list">{configuration.availableAgents.map((agent) => { const selected = configuration.availableAgentIds.includes(agent.id); const required = configuration.requiredRoleRules.some((rule) => rule.role === agent.role); return <div className="agent-config-row" key={agent.id}><label><input type="checkbox" checked={selected} disabled={required} onChange={() => toggleAgent(agent)} /> <strong>{agent.label}</strong><span>{agent.modelRef?.displayName ?? 'Model missing'}</span></label><span className="agent-capabilities">{agent.capabilities.join(' · ')}</span>{agent.agentDefinitionId.startsWith('builtin.') ? null : <span className="setup-muted">Custom definition</span>}{required && <span className="required-lock">Required gate</span>}</div>; })}</div>
             <p className="setup-muted">Selected: {visibleAgentNames(configuration)}</p>
           </section>
 

@@ -46,12 +46,16 @@ async def scheduler_session(database: aiosqlite.Connection) -> dict[str, str]:
     return {agent["sourceAgentId"]: agent["id"] for agent in snapshot.agent_snapshots}
 
 
-def proposal(proposal_id: str, assignee: str, *, operation: str = "read_only", parent: str | None = None) -> CoordinatorAssignment:
+def proposal(
+    proposal_id: str, assignee: str, *, operation: str = "read_only", parent: str | None = None,
+    requested_tools: list[str] | None = None,
+) -> CoordinatorAssignment:
     capabilities = ["workspace.write"] if operation == "mutating" else ["workspace.read"]
     return CoordinatorAssignment.model_validate({
         "proposalId": proposal_id, "assigneeAgentId": assignee, "parentId": parent,
         "objective": "Complete the bounded scheduler task.", "acceptanceCriteria": ["Persist a concise result."],
         "operationClass": operation, "requestedBudget": {}, "requestedCapabilities": capabilities,
+        "requestedTools": requested_tools or [],
         "reasonSummary": "The available specialist has the required capability.",
     })
 
@@ -91,6 +95,23 @@ async def test_rejected_proposals_are_durable_audit_outcomes(temporary_sqlite_db
         await database.close()
 
     assert dict(outcome) == {"validation_state": "rejected", "validation_code": "missing_capability"}
+
+
+@pytest.mark.asyncio
+async def test_scheduler_rejects_tools_outside_the_immutable_agent_allowlist(temporary_sqlite_db) -> None:
+    database = await get_db()
+    try:
+        agents = await scheduler_session(database)
+        with pytest.raises(Exception, match="allow"):
+            await AssignmentScheduler(database).accept_coordinator_proposal(
+                "scheduler_session", proposal("tool-denied", agents["reader"], requested_tools=["shell_exec"]),
+            )
+        async with database.execute("SELECT validation_code FROM assignment_proposals WHERE id = 'tool-denied'") as cursor:
+            outcome = await cursor.fetchone()
+    finally:
+        await database.close()
+
+    assert outcome["validation_code"] == "tool_not_allowed"
 
 
 @pytest.mark.asyncio

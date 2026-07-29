@@ -11,6 +11,7 @@ import asyncio
 from pathlib import Path
 import subprocess
 import uuid
+from collections.abc import Iterable
 
 from langchain_core.tools import BaseTool, tool
 
@@ -29,7 +30,7 @@ def _result_error(error: Exception) -> str:
     return f"Error: {error}"
 
 
-def create_scoped_tools(workspace: WorkspaceRecord) -> list[BaseTool]:
+def create_scoped_tools(workspace: WorkspaceRecord, *, tool_allowlist: Iterable[str] | None = None) -> list[BaseTool]:
     service = ScopedToolService(workspace)
     mutation_lock = asyncio.Lock()
     holder_id = f"legacy-worker:{uuid.uuid4()}"
@@ -160,4 +161,8 @@ def create_scoped_tools(workspace: WorkspaceRecord) -> list[BaseTool]:
         """Get a bounded git diff summary for the active session workspace."""
         return await shell_exec.ainvoke({"argv": ["git", "diff", "--stat", "--no-ext-diff"]})
 
-    return [read_file, write_file, list_dir, search_files, shell_exec, git_status, git_diff]
+    tools: list[BaseTool] = [read_file, write_file, list_dir, search_files, shell_exec, git_status, git_diff]
+    if tool_allowlist is None:
+        return tools
+    allowed = frozenset(tool_allowlist)
+    return [candidate for candidate in tools if candidate.name in allowed]
