@@ -1,6 +1,435 @@
 {
   "components": {
     "schemas": {
+      "AcceptanceActionRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "enum": [
+              "apply",
+              "reject",
+              "export",
+              "follow_up"
+            ],
+            "title": "Action",
+            "type": "string"
+          },
+          "commandId": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Commandid",
+            "type": "string"
+          },
+          "disposition": {
+            "enum": [
+              "retain",
+              "cleanup"
+            ],
+            "title": "Disposition",
+            "type": "string"
+          },
+          "expectedOriginalChecksum": {
+            "anyOf": [
+              {
+                "maxLength": 160,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expectedoriginalchecksum"
+          },
+          "followUpGoal": {
+            "anyOf": [
+              {
+                "maxLength": 4000,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Followupgoal"
+          }
+        },
+        "required": [
+          "commandId",
+          "action",
+          "disposition"
+        ],
+        "title": "AcceptanceActionRequest",
+        "type": "object"
+      },
+      "AcceptanceActionResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "enum": [
+              "apply",
+              "reject",
+              "export",
+              "follow_up"
+            ],
+            "title": "Action",
+            "type": "string"
+          },
+          "completedAtMs": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Completedatms"
+          },
+          "createdAtMs": {
+            "minimum": 0.0,
+            "title": "Createdatms",
+            "type": "integer"
+          },
+          "disposition": {
+            "enum": [
+              "retain",
+              "cleanup"
+            ],
+            "title": "Disposition",
+            "type": "string"
+          },
+          "id": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Id",
+            "type": "string"
+          },
+          "state": {
+            "enum": [
+              "pending",
+              "waiting_approval",
+              "applying",
+              "applied",
+              "rejected",
+              "exported",
+              "follow_up_started",
+              "drifted",
+              "denied",
+              "failed",
+              "outcome_unknown"
+            ],
+            "title": "State",
+            "type": "string"
+          },
+          "summary": {
+            "maxLength": 4000,
+            "minLength": 1,
+            "title": "Summary",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "action",
+          "disposition",
+          "state",
+          "summary",
+          "createdAtMs"
+        ],
+        "title": "AcceptanceActionResponse",
+        "type": "object"
+      },
+      "AcceptanceFileResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "additions": {
+            "minimum": 0.0,
+            "title": "Additions",
+            "type": "integer"
+          },
+          "byteLength": {
+            "minimum": 0.0,
+            "title": "Bytelength",
+            "type": "integer"
+          },
+          "change": {
+            "enum": [
+              "added",
+              "modified",
+              "deleted",
+              "binary"
+            ],
+            "title": "Change",
+            "type": "string"
+          },
+          "deletions": {
+            "minimum": 0.0,
+            "title": "Deletions",
+            "type": "integer"
+          },
+          "path": {
+            "maxLength": 4096,
+            "minLength": 1,
+            "title": "Path",
+            "type": "string"
+          }
+        },
+        "required": [
+          "path",
+          "change",
+          "additions",
+          "deletions",
+          "byteLength"
+        ],
+        "title": "AcceptanceFileResponse",
+        "type": "object"
+      },
+      "AcceptanceGateResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "evidenceCount": {
+            "minimum": 0.0,
+            "title": "Evidencecount",
+            "type": "integer"
+          },
+          "id": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Id",
+            "type": "string"
+          },
+          "role": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Role",
+            "type": "string"
+          },
+          "status": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "role",
+          "status",
+          "evidenceCount"
+        ],
+        "title": "AcceptanceGateResponse",
+        "type": "object"
+      },
+      "AcceptancePatchResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "checksum": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Checksum",
+            "type": "string"
+          },
+          "patch": {
+            "maxLength": 2000000,
+            "title": "Patch",
+            "type": "string"
+          }
+        },
+        "required": [
+          "patch",
+          "checksum"
+        ],
+        "title": "AcceptancePatchResponse",
+        "type": "object"
+      },
+      "AcceptanceReviewResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "artifacts": {
+            "items": {
+              "$ref": "#/components/schemas/ArtifactSummaryResponse"
+            },
+            "maxItems": 100,
+            "title": "Artifacts",
+            "type": "array"
+          },
+          "canApply": {
+            "title": "Canapply",
+            "type": "boolean"
+          },
+          "coordinatorSummary": {
+            "anyOf": [
+              {
+                "maxLength": 4000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Coordinatorsummary"
+          },
+          "currentOriginalChecksum": {
+            "anyOf": [
+              {
+                "maxLength": 160,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currentoriginalchecksum"
+          },
+          "drifted": {
+            "title": "Drifted",
+            "type": "boolean"
+          },
+          "files": {
+            "items": {
+              "$ref": "#/components/schemas/AcceptanceFileResponse"
+            },
+            "maxItems": 1000,
+            "title": "Files",
+            "type": "array"
+          },
+          "gates": {
+            "items": {
+              "$ref": "#/components/schemas/AcceptanceGateResponse"
+            },
+            "maxItems": 100,
+            "title": "Gates",
+            "type": "array"
+          },
+          "latestAction": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AcceptanceActionResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "limits": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "maxItems": 100,
+            "title": "Limits",
+            "type": "array"
+          },
+          "originalChecksum": {
+            "anyOf": [
+              {
+                "maxLength": 160,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Originalchecksum"
+          },
+          "patchAvailable": {
+            "title": "Patchavailable",
+            "type": "boolean"
+          },
+          "sessionId": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Sessionid",
+            "type": "string"
+          },
+          "unmetGates": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 100,
+            "title": "Unmetgates",
+            "type": "array"
+          },
+          "usage": {
+            "$ref": "#/components/schemas/AcceptanceUsageResponse"
+          },
+          "workspaceChecksum": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Workspacechecksum",
+            "type": "string"
+          },
+          "workspaceMode": {
+            "enum": [
+              "worktree",
+              "snapshot",
+              "direct_write"
+            ],
+            "title": "Workspacemode",
+            "type": "string"
+          }
+        },
+        "required": [
+          "sessionId",
+          "workspaceMode",
+          "workspaceChecksum",
+          "drifted",
+          "canApply",
+          "patchAvailable",
+          "files",
+          "artifacts",
+          "gates",
+          "unmetGates",
+          "limits",
+          "usage"
+        ],
+        "title": "AcceptanceReviewResponse",
+        "type": "object"
+      },
+      "AcceptanceUsageResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "durationMs": {
+            "minimum": 0.0,
+            "title": "Durationms",
+            "type": "integer"
+          },
+          "inputTokens": {
+            "minimum": 0.0,
+            "title": "Inputtokens",
+            "type": "integer"
+          },
+          "normalizedCost": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Normalizedcost"
+          },
+          "outputTokens": {
+            "minimum": 0.0,
+            "title": "Outputtokens",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "inputTokens",
+          "outputTokens",
+          "durationMs"
+        ],
+        "title": "AcceptanceUsageResponse",
+        "type": "object"
+      },
       "AgentDefinitionCreate": {
         "additionalProperties": false,
         "description": "The immutable, versioned source for a session agent.",
@@ -5937,6 +6366,145 @@
           }
         },
         "summary": "Get Session",
+        "tags": [
+          "sessions"
+        ]
+      }
+    },
+    "/sessions/{session_id}/acceptance": {
+      "get": {
+        "description": "Return bounded evidence needed to review an isolated result.",
+        "operationId": "get_acceptance_review_sessions__session_id__acceptance_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "title": "Session Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AcceptanceReviewResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Acceptance Review",
+        "tags": [
+          "sessions"
+        ]
+      }
+    },
+    "/sessions/{session_id}/acceptance/actions": {
+      "post": {
+        "description": "Run an idempotent, auditable user acceptance action.",
+        "operationId": "acceptance_action_sessions__session_id__acceptance_actions_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "title": "Session Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AcceptanceActionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AcceptanceActionResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Acceptance Action",
+        "tags": [
+          "sessions"
+        ]
+      }
+    },
+    "/sessions/{session_id}/acceptance/patch": {
+      "get": {
+        "description": "Create a bounded user-requested patch without persisting its body.",
+        "operationId": "export_acceptance_patch_sessions__session_id__acceptance_patch_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "title": "Session Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AcceptancePatchResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Export Acceptance Patch",
         "tags": [
           "sessions"
         ]

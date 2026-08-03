@@ -12,6 +12,10 @@ type SkillPackage = components['schemas']['SkillPackageResponse'];
 type ProviderProfile = components['schemas']['ProviderProfileResponse'];
 type ProviderProfileCreate = components['schemas']['ProviderProfileCreate'];
 type ProviderModels = components['schemas']['ProviderModelListResponse'];
+type AcceptanceReview = components['schemas']['AcceptanceReviewResponse'];
+type AcceptanceActionRequest = components['schemas']['AcceptanceActionRequest'];
+type AcceptanceAction = components['schemas']['AcceptanceActionResponse'];
+type AcceptancePatch = components['schemas']['AcceptancePatchResponse'];
 
 async function request<T>(method: RequestMethod, path: string, body?: unknown): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
@@ -39,6 +43,9 @@ export const api = {
     get: (id: string) => request<unknown>('GET', `/sessions/${id}`),
     configuration: (id: string) => request<SessionConfigurationResponse>('GET', `/sessions/${id}/configuration`),
     delete: (id: string) => request<void>('DELETE', `/sessions/${id}`),
+    acceptance: (id: string) => request<AcceptanceReview>('GET', `/sessions/${id}/acceptance`),
+    acceptancePatch: (id: string) => request<AcceptancePatch>('GET', `/sessions/${id}/acceptance/patch`),
+    acceptanceAction: (id: string, action: AcceptanceActionRequest) => request<AcceptanceAction>('POST', `/sessions/${id}/acceptance/actions`, action),
   },
 
   agentDefinitions: {

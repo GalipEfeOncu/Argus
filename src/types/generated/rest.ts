@@ -220,6 +220,66 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/sessions/{session_id}/acceptance": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Acceptance Review
+         * @description Return bounded evidence needed to review an isolated result.
+         */
+        get: operations["get_acceptance_review_sessions__session_id__acceptance_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sessions/{session_id}/acceptance/actions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Acceptance Action
+         * @description Run an idempotent, auditable user acceptance action.
+         */
+        post: operations["acceptance_action_sessions__session_id__acceptance_actions_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sessions/{session_id}/acceptance/patch": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export Acceptance Patch
+         * @description Create a bounded user-requested patch without persisting its body.
+         */
+        get: operations["export_acceptance_patch_sessions__session_id__acceptance_patch_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/sessions/{session_id}/artifacts": {
         parameters: {
             query?: never;
@@ -335,6 +395,134 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** AcceptanceActionRequest */
+        AcceptanceActionRequest: {
+            /**
+             * Action
+             * @enum {string}
+             */
+            action: "apply" | "reject" | "export" | "follow_up";
+            /** Commandid */
+            commandId: string;
+            /**
+             * Disposition
+             * @enum {string}
+             */
+            disposition: "retain" | "cleanup";
+            /** Expectedoriginalchecksum */
+            expectedOriginalChecksum?: string | null;
+            /** Followupgoal */
+            followUpGoal?: string | null;
+        };
+        /** AcceptanceActionResponse */
+        AcceptanceActionResponse: {
+            /**
+             * Action
+             * @enum {string}
+             */
+            action: "apply" | "reject" | "export" | "follow_up";
+            /** Completedatms */
+            completedAtMs?: number | null;
+            /** Createdatms */
+            createdAtMs: number;
+            /**
+             * Disposition
+             * @enum {string}
+             */
+            disposition: "retain" | "cleanup";
+            /** Id */
+            id: string;
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "pending" | "waiting_approval" | "applying" | "applied" | "rejected" | "exported" | "follow_up_started" | "drifted" | "denied" | "failed" | "outcome_unknown";
+            /** Summary */
+            summary: string;
+        };
+        /** AcceptanceFileResponse */
+        AcceptanceFileResponse: {
+            /** Additions */
+            additions: number;
+            /** Bytelength */
+            byteLength: number;
+            /**
+             * Change
+             * @enum {string}
+             */
+            change: "added" | "modified" | "deleted" | "binary";
+            /** Deletions */
+            deletions: number;
+            /** Path */
+            path: string;
+        };
+        /** AcceptanceGateResponse */
+        AcceptanceGateResponse: {
+            /** Evidencecount */
+            evidenceCount: number;
+            /** Id */
+            id: string;
+            /** Role */
+            role: string;
+            /** Status */
+            status: string;
+        };
+        /** AcceptancePatchResponse */
+        AcceptancePatchResponse: {
+            /** Checksum */
+            checksum: string;
+            /** Patch */
+            patch: string;
+        };
+        /** AcceptanceReviewResponse */
+        AcceptanceReviewResponse: {
+            /** Artifacts */
+            artifacts: components["schemas"]["ArtifactSummaryResponse"][];
+            /** Canapply */
+            canApply: boolean;
+            /** Coordinatorsummary */
+            coordinatorSummary?: string | null;
+            /** Currentoriginalchecksum */
+            currentOriginalChecksum?: string | null;
+            /** Drifted */
+            drifted: boolean;
+            /** Files */
+            files: components["schemas"]["AcceptanceFileResponse"][];
+            /** Gates */
+            gates: components["schemas"]["AcceptanceGateResponse"][];
+            latestAction?: components["schemas"]["AcceptanceActionResponse"] | null;
+            /** Limits */
+            limits: {
+                [key: string]: unknown;
+            }[];
+            /** Originalchecksum */
+            originalChecksum?: string | null;
+            /** Patchavailable */
+            patchAvailable: boolean;
+            /** Sessionid */
+            sessionId: string;
+            /** Unmetgates */
+            unmetGates: string[];
+            usage: components["schemas"]["AcceptanceUsageResponse"];
+            /** Workspacechecksum */
+            workspaceChecksum: string;
+            /**
+             * Workspacemode
+             * @enum {string}
+             */
+            workspaceMode: "worktree" | "snapshot" | "direct_write";
+        };
+        /** AcceptanceUsageResponse */
+        AcceptanceUsageResponse: {
+            /** Durationms */
+            durationMs: number;
+            /** Inputtokens */
+            inputTokens: number;
+            /** Normalizedcost */
+            normalizedCost?: number | null;
+            /** Outputtokens */
+            outputTokens: number;
+        };
         /**
          * AgentDefinitionCreate
          * @description The immutable, versioned source for a session agent.
@@ -2556,6 +2744,103 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_acceptance_review_sessions__session_id__acceptance_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AcceptanceReviewResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    acceptance_action_sessions__session_id__acceptance_actions_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AcceptanceActionRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AcceptanceActionResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    export_acceptance_patch_sessions__session_id__acceptance_patch_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AcceptancePatchResponse"];
                 };
             };
             /** @description Validation Error */

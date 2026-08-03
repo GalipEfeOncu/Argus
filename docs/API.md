@@ -461,7 +461,7 @@ The REST API manages durable configuration; real-time execution uses WebSocket c
 | --- | --- |
 | `/health` | Runtime health and version |
 | `/projects` | Register, validate, and list local projects |
-| `/sessions` | Create, list, inspect, archive, and delete sessions |
+| `/sessions` | Create, list, inspect, review/accept isolated results, archive, and delete sessions |
 | `/agent-definitions` | Built-in templates, overrides, and custom roles |
 | `/skills` | List, import, validate, enable, and assign local skills |
 | `/providers` | Provider metadata, credential references, validation, and model discovery |
@@ -478,6 +478,33 @@ hydrates artifact bodies or the complete event log.
 
 `GET /sessions/{sessionId}/configuration` returns the latest normalized,
 immutable configuration snapshot after process restart.
+
+### Diff review and acceptance
+
+`GET /sessions/{sessionId}/acceptance` returns a bounded review model for an
+isolated terminal session: changed-file metadata, artifact summaries, validated
+and unmet gates, limit history, normalized usage, and the latest visible
+Coordinator summary. It never returns credentials or private reasoning.
+`GET /sessions/{sessionId}/acceptance/patch` creates a user-requested,
+text-only, bounded patch without persisting its body.
+
+`POST /sessions/{sessionId}/acceptance/actions` accepts an idempotent
+`commandId`, `action` (`apply`, `reject`, `export`, or `follow_up`) and an
+explicit `disposition` (`retain` or `cleanup`). `apply` also supplies the
+review's `expectedOriginalChecksum`. The runtime accepts apply only for a
+completed or human-accepted partial isolated session, after current
+`original_project.write` policy/grant evaluation and a writer lease. It compares the
+original project's current checksum immediately before write; any drift blocks
+the write and records a visible conflict outcome. Patch preflight must succeed
+before application. Binary or oversized changes are export/apply-blocked and
+require retained manual review. A restart while apply is in progress becomes an
+`outcome_unknown` record and is never replayed automatically.
+
+Reject/export/follow-up actions are also durable and visible in the shared
+timeline. Cleanup occurs only with the explicit `cleanup` disposition and only
+after the requested safe action succeeds. A follow-up creates a fresh isolated
+session from immutable agent/configuration snapshots; it does not reuse or
+silently modify the original project.
 
 ### Local skills
 

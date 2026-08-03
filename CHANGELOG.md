@@ -27,6 +27,10 @@ All notable user-visible changes to Argus are recorded here. The project follows
 - Restart-safe session recovery: durable projections, grants, counters, worker
   checkpoints, leases, and unknown tool/provider outcomes are reconciled after
   a sidecar restart without automatically replaying a mutating operation.
+- Review and acceptance workflow for isolated results: users can inspect file
+  changes, evidence, gates, limits, usage, and Coordinator summaries; safely
+  apply policy-checked changes, reject, export a patch, or start a fresh
+  follow-up session. Original-project drift blocks automatic writes.
 
 No stable Argus version has been published yet. The manifest version `0.1.0` is
 the current development baseline, not a stable release claim.

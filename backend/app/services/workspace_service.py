@@ -239,6 +239,7 @@ class WorkspaceRecord:
     root_path: Path
     baseline_path: Path | None
     revision_checksum: str
+    original_revision_checksum: str | None
 
 
 class ProjectWorkspaceService:
@@ -330,6 +331,10 @@ class ProjectWorkspaceService:
             raise UnsupportedProject("git projects use worktree mode by default")
         if mode is WorkspaceMode.direct_write and not acknowledged_direct_write:
             raise WorkspaceError("direct_write requires an explicit acknowledgement")
+        # This checksum is the compare-and-swap baseline for later acceptance.
+        # It is captured before creating an isolated workspace and never
+        # recomputed as a substitute for user confirmation.
+        original_revision = await asyncio.to_thread(_workspace_checksum, source)
         self._managed_root.mkdir(parents=True, exist_ok=True)
         root = source if mode is WorkspaceMode.direct_write else self._managed_root / session_id / "workspace"
         baseline: Path | None = None
@@ -355,12 +360,12 @@ class ProjectWorkspaceService:
         async with transaction(self._db):
             await self._db.execute("DELETE FROM workspaces WHERE session_id = ?", (session_id,))
             await self._db.execute(
-                """INSERT INTO workspaces (session_id, project_id, mode, root_path, baseline_path, revision_checksum, created_at_ms, updated_at_ms)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
-                (session_id, project_id, mode.value, str(root), None if baseline is None else str(baseline), revision, now, now),
+                """INSERT INTO workspaces (session_id, project_id, mode, root_path, baseline_path, revision_checksum, original_revision_checksum, created_at_ms, updated_at_ms)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (session_id, project_id, mode.value, str(root), None if baseline is None else str(baseline), revision, original_revision, now, now),
             )
             await self._audit(session_id, "workspace.prepared", {"mode": mode.value, "revisionChecksum": revision})
-        return WorkspaceRecord(session_id, project_id, mode, root, baseline, revision)
+        return WorkspaceRecord(session_id, project_id, mode, root, baseline, revision, original_revision)
 
     async def workspace_for_session(self, session_id: str) -> WorkspaceRecord:
         async with self._db.execute("SELECT * FROM workspaces WHERE session_id = ? AND cleaned_at_ms IS NULL", (session_id,)) as cursor:
@@ -368,7 +373,7 @@ class ProjectWorkspaceService:
         if row is None:
             raise WorkspaceError("session workspace not found")
         return WorkspaceRecord(row["session_id"], row["project_id"], WorkspaceMode(row["mode"]), Path(row["root_path"]),
-                               None if row["baseline_path"] is None else Path(row["baseline_path"]), row["revision_checksum"])
+                               None if row["baseline_path"] is None else Path(row["baseline_path"]), row["revision_checksum"], row["original_revision_checksum"])
 
     async def acquire_writer_lease(self, *, project_id: str, session_id: str, holder_id: str, ttl_ms: int = 60_000) -> str:
         if ttl_ms < 1_000:
@@ -447,10 +452,14 @@ class ProjectWorkspaceService:
         workspace = await self.workspace_for_session(session_id)
         if workspace.mode is WorkspaceMode.worktree:
             project = await self._project_path(workspace.project_id)
-            await asyncio.to_thread(_run, ["git", "worktree", "remove", "--force", str(workspace.root_path)], cwd=project)
-            await asyncio.to_thread(_run, ["git", "branch", "-D", f"argus/{session_id}"], cwd=project)
+            removed = await asyncio.to_thread(_run, ["git", "worktree", "remove", "--force", str(workspace.root_path)], cwd=project)
+            if removed.returncode != 0:
+                raise WorkspaceError("worktree cleanup failed")
+            branch = await asyncio.to_thread(_run, ["git", "branch", "-D", f"argus/{session_id}"], cwd=project)
+            if branch.returncode != 0:
+                raise WorkspaceError("worktree branch cleanup failed")
         elif workspace.mode is WorkspaceMode.snapshot:
-            await asyncio.to_thread(shutil.rmtree, workspace.root_path.parent, True)
+            await asyncio.to_thread(shutil.rmtree, workspace.root_path.parent)
         now = _now_ms()
         async with transaction(self._db):
             await self._db.execute("UPDATE workspaces SET cleaned_at_ms = ? WHERE session_id = ?", (now, session_id))

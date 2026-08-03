@@ -4,7 +4,7 @@ from fastapi import APIRouter, HTTPException, Query
 from app.schemas.session import SessionCreateRequest, SessionCreateResponse, SessionConfigurationResponse
 from app.db.database import get_db
 from app.db.repositories import EventRepository, SessionRepository
-from app.schemas.session_store import ArtifactPageResponse, TimelinePageResponse
+from app.schemas.session_store import AcceptanceActionRequest, AcceptanceActionResponse, AcceptancePatchResponse, AcceptanceReviewResponse, ArtifactPageResponse, TimelinePageResponse
 from app.services.command_processor import event_wire_value
 from app.services.workspace_service import ProjectWorkspaceService, WorkspaceError
 from app.schemas.project import WorkspaceMode
@@ -14,6 +14,8 @@ from app.db.database import transaction
 from app.services.session_configuration_service import ConfigurationError, SessionConfigurationService
 from app.schemas.session import SessionAgentInput
 from app.services.agent_definition_service import AgentDefinitionService
+from app.services.acceptance_service import AcceptanceError, AcceptanceService
+from app.api.websocket import connection_hub
 
 router = APIRouter()
 
@@ -175,6 +177,50 @@ async def get_artifact_summaries(
         await db.close()
     next_cursor = None if page.next_cursor is None else f"{page.next_cursor[0]}:{page.next_cursor[1]}"
     return {"items": list(page.items), "nextCursor": next_cursor}
+
+
+@router.get("/{session_id}/acceptance", response_model=AcceptanceReviewResponse)
+async def get_acceptance_review(session_id: str):
+    """Return bounded evidence needed to review an isolated result."""
+
+    db = await get_db()
+    try:
+        return await AcceptanceService(db, managed_root=Path(settings.db_path).expanduser().resolve().parent / "workspaces").review(session_id)
+    except (AcceptanceError, WorkspaceError) as error:
+        raise HTTPException(409, {"code": "acceptance_unavailable", "message": str(error)}) from error
+    finally:
+        await db.close()
+
+
+@router.get("/{session_id}/acceptance/patch", response_model=AcceptancePatchResponse)
+async def export_acceptance_patch(session_id: str):
+    """Create a bounded user-requested patch without persisting its body."""
+
+    db = await get_db()
+    try:
+        return await AcceptanceService(db, managed_root=Path(settings.db_path).expanduser().resolve().parent / "workspaces").patch(session_id)
+    except (AcceptanceError, WorkspaceError) as error:
+        raise HTTPException(409, {"code": "patch_unavailable", "message": str(error)}) from error
+    finally:
+        await db.close()
+
+
+@router.post("/{session_id}/acceptance/actions", response_model=AcceptanceActionResponse)
+async def acceptance_action(session_id: str, request: AcceptanceActionRequest):
+    """Run an idempotent, auditable user acceptance action."""
+
+    db = await get_db()
+    try:
+        events = EventRepository(db)
+        before = await events.last_sequence(session_id)
+        result = await AcceptanceService(db, managed_root=Path(settings.db_path).expanduser().resolve().parent / "workspaces").act(session_id, request)
+        committed = await events.page_after(session_id, after_sequence=before, limit=200)
+        await connection_hub.publish(session_id, [event_wire_value(event) for event in committed.events])
+        return result
+    except (AcceptanceError, WorkspaceError) as error:
+        raise HTTPException(409, {"code": "acceptance_action_rejected", "message": str(error)}) from error
+    finally:
+        await db.close()
 
 
 @router.delete("/{session_id}")

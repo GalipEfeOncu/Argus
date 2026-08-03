@@ -1,0 +1,13 @@
+.acceptance-review { border-top: 1px solid var(--border-subtle); margin-top: 12px; padding-top: 12px; font-size: 12px; color: var(--text-secondary); }
+.acceptance-review__heading, .acceptance-review__actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.acceptance-review__heading { justify-content: space-between; }
+.acceptance-review h3 { color: var(--text-primary); font-size: 13px; margin: 0; }
+.acceptance-review button { border: 1px solid var(--border-medium); background: var(--bg-card); color: var(--text-primary); border-radius: var(--radius-sm); padding: 5px 8px; }
+.acceptance-review button:disabled { opacity: .55; cursor: not-allowed; }
+.acceptance-review fieldset { border: 0; padding: 0; margin: 8px 0; display: grid; gap: 4px; }
+.acceptance-review__files { max-height: 120px; overflow: auto; margin: 6px 0; padding-left: 18px; }
+.acceptance-review__warning, .acceptance-review__error { border-left: 3px solid var(--accent-primary); padding-left: 8px; }
+.acceptance-review__error { color: var(--status-error); }
+.acceptance-review__followup { display: grid; gap: 4px; margin-top: 8px; }
+.acceptance-review__followup input { min-width: 0; background: var(--bg-main); border: 1px solid var(--border-medium); color: var(--text-primary); padding: 5px; border-radius: var(--radius-sm); }
+.acceptance-review__status { margin-bottom: 0; }

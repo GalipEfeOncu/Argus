@@ -18,6 +18,7 @@ class RecoveryReport:
     orphaned_attempts: int
     unknown_tools: int
     unknown_provider_operations: int
+    unknown_acceptance_actions: int
     compacted_snapshots: int
 
 
@@ -31,7 +32,7 @@ class RecoveryService:
     async def recover_after_restart(self) -> RecoveryReport:
         async with self._db.execute("SELECT id FROM sessions WHERE status != 'setup' ORDER BY created_at_ms") as cursor:
             session_ids = [str(row["id"]) for row in await cursor.fetchall()]
-        orphaned_attempts = unknown_tools = unknown_provider_operations = compacted = 0
+        orphaned_attempts = unknown_tools = unknown_provider_operations = unknown_acceptance_actions = compacted = 0
         for session_id in session_ids:
             # The session table is a cache; immutable events remain the source
             # of truth even if the previous process stopped between writes.
@@ -41,6 +42,7 @@ class RecoveryService:
             unknown_provider_ids, provider_operation_count = await self._recover_provider_operations(session_id)
             unknown_tools += len(unknown_tool_ids)
             unknown_provider_operations += provider_operation_count
+            unknown_acceptance_actions += await self._recover_acceptance_actions(session_id)
             scheduler = AssignmentScheduler(self._db)
             recovered_attempts = await scheduler.recover_orphaned_attempts(
                 session_id, blocked_assignment_ids=frozenset(unknown_tool_ids | unknown_provider_ids),
@@ -48,7 +50,24 @@ class RecoveryService:
             orphaned_attempts += len(recovered_attempts)
             compacted += await self._events.compact_snapshots(session_id)
         await self._forfeit_stale_reservations()
-        return RecoveryReport(len(session_ids), orphaned_attempts, unknown_tools, unknown_provider_operations, compacted)
+        return RecoveryReport(len(session_ids), orphaned_attempts, unknown_tools, unknown_provider_operations, unknown_acceptance_actions, compacted)
+
+    async def _recover_acceptance_actions(self, session_id: str) -> int:
+        """Never repeat a source-project apply after a crash mid-operation."""
+
+        async with transaction(self._db):
+            summary = "Argus stopped while applying this review. The original-project outcome is unknown; inspect the project and retained workspace before any new action."
+            async with self._db.execute("SELECT id, command_id FROM acceptance_actions WHERE session_id = ? AND state = 'applying'", (session_id,)) as cursor:
+                rows = await cursor.fetchall()
+            now = _now_ms()
+            for row in rows:
+                await self._db.execute("UPDATE acceptance_actions SET state = 'outcome_unknown', summary = ?, completed_at_ms = ? WHERE id = ?", (summary, now, row["id"]))
+                payload = {"messageId": f"acceptance_recovery_{row['id']}", "authorId": "system", "authorKind": "system", "content": summary, "mentionIds": [], "streaming": False}
+                await self._events._append_in_transaction(
+                    event_id=f"evt_{uuid.uuid4().hex}", session_id=session_id, event_type="message.created", actor_id="system",
+                    payload=payload, payload_json=_safe_json(payload), timestamp_ms=now, correlation_id=str(row["command_id"]), command_id=None,
+                )
+            return len(rows)
 
     async def _recover_tools(self, session_id: str) -> set[str]:
         """Mark lost tool responses failed; mutating effects are deliberately unknown."""

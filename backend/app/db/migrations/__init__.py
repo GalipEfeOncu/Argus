@@ -34,6 +34,7 @@ from app.db.migrations import (
     v0016_local_skill_packages,
     v0017_provider_profiles,
     v0018_recovery,
+    v0019_acceptance,
 )
 
 
@@ -75,6 +76,7 @@ MIGRATIONS: tuple[Migration, ...] = (
     Migration(16, "local_skill_packages", v0016_local_skill_packages.apply),
     Migration(17, "provider_profiles", v0017_provider_profiles.apply),
     Migration(18, "restart_recovery", v0018_recovery.apply),
+    Migration(19, "diff_review_and_acceptance", v0019_acceptance.apply),
 )
 
 

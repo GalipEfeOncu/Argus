@@ -117,6 +117,18 @@ An interrupted mutating tool or provider request is recorded as an unknown
 outcome and cannot be retried merely because its response was lost. A later
 retry must pass the usual scheduler, budget, workspace, and approval checks.
 
+## Applying reviewed work
+
+Only a human acceptance action may copy an isolated worktree or snapshot back
+to the registered original project. The backend requires terminal session
+state, current `original_project.write` authority, a session writer lease, a bounded
+text patch preflight, and a compare-and-swap checksum of the original project
+captured before workspace creation. Source drift, binary/oversized changes,
+missing baselines, direct-write mode, or a failed preflight fail closed: no
+automatic merge or write occurs. The user may export the patch or retain the
+isolated workspace for manual conflict resolution. Cleanup is an explicit,
+audited user choice; a crash during apply is marked unknown and never replayed.
+
 ## Reporting
 
 Until a dedicated security contact is published, report vulnerabilities privately to the repository owner and do not include exploitable details in public issues.

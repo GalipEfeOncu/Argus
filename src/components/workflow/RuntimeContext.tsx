@@ -6,6 +6,7 @@ import type { ProjectedParticipant } from '@/services/sessionProjection';
 import type { SessionConfigurationPatch } from '@/types/generated/session-commands';
 import { roleEvidence } from '@/services/sessionConfiguration';
 import './RuntimeContext.css';
+import { AcceptanceReview } from './AcceptanceReview';
 
 interface RuntimeContextProps {
   sessionId: string;
@@ -134,6 +135,7 @@ export const RuntimeContext: React.FC<RuntimeContextProps> = ({ sessionId }) => 
       {Object.values(projection.approvals).map((approval) => { const pending = Object.values(projection.pendingCommands).some((entry) => entry.command.type === 'approval.resolve' && entry.command.payload.approvalId === approval.id); return <div className="runtime-decision" key={approval.id}><strong>Approval required: {approval.capability}</strong><p>{pending ? 'Decision pending — waiting for the session event.' : approval.scopeSummary}</p><button type="button" onClick={() => sendApproval(true, approval.id)} disabled={pending}>Approve</button><button type="button" onClick={() => sendApproval(false, approval.id)} disabled={pending}>Reject</button></div>; })}
 
       {Object.values(projection.decisions).map((decision) => { const pending = Object.values(projection.pendingCommands).some((entry) => entry.command.type === 'decision.resolve' && entry.command.payload.decisionId === decision.id); return <div className="runtime-decision" key={decision.id}><strong>Decision required</strong><p>{pending ? 'Decision pending — waiting for the session event.' : decision.reasonSummary}</p>{decision.choices.map((choice) => <button type="button" key={choice} disabled={pending} onClick={() => resolveDecision(decision.id, choice as 'reassign' | 'change_approach' | 'deliver_partial' | 'stop')}>{choice.replace('_', ' ')}</button>)}</div>; })}
+      <AcceptanceReview sessionId={sessionId} status={projection.status} />
     </section>
   );
 };

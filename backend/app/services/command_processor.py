@@ -275,7 +275,6 @@ class CommandProcessor:
                 "actionSummary": payload.reason_summary,
             })]
         if command.type == "approval.resolve":
-            self._require_transition(status, "running")
             resolution = {"approve": "approved", "reject": "rejected", "grant": "granted"}[payload.resolution]
             approval: dict[str, Any] = {"approvalId": payload.approval_id, "resolution": resolution}
             if payload.resolution == "grant":
@@ -286,6 +285,11 @@ class CommandProcessor:
                 grant_scope = payload.grant_scope or "once"
                 approval["grantExpiresAtMs"] = _now_ms() + (payload.grant_duration_seconds or {"once": 300, "scope": 3600, "session": 86400}[grant_scope]) * 1000
                 approval["reasonSummary"] = payload.scope_summary
+            if status in {"completed", "completed_partial", "cancelled", "failed"}:
+                # A final-review apply can require a dedicated original-project
+                # grant. Resolving it must not resurrect the finished session.
+                return [("approval.resolved", "human", approval)]
+            self._require_transition(status, "running")
             return [
                 ("approval.resolved", "human", approval),
                 ("session.status_changed", "system", {"status": "running", "reasonSummary": "Approval resolved."}),

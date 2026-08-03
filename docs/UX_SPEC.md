@@ -82,6 +82,23 @@ reasoning.
 lists unmet gates, limits reached, skipped verification, and how the user can
 resume in a new assignment or session.
 
+## Diff review and acceptance
+
+At a completed or human-accepted partial result, the context panel provides one
+keyboard-accessible review card. It lists a bounded changed-file tree, artifact
+evidence, validated and unmet gates, limit history, normalized usage, and the
+visible Coordinator summary. The card clearly distinguishes a completed result
+from one with unmet gates.
+
+Apply, reject, export patch, and start-follow-up are explicit human actions.
+Before apply or reject, the user chooses whether to retain or clean up the
+isolated workspace; retain is the safe default. Apply remains disabled until
+the server confirms the current policy/grant, writer availability, and original
+project checksum. If the original project drifted, the UI explains that no
+files were written and offers patch export, retained-workspace review, reject,
+or a fresh follow-up session rather than an automatic merge. Action status is
+visible and refreshed from the durable server result.
+
 ## Intervention
 
 The user can pause/resume/cancel a session, interrupt an individual participant,

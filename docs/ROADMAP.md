@@ -905,7 +905,7 @@ Completion evidence (2026-07-29):
   native credential-store restart smoke tests require Phase 7 target runners;
   development-host checks do not certify those targets.
 
-### 6.2 Diff review and acceptance
+### 6.2 Diff review and acceptance (✅ Completed)
 
 Deliverables:
 
@@ -915,6 +915,20 @@ Deliverables:
   them, export a patch, or start a follow-up assignment/session.
 - Detect original project drift before apply and offer a safe conflict workflow.
 - Clean up or retain worktrees according to an explicit user choice and status.
+
+Completion evidence (2026-08-03):
+
+- Source: this change
+- Verification: acceptance/migration security tests, generated OpenAPI and
+  TypeScript client validation, frontend type-check/test/build, backend
+  import/test, Cargo check, contract and documentation validation, and full
+  repository verification (results recorded with this change).
+- Artifacts/benchmarks: migration 19; bounded acceptance review and patch
+  endpoints; durable idempotent acceptance actions; original-project
+  compare-and-swap checksum and policy/lease-gated apply workflow.
+- Deferred/unavailable: packaged Windows/macOS/Linux apply and conflict smoke
+  probes require Phase 7 release runners; development-host checks do not
+  certify those targets.
 
 ### 6.3 Local observability
 
