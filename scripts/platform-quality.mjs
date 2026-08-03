@@ -8,6 +8,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { promisify } from 'node:util';
 
 const execute = promisify(execFile);
+const TAURI_CONFIG_PATH = fileURLToPath(new URL('../src-tauri/tauri.conf.json', import.meta.url));
 const SUPPORTED_ARCHITECTURES = Object.freeze({
   darwin: new Set(['arm64', 'x64']),
   linux: new Set(['x64']),
@@ -84,11 +85,20 @@ async function webviewCheck(osName) {
     '-Command',
     "$keys = @('HKLM:\\SOFTWARE\\Microsoft\\EdgeUpdate\\Clients\\{F1E7E7A4-017C-4B47-B81B-69A4F8E49E37}', 'HKLM:\\SOFTWARE\\WOW6432Node\\Microsoft\\EdgeUpdate\\Clients\\{F1E7E7A4-017C-4B47-B81B-69A4F8E49E37}'); if ($keys | Where-Object { Test-Path $_ }) { 'installed' } else { exit 1 }",
   ]);
+  let embeddedBootstrapper = false;
+  try {
+    const config = JSON.parse(await readFile(TAURI_CONFIG_PATH, 'utf8'));
+    embeddedBootstrapper = config?.bundle?.windows?.webviewInstallMode?.type === 'embeddedBootstrapper';
+  } catch {
+    embeddedBootstrapper = false;
+  }
   return {
-    passed: probe.available,
+    passed: probe.available || embeddedBootstrapper,
     detail: probe.available
       ? 'WebView2 Runtime is installed; the Argus installer also embeds the bootstrapper'
-      : 'WebView2 Runtime was not found; installer bootstrap must be tested on a clean Windows client',
+      : embeddedBootstrapper
+        ? 'WebView2 Runtime is absent on the build host; the embedded bootstrapper is configured and clean-client installation remains a pre-publish check'
+        : 'WebView2 Runtime was not found and the embedded installer bootstrapper is not configured',
   };
 }
 
