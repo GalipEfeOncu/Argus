@@ -4,6 +4,8 @@ from pathlib import Path
 import subprocess
 import threading
 import asyncio
+import time
+from types import SimpleNamespace
 
 import pytest
 
@@ -179,6 +181,19 @@ async def test_workspace_tools_reject_escape_symlink_shell_injection_secrets_and
     project = tmp_path / "plain"
     project.mkdir()
     (project / "safe.txt").write_text("safe\n", encoding="utf-8")
+    (project / "adversarial.txt").write_text(f"{'a' * 10_000}!\n", encoding="utf-8")
+    (project / ".env").write_text("safe-hidden\n", encoding="utf-8")
+    (project / ".gitignore").write_text("ignored.secret\n", encoding="utf-8")
+    (project / "ignored.secret").write_text("safe-ignored\n", encoding="utf-8")
+    (project / ".ignore").write_text("ignored-by-ignore.secret\n", encoding="utf-8")
+    (project / "ignored-by-ignore.secret").write_text("safe-ignore-rule\n", encoding="utf-8")
+    (project / ".rgignore").write_text("ignored-by-rgignore.secret\n", encoding="utf-8")
+    (project / "ignored-by-rgignore.secret").write_text("safe-rgignore-rule\n", encoding="utf-8")
+    (project / "types.d.ts").write_text("typed-needle\n", encoding="utf-8")
+    nested = project / "nested"
+    nested.mkdir()
+    (nested / ".gitignore").write_text("nested.secret\n", encoding="utf-8")
+    (nested / "nested.secret").write_text("safe-nested-ignored\n", encoding="utf-8")
     outside = tmp_path / "outside.txt"
     outside.write_text("outside\n", encoding="utf-8")
     (project / "escape").symlink_to(outside)
@@ -192,12 +207,15 @@ async def test_workspace_tools_reject_escape_symlink_shell_injection_secrets_and
         (project / "escape").unlink()
         registered = await service.register_project(str(project))
         workspace = await service.prepare_workspace(session_id="tool-session", project_id=registered["id"], mode=WorkspaceMode.snapshot)
+        (workspace.root_path / ".git").write_text("safe-hidden-metadata\n", encoding="utf-8")
         tools = ScopedToolService(workspace)
         with pytest.raises(WorkspaceScopeError):
             tools.read_text("../outside.txt")
         (workspace.root_path / "escape").symlink_to(outside)
         with pytest.raises(WorkspaceScopeError):
             tools.read_text("escape")
+        with pytest.raises(WorkspaceError, match="bounded read limit"):
+            tools.read_text("safe.txt", max_characters=2)
         with pytest.raises(WorkspaceError, match="destructive"):
             tools.run(["rm", "-rf", "."])
         with pytest.raises(WorkspaceError, match="destructive"):
@@ -213,7 +231,32 @@ async def test_workspace_tools_reject_escape_symlink_shell_injection_secrets_and
         output = tools.run(["env"], environment={"API_TOKEN": "not-forwarded", "LANG": "C"})
         by_name = {tool.name: tool for tool in create_scoped_tools(workspace)}
         escaped = by_name["read_file"].invoke({"path": "../outside.txt"})
+        regex_like_with_rg = by_name["search_files"].invoke({"pattern": "safe.*", "path": "."})
+        option_like_with_rg = by_name["search_files"].invoke({"pattern": "--version", "path": "."})
+        direct_ignored_with_rg = by_name["search_files"].invoke(
+            {"pattern": "safe-ignored", "path": "ignored.secret"}
+        )
+        monkeypatch.setenv("PATH", "")
         searched = by_name["search_files"].invoke({"pattern": "safe", "path": "."})
+        adversarial = by_name["search_files"].invoke({"pattern": "(a+)+$", "path": "."})
+        regex_like = by_name["search_files"].invoke({"pattern": "safe.*", "path": "."})
+        option_like = by_name["search_files"].invoke({"pattern": "--version", "path": "."})
+        direct_ignored = by_name["search_files"].invoke({"pattern": "safe-ignored", "path": "ignored.secret"})
+        direct_multi_extension = by_name["search_files"].invoke(
+            {"pattern": "typed-needle", "path": "types.d.ts", "file_types": "d.ts"}
+        )
+        monotonic_values = iter((0.0, 16.0))
+        monkeypatch.setattr(
+            "app.tools.scoped_tools.time",
+            SimpleNamespace(monotonic=lambda: next(monotonic_values)),
+        )
+        timed_out = by_name["search_files"].invoke({"pattern": "missing", "path": "."})
+        monkeypatch.setattr("app.tools.scoped_tools.time", time)
+        (workspace.root_path / ".gitignore").write_text(
+            f"ignored.secret\n{'#' * 100_000}\n",
+            encoding="utf-8",
+        )
+        fail_closed = by_name["search_files"].invoke({"pattern": "safe-ignored", "path": "."})
     finally:
         await database.close()
 
@@ -221,6 +264,16 @@ async def test_workspace_tools_reject_escape_symlink_shell_injection_secrets_and
     assert "ARGUS_TEST_SECRET" not in output.stdout
     assert escaped.startswith("Error:")
     assert "safe.txt" in searched
+    assert ".env" not in searched and ".git" not in searched
+    assert "ignored.secret" not in searched and "nested.secret" not in searched
+    assert "ignored-by-ignore.secret" not in searched and "ignored-by-rgignore.secret" not in searched
+    assert adversarial == "No matches found"
+    assert regex_like_with_rg == regex_like == "No matches found"
+    assert option_like_with_rg == option_like == "No matches found"
+    assert "safe-ignored" in direct_ignored_with_rg and "safe-ignored" in direct_ignored
+    assert "types.d.ts:1:typed-needle" in direct_multi_extension
+    assert timed_out == "No matches found (15-second scan limit reached)"
+    assert fail_closed == "Error: workspace ignore rules could not be evaluated"
 
 
 @pytest.mark.asyncio

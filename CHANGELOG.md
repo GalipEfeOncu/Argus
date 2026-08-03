@@ -42,6 +42,7 @@ All notable user-visible changes to Argus are recorded here. The project follows
   automation; current Ubuntu/Debian compatibility probes; embedded WebView2
   bootstrap; and improved keyboard, contrast, screen-reader, reduced-motion,
   Unicode/long-path, symlink, line-ending, and process-cancellation coverage.
+  Workspace search now has a bounded literal fallback when ripgrep is absent.
 
 No stable Argus version has been published yet. The manifest version `0.1.0` is
 the current development baseline, not a stable release claim.

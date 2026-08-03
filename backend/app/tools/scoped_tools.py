@@ -8,12 +8,16 @@ workspace once, so model arguments cannot choose another host directory.
 from __future__ import annotations
 
 import asyncio
+import os
 from pathlib import Path
 import subprocess
+import stat
+import time
 import uuid
 from collections.abc import Iterable
 
 from langchain_core.tools import BaseTool, tool
+from pathspec import GitIgnoreSpec
 
 from app.config import settings
 from app.db.database import get_db, transaction
@@ -128,16 +132,127 @@ def create_scoped_tools(workspace: WorkspaceRecord, *, tool_allowlist: Iterable[
 
     @tool
     def search_files(pattern: str, path: str = ".", file_types: str = "") -> str:
-        """Search relative workspace files using ripgrep; patterns never select another root."""
+        """Search relative files with ripgrep or a bounded literal fallback."""
         try:
             directory = resolve_workspace_path(workspace.root_path, path, must_exist=True)
-            argv = ["rg", "--line-number", "--color=never", "--max-count=5"]
-            for extension in filter(None, (item.strip() for item in file_types.split(","))):
+            extensions = tuple(filter(None, (item.strip() for item in file_types.split(","))))
+            relative_directory = directory.relative_to(workspace.root_path)
+            if any(part.startswith(".") for part in relative_directory.parts):
+                return "No matches found"
+            argv = ["rg", "--fixed-strings", "--line-number", "--color=never", "--max-count=5"]
+            for extension in extensions:
                 argv.extend(("-g", f"*.{extension}"))
-            relative_directory = directory.relative_to(workspace.root_path).as_posix()
-            argv.extend((pattern, "." if relative_directory == "." else relative_directory))
-            result = service.run(argv, timeout_seconds=15)
-            return (result.stdout or result.stderr or "No matches found")[:3000]
+            relative_argument = relative_directory.as_posix()
+            argv.extend(("--", pattern, "." if relative_argument == "." else relative_argument))
+            try:
+                result = service.run(argv, timeout_seconds=15)
+                return (result.stdout or result.stderr or "No matches found")[:3000]
+            except FileNotFoundError:
+                matches: list[str] = []
+                scanned_files = 0
+                deadline = time.monotonic() + 15
+
+                def load_ignore_specs(base: Path) -> list[tuple[Path, GitIgnoreSpec]]:
+                    specs: list[tuple[Path, GitIgnoreSpec]] = []
+                    for filename in (".gitignore", ".ignore", ".rgignore"):
+                        ignore_path = base / filename
+                        try:
+                            metadata = ignore_path.lstat()
+                        except FileNotFoundError:
+                            continue
+                        except OSError as error:
+                            raise WorkspaceError("workspace ignore rules could not be evaluated") from error
+                        if stat.S_ISLNK(metadata.st_mode) or not stat.S_ISREG(metadata.st_mode):
+                            raise WorkspaceError("workspace ignore rules could not be evaluated")
+                        relative_ignore = ignore_path.relative_to(workspace.root_path).as_posix()
+                        try:
+                            source = service.read_text(relative_ignore, max_characters=100_000)
+                            specs.append((base, GitIgnoreSpec.from_lines(source.splitlines())))
+                        except (OSError, UnicodeError, ValueError, WorkspaceError) as error:
+                            raise WorkspaceError("workspace ignore rules could not be evaluated") from error
+                    return specs
+
+                def inherited_specs(base: Path) -> list[tuple[Path, GitIgnoreSpec]]:
+                    specs: list[tuple[Path, GitIgnoreSpec]] = []
+                    ancestors = [workspace.root_path]
+                    current = workspace.root_path
+                    for part in base.relative_to(workspace.root_path).parts:
+                        current /= part
+                        ancestors.append(current)
+                    for ancestor in ancestors:
+                        specs.extend(load_ignore_specs(ancestor))
+                    return specs
+
+                def is_ignored(candidate: Path, specs: list[tuple[Path, GitIgnoreSpec]], *, is_directory: bool = False) -> bool:
+                    ignored = False
+                    for base, spec in specs:
+                        try:
+                            relative = candidate.relative_to(base).as_posix()
+                        except ValueError:
+                            continue
+                        result = spec.check_file(f"{relative}/" if is_directory else relative)
+                        if result.include is not None:
+                            ignored = result.include
+                    return ignored
+
+                def search_candidate(candidate: Path) -> str | None:
+                    nonlocal scanned_files
+                    if candidate.is_symlink() or any(part.startswith(".") for part in candidate.relative_to(workspace.root_path).parts):
+                        return None
+                    scanned_files += 1
+                    if scanned_files > 10_000:
+                        return "No matches found (10,000-file scan limit reached)"
+                    if extensions and not any(candidate.name.endswith(f".{extension}") for extension in extensions):
+                        return None
+                    relative = candidate.relative_to(workspace.root_path).as_posix()
+                    try:
+                        content = service.read_text(relative, max_characters=1_000_000)
+                    except (OSError, UnicodeError, WorkspaceError):
+                        return None
+                    file_matches = 0
+                    for line_number, line in enumerate(content.splitlines(), start=1):
+                        if pattern not in line:
+                            continue
+                        matches.append(f"{relative}:{line_number}:{line}")
+                        file_matches += 1
+                        if len("\n".join(matches)) >= 3000:
+                            return "\n".join(matches)[:3000]
+                        if file_matches == 5:
+                            break
+                    return None
+
+                if directory.is_file():
+                    return search_candidate(directory) or "\n".join(matches) or "No matches found"
+
+                pending = [(directory, inherited_specs(directory))]
+                while pending:
+                    current_path, current_specs = pending.pop()
+                    try:
+                        entries = os.scandir(current_path)
+                    except OSError:
+                        continue
+                    with entries:
+                        for entry in entries:
+                            if time.monotonic() >= deadline:
+                                return "\n".join(matches)[:3000] or "No matches found (15-second scan limit reached)"
+                            candidate = Path(entry.path)
+                            if entry.name.startswith(".") or entry.is_symlink():
+                                continue
+                            try:
+                                if entry.is_dir(follow_symlinks=False):
+                                    if is_ignored(candidate, current_specs, is_directory=True):
+                                        continue
+                                    child_specs = list(current_specs)
+                                    child_specs.extend(load_ignore_specs(candidate))
+                                    pending.append((candidate, child_specs))
+                                    continue
+                                if not entry.is_file(follow_symlinks=False) or is_ignored(candidate, current_specs):
+                                    continue
+                            except OSError:
+                                continue
+                            if result := search_candidate(candidate):
+                                return result
+                return "\n".join(matches) or "No matches found"
         except (OSError, WorkspaceError) as error:
             return _result_error(error)
 

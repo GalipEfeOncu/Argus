@@ -522,7 +522,7 @@ class ScopedToolService:
     def __init__(self, workspace: WorkspaceRecord) -> None:
         self._workspace = workspace
 
-    def read_text(self, path: str) -> str:
+    def read_text(self, path: str, *, max_characters: int | None = None) -> str:
         try:
             file_fd = _open_workspace_file(self._workspace.root_path, path, write=False)
         except OSError as error:
@@ -530,7 +530,10 @@ class ScopedToolService:
                 raise WorkspaceScopeError("symbolic links are not allowed in workspace paths") from error
             raise
         with os.fdopen(file_fd, "r", encoding="utf-8") as handle:
-            return handle.read()
+            content = handle.read() if max_characters is None else handle.read(max_characters + 1)
+        if max_characters is not None and len(content) > max_characters:
+            raise WorkspaceError("workspace file exceeds the bounded read limit")
+        return content
 
     def write_text(self, path: str, content: str) -> None:
         try:

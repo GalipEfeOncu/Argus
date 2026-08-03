@@ -12,6 +12,7 @@ dependencies = [
     "websockets>=14.0",
     "cryptography>=44.0.0",
     "langchain-core>=0.3.0",
+    "pathspec>=0.12.1",
     "ripgrepy>=2.0.0",
 ]
 
