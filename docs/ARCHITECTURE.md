@@ -134,6 +134,13 @@ shell selection, executable suffixes, line endings, webview differences, and
 installer lifecycle. Product/runtime code consumes normalized interfaces and
 must not branch on platform outside those adapters.
 
+The executable native-quality matrix and operational prerequisites are listed
+in [Desktop platform support](PLATFORM_SUPPORT.md). Per-commit artifacts are
+release-equivalent quality evidence, not signed release candidates. Windows
+client versions, OS credential-store variants, real suspend/resume, and signed
+installer lifecycle require clean native release machines and remain distinct
+from hosted-runner build compatibility.
+
 ## Control plane and collaboration plane
 
 The control plane owns facts that must be deterministic: event sequencing,

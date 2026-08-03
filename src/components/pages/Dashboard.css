@@ -249,7 +249,7 @@
 
 .session-open-hint {
   font-size: 11px;
-  color: var(--accent-primary);
+  color: var(--accent-text);
   font-weight: 600;
   opacity: 0;
   transition: opacity var(--transition-fast);

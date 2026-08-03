@@ -1,0 +1,122 @@
+name: Native quality
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  UV_PYTHON: '3.12'
+
+jobs:
+  native:
+    name: ${{ matrix.name }} native build and quality
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Windows x86_64
+            runner: windows-2022
+            target: x86_64-pc-windows-msvc
+            bundles: nsis
+            sidecar: src-tauri/binaries/argus-backend-x86_64-pc-windows-msvc.exe
+          - name: macOS Intel
+            runner: macos-15-intel
+            target: x86_64-apple-darwin
+            bundles: app,dmg
+            sidecar: src-tauri/binaries/argus-backend-x86_64-apple-darwin
+          - name: macOS Apple Silicon
+            runner: macos-14
+            target: aarch64-apple-darwin
+            bundles: app,dmg
+            sidecar: src-tauri/binaries/argus-backend-aarch64-apple-darwin
+          - name: Ubuntu 22.04 baseline
+            runner: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
+            bundles: appimage,deb
+            sidecar: src-tauri/binaries/argus-backend-x86_64-unknown-linux-gnu
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - uses: astral-sh/setup-uv@v7
+      - name: Install Linux native dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes \
+            build-essential \
+            curl \
+            file \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            libssl-dev \
+            libwebkit2gtk-4.1-dev \
+            libxdo-dev \
+            patchelf \
+            wget
+      - run: npm ci
+      - run: npm run platform:quality -- --require-webview --output artifacts/platform-quality.json
+      - run: npm run accessibility:quality
+      - run: npm run type-check
+      - run: npm run test
+      - run: npm run test:benchmarks
+      - run: uv run --project backend --extra dev pytest -q
+      - run: cargo test --target ${{ matrix.target }}
+        working-directory: src-tauri
+      - name: Build target sidecar
+        shell: bash
+        run: npm run sidecar:build -- ${{ matrix.target }}
+      - name: Smoke target sidecar
+        run: python scripts/smoke-sidecar.py "${{ matrix.sidecar }}"
+      - name: Build native bundles
+        run: npx tauri build --config src-tauri/tauri.sidecar.conf.json --target ${{ matrix.target }} --bundles ${{ matrix.bundles }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: argus-${{ matrix.target }}-${{ github.sha }}
+          if-no-files-found: error
+          path: |
+            artifacts/platform-quality.json
+            benchmarks/results/sidecar-${{ matrix.target }}-attribution.json
+            src-tauri/target/${{ matrix.target }}/release/bundle/**
+
+  ubuntu-current:
+    name: Current Ubuntu compatibility
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+      - run: sudo apt-get update && sudo apt-get install --yes libwebkit2gtk-4.1-dev
+      - run: npm ci
+      - run: npm run platform:quality -- --require-webview
+
+  debian-stable:
+    name: Debian stable compatibility
+    runs-on: ubuntu-24.04
+    container: debian:stable-slim
+    steps:
+      - run: apt-get update && apt-get install --yes ca-certificates curl git libwebkit2gtk-4.1-dev python3
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run platform:quality -- --require-webview

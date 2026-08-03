@@ -43,7 +43,7 @@
 .border-accent-primary { border-color: var(--accent-primary); }
 
 /* Text */
-.text-accent-primary { color: var(--accent-primary); }
+.text-accent-primary { color: var(--accent-text); }
 .hover\:text-primary:hover { color: var(--text-primary); }
 .hover\:text-secondary:hover { color: var(--text-secondary); }
 .hover\:text-\[var\(--status-error\)\]:hover { color: var(--status-error); }
@@ -141,4 +141,3 @@
 /* ── border-b/t with border-subtle ──────────────────────── */
 .border-t.border-border-subtle { border-top: 1px solid var(--border-subtle); }
 .border-b.border-border-subtle { border-bottom: 1px solid var(--border-subtle); }
-

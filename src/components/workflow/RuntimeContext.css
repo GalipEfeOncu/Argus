@@ -1,7 +1,7 @@
 .runtime-context { border-top: 1px solid var(--border-subtle); margin-top: 14px; padding-top: 14px; color: var(--text-secondary); font-size: 11px; }
 .runtime-context__heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .runtime-context h2, .runtime-context h3 { color: var(--text-primary); font-size: 10px; font-weight: 800; letter-spacing: .08em; margin: 0 0 6px; text-transform: uppercase; }
-.runtime-context__heading span { color: var(--accent-primary); font-family: var(--font-mono); font-size: 9px; }
+.runtime-context__heading span { color: var(--accent-text); font-family: var(--font-mono); font-size: 9px; }
 .runtime-context__status, .runtime-context p { margin: 0 0 8px; line-height: 1.4; }
 .runtime-controls { display: grid; gap: 6px; grid-template-columns: 1fr 1fr; margin-bottom: 10px; }
 .runtime-controls button, .runtime-groups button, .runtime-decision button { background: var(--bg-element); border: 1px solid var(--border-medium); border-radius: var(--radius-sm); color: var(--text-primary); cursor: pointer; font: inherit; padding: 5px 6px; }

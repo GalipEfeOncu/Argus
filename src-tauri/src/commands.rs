@@ -42,7 +42,7 @@ pub async fn select_directory(app: tauri::AppHandle) -> Result<Option<String>, S
     Ok(dir.map(|p| p.to_string()))
 }
 
-const CREDENTIAL_SERVICE: &str = "com.argus.app.provider";
+const CREDENTIAL_SERVICE: &str = "com.argus.desktop.provider";
 
 fn credential_entry(reference: &str) -> Result<keyring::Entry, String> {
     if !reference.starts_with("argus-provider-") || reference.len() > 256 {

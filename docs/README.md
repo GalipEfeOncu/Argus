@@ -11,6 +11,8 @@ prompts or implementation notes.
 | --- | --- | --- |
 | What are we building and for whom? | [PRODUCT.md](PRODUCT.md) | Product contract |
 | Which layer owns a responsibility? | [ARCHITECTURE.md](ARCHITECTURE.md) | Target architecture |
+| Which desktop versions and prerequisites are supported? | [PLATFORM_SUPPORT.md](PLATFORM_SUPPORT.md) | Operational support guide |
+| What must pass immediately before publishing desktop artifacts? | [PUBLISH_CHECKLIST.md](PUBLISH_CHECKLIST.md) | Publication gate |
 | What crosses REST or WebSocket? | [API.md](API.md) | Target protocol; transitional endpoints are labeled |
 | What must the user see and control? | [UX_SPEC.md](UX_SPEC.md) | UX contract |
 | What is allowed and where is it enforced? | [SECURITY.md](SECURITY.md) | Security contract |
@@ -34,10 +36,11 @@ behavior or scope may change.
 | FastAPI runtime, scheduling, or persistence | `ARCHITECTURE.md`, `IMPLEMENTATION_SPEC.md`, `API.md` |
 | REST/WebSocket contract | `API.md`, `IMPLEMENTATION_SPEC.md` section 6 |
 | Filesystem, shell, git, credentials, or Tauri permissions | `SECURITY.md`, `ARCHITECTURE.md` |
+| Native packaging or platform compatibility | `PLATFORM_SUPPORT.md`, `ARCHITECTURE.md`, `IMPLEMENTATION_SPEC.md` sections 12–13 |
 | Agents, roles, skills, or orchestration | `PRODUCT.md`, `ARCHITECTURE.md`, `IMPLEMENTATION_SPEC.md` |
 | Roadmap or status claim | `ROADMAP.md` and the current implementation/tests |
-| Roadmap slice completion or phase exit | `ROADMAP.md` cross-phase controls, current implementation/tests, and `IMPLEMENTATION_SPEC.md` section 14 for a maturity milestone |
-| Release, version, or changelog | `IMPLEMENTATION_SPEC.md` section 14, `CHANGELOG.md`, and `ROADMAP.md` product-maturity milestones |
+| Roadmap slice completion or phase exit | `ROADMAP.md` cross-phase controls and current implementation/tests |
+| Release, version, changelog, or artifact publication | `PUBLISH_CHECKLIST.md`, `IMPLEMENTATION_SPEC.md` section 14, `CHANGELOG.md`, and `ROADMAP.md` product-maturity milestones |
 
 ## Documentation rules
 
@@ -47,7 +50,8 @@ behavior or scope may change.
 - Record user-visible changes under `CHANGELOG.md` `Unreleased`; do not bump the
   application version outside a dedicated release change.
 - A roadmap completion claim must include the evidence block required by
-  `ROADMAP.md`; a phase exit must also record release-readiness probes.
+  `ROADMAP.md`. Environment- or credential-dependent checks belong in
+  `PUBLISH_CHECKLIST.md` and block publication, not roadmap completion.
 - Use relative links and repository-relative paths in prose and commands.
 - Prefer durable headings; other documents and agent tasks may deep-link to them.
 - Do not include credentials, private model reasoning, personal machine paths, or user project data.

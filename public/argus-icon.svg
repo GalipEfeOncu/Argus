@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Argus">
+  <rect width="512" height="512" rx="112" fill="#171717"/>
+  <rect x="72" y="72" width="368" height="368" rx="88" fill="#a50e1c"/>
+  <g fill="none" stroke="#f0f0f0" stroke-width="32" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M256 132 120 200l136 68 136-68-136-68Z"/>
+    <path d="m120 268 136 68 136-68"/>
+    <path d="m120 336 136 68 136-68"/>
+  </g>
+</svg>

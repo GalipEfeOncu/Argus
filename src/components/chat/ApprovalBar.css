@@ -43,7 +43,7 @@
   font-weight: 800;
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: var(--accent-primary);
+  color: var(--accent-text);
   margin-bottom: 2px;
 }
 
@@ -88,7 +88,7 @@
   align-items: center;
   padding: 6px 14px;
   background: transparent;
-  color: var(--accent-primary);
+  color: var(--accent-text);
   border: 1px solid rgba(165, 14, 28, 0.45);
   border-radius: var(--radius-sm);
   font-size: 12px;

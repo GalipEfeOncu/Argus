@@ -130,10 +130,12 @@ configured and rejects browser/WebSocket origins outside the exact Tauri and
 development allowlist. This API token is distinct from the stronger
 native-only credential-bridge token, which never crosses into JavaScript.
 
-The capability manifest exposes only the folder-open dialog to webview code.
-Process spawn, execute, kill, generic open/save/ask/message dialogs, and global
-Tauri injection are not webview permissions. Rust owns the fixed sidecar name,
-arguments, environment, lifecycle, and forced-stop fallback.
+The capability manifest exposes only the folder-open dialog and the narrow
+native page-zoom command to webview code. Page zoom changes presentation only;
+it grants no filesystem, process, network, or credential access. Process spawn,
+execute, kill, generic open/save/ask/message dialogs, and global Tauri injection
+are not webview permissions. Rust owns the fixed sidecar name, arguments,
+environment, lifecycle, and forced-stop fallback.
 
 ## Local diagnostics and support exports
 

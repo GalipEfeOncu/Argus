@@ -353,7 +353,8 @@ cancellation handling must still keep the UI responsive.
 Budgets are initial engineering targets, not measured claims about the current
 prototype. Phase 0 verifies deterministic performance tooling on the designated
 CachyOS development host; its results are development calibration and never
-release evidence. Phase 7 records the release baseline on every supported OS. A
+release evidence. The [pre-publish checklist](PUBLISH_CHECKLIST.md) records the
+release baseline on every supported OS. A
 budget may be changed only with a documented benchmark, user-visible impact
 analysis, and the same review as an architecture decision; it must not be
 relaxed merely to make CI pass.
@@ -386,9 +387,9 @@ and macOS installer metrics are deliberately mutually platform-specific. The
 tools reject Vite/dev-server and debug provenance, incompatible baseline metadata,
 and unavailable runners as release evidence. They do not contain a measured
 baseline. Native packaged measurements on each supported target remain required
-for the Phase 7 release exit gate; an unsupported runner must never be promoted
-to a baseline. CachyOS development-host results may guide engineering work but
-must remain labelled as non-release calibration.
+before publishing an artifact; an unsupported runner must never be promoted to
+a baseline. CachyOS development-host results may guide engineering work but must
+remain labelled as non-release calibration.
 
 ### Implementation constraints
 
@@ -432,11 +433,20 @@ gates. Each release matrix must build and test on the target OS because
 installer, webview, keychain, process, and filesystem behavior cannot be
 certified by cross-compilation alone.
 
-Every supported target must pass install, first launch, sidecar start/stop,
-provider credential storage, project selection, worktree/snapshot, shell and test
-process cancellation, reconnect/restart, update, uninstall, and the performance
-budgets above. Platform-specific exclusions must be visible before release and
-cannot silently degrade safety or orchestration semantics.
+The current executable matrix and user/developer prerequisites are recorded in
+[Desktop platform support](PLATFORM_SUPPORT.md). Its hosted native builds prove
+target compilation, package formation, frozen-sidecar behavior, filesystem and
+process semantics, and webview prerequisites. They do not substitute for clean
+supported-client, signing/notarization, keychain-variant, suspend/resume, or
+reference-hardware performance evidence.
+
+Before publication, every supported target must pass install, first launch,
+sidecar start/stop, provider credential storage, project selection,
+worktree/snapshot, shell and test process cancellation, reconnect/restart,
+update, uninstall, and the performance budgets above through
+[PUBLISH_CHECKLIST.md](PUBLISH_CHECKLIST.md).
+Platform-specific exclusions must be visible before release and cannot silently
+degrade safety or orchestration semantics.
 
 A phase is complete only when its behavior is implemented, automated tests pass, documentation reflects the result, and the next phase no longer depends on an undecided design choice.
 
@@ -490,14 +500,17 @@ support evidence record the source commit separately.
 
 Every distributed update uses one auditable release change:
 
-1. Classify user-visible and compatibility impact and choose the next version.
-2. Move applicable `Unreleased` changelog entries into a dated version section.
-3. Run `npm run version:set -- <version>` and commit every synchronized manifest
+1. Open and complete [PUBLISH_CHECKLIST.md](PUBLISH_CHECKLIST.md) for every
+   applicable target; missing target-machine or credential evidence blocks the
+   publication, not roadmap phase completion.
+2. Classify user-visible and compatibility impact and choose the next version.
+3. Move applicable `Unreleased` changelog entries into a dated version section.
+4. Run `npm run version:set -- <version>` and commit every synchronized manifest
    and lockfile change together.
-4. Run all verification scopes, contract/version drift, security scanning, the
+5. Run all verification scopes, contract/version drift, security scanning, the
    applicable upgrade/rollback suite, and native artifact gates for the release
    channel.
-5. Merge the release change, create the immutable annotated tag `v<version>` on
+6. Merge the release change, create the immutable annotated tag `v<version>` on
    that exact commit, and build/sign artifacts from the tag.
-6. Publish checksums and release notes. Never move or reuse a published version
+7. Publish checksums and release notes. Never move or reuse a published version
    or tag; a correction receives a new patch or prerelease number.

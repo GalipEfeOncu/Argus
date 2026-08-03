@@ -32,7 +32,7 @@
 }
 
 .tool-status-icon--running {
-  color: var(--accent-primary);
+  color: var(--accent-text);
   animation: toolSpin 1.2s linear infinite;
 }
 

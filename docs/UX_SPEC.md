@@ -139,6 +139,13 @@ session.
 - Sufficient text contrast and color-independent status indicators.
 - Reduced-motion behavior for streaming and workflow animations.
 
+The application applies reduced-motion suppression globally, exposes sidecar
+recovery as a native keyboard-operable control, and checks semantic text/status
+tokens against WCAG AA contrast thresholds. Automated structural checks and the
+10,000-event DOM bound complement, but do not replace, native keyboard-only and
+screen-reader pairing smoke tests described in
+[Desktop platform support](PLATFORM_SUPPORT.md).
+
 ## Responsiveness and perceived performance
 
 - Show the native window and functional navigation shell without waiting for the

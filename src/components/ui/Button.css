@@ -87,7 +87,7 @@
 /* Neon → repurposed as Danger outline */
 .argus-btn--neon {
   background: transparent;
-  color: var(--accent-primary);
+  color: var(--accent-text);
   border: 1px solid rgba(165, 14, 28, 0.45);
 }
 

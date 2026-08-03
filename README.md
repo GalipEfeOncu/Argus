@@ -56,10 +56,13 @@ contains a narrower `AGENTS.md` that extends the repository-wide rules.
 
 ### Prerequisites
 
-- Node.js 18+
+- Node.js 24
 - Rust stable
 - Python 3.12+
 - [uv](https://docs.astral.sh/uv/)
+
+Platform-specific webview, Git/shell, non-git fallback, and native packaging
+requirements are documented in the [desktop platform support guide](docs/PLATFORM_SUPPORT.md).
 
 ### Setup
 
@@ -94,6 +97,7 @@ one boundary.
 - [API and event protocol](docs/API.md)
 - [Security model](docs/SECURITY.md)
 - [Implementation specification](docs/IMPLEMENTATION_SPEC.md)
+- [Desktop platform support](docs/PLATFORM_SUPPORT.md)
 - [Roadmap](docs/ROADMAP.md)
 - [Contributing](CONTRIBUTING.md)
 

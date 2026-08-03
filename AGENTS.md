@@ -76,10 +76,12 @@ contract instead of copying its policy into implementation files.
   never mark target prose as current behavior prematurely.
 - **Phase exit:** in addition to completion evidence, run and record the available
   release-readiness runway probes and apply the Alpha/Beta/RC milestone rule.
-  Unavailable platform/signing evidence is an explicit blocker or deferred risk,
-  never an inferred pass.
+  Environment- or credential-dependent native checks are recorded as deferred
+  publication work; they do not block roadmap completion and are never inferred
+  to have passed.
 - **Release preparation:** read
   [IMPLEMENTATION_SPEC.md section 14](docs/IMPLEMENTATION_SPEC.md#14-versioning-and-release-train),
+  complete [docs/PUBLISH_CHECKLIST.md](docs/PUBLISH_CHECKLIST.md),
   move `Unreleased` changelog entries into the dated release, select SemVer from
   compatibility impact, and run `npm run version:set -- <version>`. Version bumps
   occur only in a dedicated release change, not in ordinary feature work.

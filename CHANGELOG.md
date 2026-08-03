@@ -38,6 +38,10 @@ All notable user-visible changes to Argus are recorded here. The project follows
   authenticated localhost transport, origin checks, bounded crash restart,
   graceful shutdown fallback, single-instance coordination, least-privilege
   Tauri capabilities, and reproducible binary-size attribution.
+- Native Windows, macOS Intel/Apple Silicon, and Ubuntu packaging quality
+  automation; current Ubuntu/Debian compatibility probes; embedded WebView2
+  bootstrap; and improved keyboard, contrast, screen-reader, reduced-motion,
+  Unicode/long-path, symlink, line-ending, and process-cancellation coverage.
 
 No stable Argus version has been published yet. The manifest version `0.1.0` is
 the current development baseline, not a stable release claim.

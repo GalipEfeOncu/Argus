@@ -29,28 +29,30 @@ const App: React.FC = () => {
     switch (status) {
       case 'starting':
         return (
-          <div className="absolute top-2 right-1/2 translate-x-1/2 z-50 flex items-center gap-2 bg-[var(--status-warning)] text-[#111111] px-3 py-1 rounded-full text-xs font-medium animate-pulse shadow-md">
+          <div role="status" aria-live="polite" className="absolute top-2 right-1/2 translate-x-1/2 z-50 flex items-center gap-2 bg-[var(--status-warning)] text-[#111111] px-3 py-1 rounded-full text-xs font-medium animate-pulse shadow-md">
             Starting backend service…
           </div>
         );
       case 'error':
         return (
-          <div
-            className="absolute top-2 right-1/2 translate-x-1/2 z-50 flex items-center gap-2 bg-[var(--status-error)] text-white px-3 py-1 rounded-full text-xs font-medium cursor-pointer shadow-md"
+          <button
+            type="button"
+            className="absolute top-2 right-1/2 translate-x-1/2 z-50 flex items-center gap-2 bg-[var(--status-error)] text-[#111111] px-3 py-1 rounded-full text-xs font-medium cursor-pointer shadow-md"
             title={errorMsg ?? undefined}
             onClick={() => startBackend()}
           >
             Backend error — click to retry
-          </div>
+          </button>
         );
       case 'stopped':
         return (
-          <div
+          <button
+            type="button"
             className="absolute top-2 right-1/2 translate-x-1/2 z-50 flex items-center gap-2 bg-[var(--status-idle)] text-white px-3 py-1 rounded-full text-xs font-medium cursor-pointer shadow-md"
             onClick={() => startBackend()}
           >
             Backend stopped — click to start
-          </div>
+          </button>
         );
       case 'running':
       default:

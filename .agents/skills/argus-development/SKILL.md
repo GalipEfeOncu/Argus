@@ -13,7 +13,8 @@ Implement a focused Argus feature slice while preserving the shared-room, local-
    `docs/README.md` to select the relevant source-of-truth documents.
 2. Classify the change as internal-only, user-visible, roadmap completion/phase
    exit, or release preparation. Apply the changelog, completion-evidence,
-   release-readiness, milestone, and version companions required by `AGENTS.md`.
+   release-readiness, publication-checklist, milestone, and version companions
+   required by `AGENTS.md`.
 3. Inspect existing code and state the affected contract, persistence, UI, and permission boundaries.
 4. For protocol work, update the backend model first; then generated types, frontend reducer/simulator, tests, and `docs/API.md`.
 5. Keep changes small enough to validate end-to-end. Do not replace a working layer with an unverified broad rewrite.
@@ -39,5 +40,6 @@ Implement a focused Argus feature slice while preserving the shared-room, local-
 - Read `references/contract-checklist.md` for REST/WebSocket changes.
 - Read `docs/UX_SPEC.md` for UI work and `docs/SECURITY.md` for tools, credentials, or workspace changes.
 - Read `docs/ROADMAP.md` for slice completion or phase exits; read
-  `docs/IMPLEMENTATION_SPEC.md` section 14 and `CHANGELOG.md` for releases.
+  `docs/PUBLISH_CHECKLIST.md`, `docs/IMPLEMENTATION_SPEC.md` section 14, and
+  `CHANGELOG.md` for releases.
 - Treat `docs/README.md` as the documentation ownership and reading map.

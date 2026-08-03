@@ -24,7 +24,11 @@
     "benchmark:report": "node scripts/benchmarks/benchmark.mjs report",
     "benchmark:attribution": "node scripts/benchmarks/benchmark.mjs attribution",
     "benchmark:release": "node scripts/benchmarks/benchmark.mjs release",
-    "test:benchmarks": "node --test scripts/benchmarks/test/*.test.mjs"
+    "test:benchmarks": "node --test scripts/benchmarks/test/*.test.mjs",
+    "platform:quality": "node scripts/platform-quality.mjs",
+    "test:platform-quality": "node --test scripts/platform-quality.test.mjs",
+    "accessibility:quality": "node scripts/accessibility-quality.mjs",
+    "test:accessibility-quality": "node --test scripts/accessibility-quality.test.mjs"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.1.14",
@@ -56,6 +60,7 @@
     "@types/react": "^19.1.8",
     "@types/react-dom": "^19.1.6",
     "@vitejs/plugin-react": "^4.5.2",
+    "axe-core": "^4.12.1",
     "jsdom": "^26.1.0",
     "json-schema-to-typescript": "^15.0.4",
     "openapi-typescript": "^7.10.1",

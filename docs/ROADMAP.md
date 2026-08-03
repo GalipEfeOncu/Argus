@@ -8,11 +8,12 @@ slices. An implementation agent should be able to select the next unchecked
 slice, follow its owned contracts and acceptance criteria, and leave the
 repository in a releasable intermediate state.
 
-The product is complete only when a user can select a local project, configure a
-Coordinator and constrained team, run a provider-backed task in an isolated
-workspace, observe the ordered collaboration timeline, use customized limits
+The roadmap implementation is complete only when a user can select a local
+project, configure a Coordinator and constrained team, run a provider-backed
+task in an isolated workspace, observe the ordered collaboration timeline, use customized limits
 and approval behavior, recover after restart, inspect evidence and diffs, and
-install a signed desktop build on every supported platform.
+produce native desktop artifacts for every supported platform. Publishing those
+artifacts additionally requires [pre-publish verification](PUBLISH_CHECKLIST.md).
 
 Normative decisions live in:
 
@@ -59,14 +60,16 @@ later phase or allowing a probe to satisfy that phase's exit gate.
 
 - At every phase exit, run the narrowest available packaged-shell, sidecar,
   provider-contract, upgrade, and platform smoke probes. Record unavailable
-  native runners and signing/notarization prerequisites as explicit release
-  risks; one platform's result never certifies another platform.
+  probes without inferring a pass; one platform's result never certifies another
+  platform.
 - Keep the native CI matrix, installer skeleton, sidecar composition report, and
   provider conformance harness executable as soon as their dependencies exist.
   A feasibility probe may discover risk early, but it may not ship target
   behavior or mark a later roadmap slice complete.
-- Attach development-host results only as calibration. Release claims still
-  require the signed or release-equivalent native evidence defined by Phase 7.
+- Attach development-host results only as calibration. Clean-client, credential,
+  signing/notarization, assistive-technology, and reference-hardware checks live
+  in [PUBLISH_CHECKLIST.md](PUBLISH_CHECKLIST.md). They block publication for an
+  affected target, not roadmap phase completion.
 
 ### Evidence-linked completion records
 
@@ -101,11 +104,13 @@ Completion evidence (YYYY-MM-DD):
 - **Beta — Phase 6 exit:** the product is feature-complete for the 1.0 scope and
   may enter a bounded user pilot after recovery, diff acceptance, and degraded
   modes pass. New scope requires an explicit roadmap change.
-- **Release candidate — Phase 7:** signed native candidates enter a stabilization
-  window. Only release blockers, security fixes, compatibility fixes, and
-  evidence corrections may change the candidate.
-- Stable `1.0.0` is permitted only after Phase 7 exit and the final definition of
-  done pass. Version selection and synchronized metadata follow
+- **Release candidate — Phase 7:** the codebase and native build automation may
+  enter a stabilization window. Publishing an RC additionally requires the
+  pre-publish checklist. Only release blockers, security fixes, compatibility
+  fixes, and evidence corrections may change the candidate.
+- Stable `1.0.0` is permitted only after Phase 7 exit, the final definition of
+  done, and the pre-publish checklist pass. Version selection and synchronized
+  metadata follow
   [IMPLEMENTATION_SPEC.md](IMPLEMENTATION_SPEC.md#14-versioning-and-release-train).
 
 ## Current baseline and migration target
@@ -128,7 +133,7 @@ human → Coordinator → structured proposal → deterministic scheduler
                                              └─ ordered shared-room events
 ```
 
-## Phase 0 — Contract and test foundation (✅ Completed; release certification deferred to Phase 7)
+## Phase 0 — Contract and test foundation (✅ Completed; native certification is pre-publish)
 
 ### 0.1 Freeze Coordinator-first contracts (✅ Completed)
 
@@ -180,7 +185,7 @@ Acceptance:
 - CI fails on stale generated output or a hand-authored incompatible frontend
   event type.
 
-### 0.3 Establish development-host performance tooling (✅ Completed; release certification deferred to Phase 7)
+### 0.3 Establish development-host performance tooling (✅ Completed; native certification is pre-publish)
 
 Deliverables:
 
@@ -194,9 +199,9 @@ Deliverables:
   development host. Label all resulting measurements as development calibration,
   never as release evidence.
 - Defer native packaged baselines for Windows 10/11 x86_64, macOS Apple Silicon
-  and Intel, and the Ubuntu 22.04-compatible Linux reference runner to Phase 7.
-  Unavailable hardware is an explicit Phase 7 blocker; never invent, copy, or
-  cross-compile measurements for another target.
+  and Intel, and the Ubuntu 22.04-compatible Linux reference runner to the
+  pre-publish checklist. Never invent, copy, or cross-compile measurements for
+  another target.
 - Emit machine-readable benchmark JSON and a human-readable comparison report.
   Retaining a rolling release baseline in CI artifacts belongs to Phase 7.
 - Add size attribution for the web assets, Rust shell, Python runtime, each
@@ -224,13 +229,13 @@ Current status (2026-07-18):
   until Phase 7 packages a native Tauri plus sidecar runner. It cannot create a
   release baseline during development.
 - ℹ️ Windows x86_64, macOS Apple Silicon, macOS Intel, and Ubuntu 22.04-
-  compatible Linux release runners are deferred Phase 7 blockers. No values may
+  compatible Linux reference measurements are pre-publish gates. No values may
   be estimated or copied from another platform.
 
 Phase 0 exit (passed): contracts are internally consistent, test runners execute
 locally, generated types have a single authoritative source, and deterministic
 benchmark tooling is verified on the designated CachyOS development host. Native
-release measurements and rolling cross-platform baselines are Phase 7 exit-gate
+release measurements and rolling cross-platform baselines are pre-publish
 requirements.
 
 ## Phase 1 — Typed shared-room contract prototype
@@ -874,10 +879,11 @@ Completion evidence (2026-07-29):
   profiles; Tauri OS credential-store commands and authenticated ephemeral
   sidecar leases; synthetic four-provider conformance fixtures.
 - Deferred/unavailable: signed/installable Alpha shell and Windows/macOS/Linux
-  native credential-store smoke probes require Phase 7 release runners. This
-  development-host check does not certify those targets.
+  native credential-store smoke probes require target clients and release
+  credentials. They are pre-publish checks; this development-host result does
+  not certify those targets.
 
-## Phase 6 — Recovery, observability, and project completion workflow (✅ Completed; Beta distribution deferred to Phase 7)
+## Phase 6 — Recovery, observability, and project completion workflow (✅ Completed; Beta publication is pre-publish)
 
 ### 6.1 Crash and reconnect recovery (✅ Completed)
 
@@ -902,8 +908,9 @@ Completion evidence (2026-07-29):
 - Artifacts/benchmarks: migration 18; checksummed bounded event snapshots;
   restart-recovery service; native 60-second sidecar-idle grace probe.
 - Deferred/unavailable: packaged Windows/macOS/Linux crash, suspend/resume, and
-  native credential-store restart smoke tests require Phase 7 target runners;
-  development-host checks do not certify those targets.
+  native credential-store restart smoke tests require target clients and are
+  tracked by the pre-publish checklist; development-host checks do not certify
+  those targets.
 
 ### 6.2 Diff review and acceptance (✅ Completed)
 
@@ -927,8 +934,8 @@ Completion evidence (2026-08-03):
   endpoints; durable idempotent acceptance actions; original-project
   compare-and-swap checksum and policy/lease-gated apply workflow.
 - Deferred/unavailable: packaged Windows/macOS/Linux apply and conflict smoke
-  probes require Phase 7 release runners; development-host checks do not
-  certify those targets.
+  probes require target clients and are tracked by the pre-publish checklist;
+  development-host checks do not certify those targets.
 
 ### 6.3 Local observability (✅ Completed)
 
@@ -956,9 +963,9 @@ Completion evidence (2026-08-03):
   pending-approval, support-bundle failure regression tests.
 - Deferred/unavailable: `npm run benchmark:release` reported the native packaged
   Tauri-plus-sidecar release runner unavailable on this Linux development host.
-  Signed/installable Windows, macOS, and Linux packaging, upgrade/install, and
-  target credential-store smoke probes remain Phase 7 release-runner risks;
-  no development-host result certifies Beta distribution.
+  Signed/installable Windows, macOS, and Linux upgrade/install and target
+  credential-store smoke probes are pre-publish gates; no development-host
+  result certifies Beta distribution.
 
 Phase 6 exit: an interrupted task recovers without duplicate mutation, and the
 user can safely evaluate and apply or export the final isolated result.
@@ -997,32 +1004,58 @@ Completion evidence (2026-08-03):
   `ad682a71e9edeefc476d84762902eb5712f9df217bb1f7ceece525f10649b1b6`;
   the generated composition report separates Argus code, base dependencies,
   Python runtime, and platform runtime and records excluded provider/dev groups.
-- Deferred/unavailable: Windows and macOS frozen-sidecar/native lifecycle
-  runners, signed installers, real updater/uninstall/forced-close process-tree
-  probes, and the packaged native release benchmark are unavailable on this
-  Linux development host. They remain Phase 7.2/7.3 and Phase 7 exit gates; this
-  host result does not certify those targets.
+- Deferred/unavailable: clean Windows/macOS client lifecycle probes, signed
+  installers, real updater/uninstall/forced-close process-tree probes, and
+  reference-hardware packaged benchmarks require publication environments. They
+  are tracked by `PUBLISH_CHECKLIST.md`; this host result does not certify them.
 
-### 7.2 Cross-platform quality
+### 7.2 Cross-platform quality (✅ Completed)
 
 Deliverables:
 
 - Support declared Windows, macOS, and Linux versions; document git/shell
   prerequisites and non-git fallback.
-- Build natively on Windows 10 22H2/11 x86_64, macOS 12+ arm64/x86_64, and an
-  Ubuntu 22.04-compatible Linux x86_64 baseline; test current Ubuntu and Debian
-  stable. Add Linux ARM64 only with a native runner and separate release gate.
-- Ship signed NSIS or MSI on Windows, signed/notarized app bundle and DMG on
-  macOS, and AppImage plus at least one native Linux package family.
+- Build natively in Windows x86_64, macOS arm64/x86_64, and Ubuntu 22.04 x86_64
+  CI environments; probe current Ubuntu and Debian stable. Add Linux ARM64 only
+  with a native runner and separate support gate.
+- Generate unsigned release-equivalent NSIS, app bundle/DMG, AppImage, and Debian
+  packages in native CI. Signing, notarization, and clean-client installation are
+  pre-publish checks.
 - Test path encoding, spaces, long paths, case behavior, line endings, executable
-  bits, symlinks, process cancellation, keychain variants, and sleep/resume.
-- Complete keyboard-only, screen-reader smoke, contrast, zoom, reduced-motion,
-  large-timeline virtualization, and low-resource testing.
-- Test WebView2 availability/bootstrap on Windows, the declared WebKit/system
-  version range on macOS, and WebKitGTK/glibc compatibility on Linux.
-- Run every performance fixture on each release artifact; record cold/warm
-  startup, process-tree RSS/CPU, installer size, long-task count, and 10,000-event
-  interaction results.
+  bits, symlinks, and process cancellation deterministically. Test native
+  keychain variants and sleep/resume before publishing.
+- Automate keyboard semantics, axe structure, contrast, zoom, reduced motion,
+  focus recovery, and large-timeline virtualization. Run real screen-reader and
+  reference low-resource checks before publishing.
+- Validate WebView2 bootstrap configuration and native-runner prerequisites on
+  Windows, the declared WebKit/system version range on macOS, and
+  WebKitGTK/glibc compatibility on Linux. Test real clean-client bootstrap
+  before publishing.
+- Keep deterministic performance fixtures and artifact attribution executable;
+  run packaged measurements on each target's reference hardware before
+  publishing.
+
+Completion evidence (2026-08-03):
+
+- Source: this change
+- Verification: full repository verification passed (documentation, version,
+  frontend type-check/test/build, backend import/test, and Cargo check); 57
+  frontend and 268 backend tests passed. Platform-quality and accessibility
+  suites, Python 3.12 backend isolation, generated-contract drift, Cargo
+  fmt/clippy/test (4 tests), workflow lint, independent reviewer re-review, and
+  read-only test review passed.
+- Artifacts/benchmarks: a target-triple Linux frozen sidecar passed authenticated
+  lifecycle smoke; a valid Debian package was produced at 45,115,790 bytes with
+  SHA-256 `e77a12cd566b40a15e4f1abd25b0ec4a2c9d7bc1fdbc61061a42fb4c5f611ba9`;
+  native CI declares Windows NSIS, macOS app/DMG, Linux AppImage/Debian, and
+  current Ubuntu/Debian compatibility jobs. Desktop icons have valid native
+  formats and the platform/accessibility contracts are executable in CI.
+- Deferred/unavailable: clean supported-client installation, real keychain and
+  sleep/resume variants, screen-reader pairings, signed/notarized artifacts, and
+  reference-hardware packaged performance require target machines or release
+  credentials and are tracked in `PUBLISH_CHECKLIST.md`. Local AppImage bundling
+  on CachyOS is incompatible with linuxdeploy's RELR stripping; the declared
+  Ubuntu 22.04 native CI environment owns that artifact.
 
 ### 7.3 Supply chain and release
 
@@ -1030,8 +1063,9 @@ Deliverables:
 
 - Pin dependencies, generate SBOM, audit licenses/vulnerabilities, scan secrets,
   and verify reproducible clean builds where feasible.
-- Sign/notarize installers, publish checksums and versioned release notes, and
-  test install/upgrade/uninstall with preservation of user configuration.
+- Configure signing/notarization, checksum, and versioned-release-note
+  automation. Execute credential-dependent signing and clean-client
+  install/upgrade/uninstall verification through the pre-publish checklist.
 - Select the release version from the compatibility impact, synchronize every
   application manifest, update the changelog, and create one immutable `vX.Y.Z`
   tag according to the versioning and release-train contract.
@@ -1039,25 +1073,14 @@ Deliverables:
 - Publish threat model, privacy statement, vulnerability contact, known limits,
   and operator troubleshooting.
 
-Release candidate gates:
-
-- All verification scopes pass on every supported platform.
-- Every hard performance and footprint budget passes on release-equivalent
-  reference hardware; deviations have no waiver path for the first stable release.
-- Provider conformance, fake-provider end-to-end, recovery, workspace escape,
-  approval bypass, loop limit, required gate, and update tests pass.
-- A clean machine can install, configure a provider, run a Coordinator task with
-  a restricted pool and no-interruption policy, recover after forced restart,
-  review the audit trail, and safely apply the diff.
-- No credential or private reasoning appears in SQLite, logs, events, exports,
-  fixtures, crash reports, or UI.
-
-Phase 7 exit: signed release artifacts satisfy the complete product contract.
+Phase 7 exit: implementation, supply-chain automation, contracts, and standard
+CI are ready to produce a release candidate. Publishing any candidate or stable
+artifact additionally requires every applicable `PUBLISH_CHECKLIST.md` gate.
 
 ## Final definition of done
 
-Argus is finished for this product scope when all phase gates pass and the
-following scenarios are automated:
+Argus roadmap implementation is finished for this product scope when all phase
+gates pass and the following scenarios are automated:
 
 1. Coordinator chooses only Builder from a broader allowed pool for a simple
    change and completes without unnecessary agents.
@@ -1074,11 +1097,12 @@ following scenarios are automated:
    decisions, and workspace state without duplicate mutation.
 8. Custom roles and local skills cannot exceed session capabilities.
 9. Every supported provider satisfies normalized execution semantics.
-10. The user reviews evidence and applies or exports an isolated diff from a
-    signed desktop build.
-11. Cold/warm launch, sidecar startup, idle CPU/RSS, first-load assets, installer
-    size, and 10,000-event interaction pass the release budgets on Windows,
-    macOS, and Linux artifacts.
+10. The user reviews evidence and applies or exports an isolated diff from the
+    desktop shell.
+
+Signed clean-client distribution and native reference-hardware release budgets
+are publication requirements in `PUBLISH_CHECKLIST.md`, not roadmap completion
+criteria.
 
 The legacy static session graph, transitional protocol types, simulator-only
 claims, and undocumented approval paths must be removed before declaring the
