@@ -117,6 +117,24 @@ An interrupted mutating tool or provider request is recorded as an unknown
 outcome and cannot be retried merely because its response was lost. A later
 retry must pass the usual scheduler, budget, workspace, and approval checks.
 
+## Local runtime transport
+
+The native shell binds the sidecar only to `127.0.0.1` on an
+operating-system-selected port. It passes a random process-local API token in
+the child environment and returns that token to the mounted webview only in
+memory; it is never persisted. Browser-facing HTTP requests use a bearer token,
+and WebSocket handshakes use the same token in a subprotocol offer so it never
+appears in a URL or access log. The
+backend rejects missing or incorrect tokens whenever native authentication is
+configured and rejects browser/WebSocket origins outside the exact Tauri and
+development allowlist. This API token is distinct from the stronger
+native-only credential-bridge token, which never crosses into JavaScript.
+
+The capability manifest exposes only the folder-open dialog to webview code.
+Process spawn, execute, kill, generic open/save/ask/message dialogs, and global
+Tauri injection are not webview permissions. Rust owns the fixed sidecar name,
+arguments, environment, lifecycle, and forced-stop fallback.
+
 ## Local diagnostics and support exports
 
 Runtime observability records bounded, process-local structured logs using

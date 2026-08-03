@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, HTTPException, Query, Request
 
 from app.api.websocket import connection_hub
 from app.db.database import get_db
@@ -12,6 +12,17 @@ from app.schemas.runtime import RuntimeHealthResponse, SupportBundleResponse
 from app.services.observability_service import observability
 
 router = APIRouter()
+
+
+@router.post("/shutdown", include_in_schema=False, status_code=202)
+async def graceful_shutdown(request: Request) -> dict[str, str]:
+    """Ask the owning frozen server loop to drain without OS signal semantics."""
+
+    shutdown = getattr(request.app.state, "request_sidecar_shutdown", None)
+    if shutdown is None:
+        raise HTTPException(503, "Native sidecar shutdown is unavailable.")
+    shutdown()
+    return {"status": "stopping"}
 
 
 @router.get("/health", response_model=RuntimeHealthResponse)

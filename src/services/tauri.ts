@@ -1,8 +1,9 @@
 import { invoke } from '@tauri-apps/api/core';
+import type { BackendConnection } from '@/services/backendConnection';
 
 export const tauriCommands = {
   /** Start the Python FastAPI backend sidecar */
-  startBackend: () => invoke<string>('start_backend'),
+  startBackend: () => invoke<BackendConnection>('start_backend'),
 
   /** Stop the Python backend */
   stopBackend: () => invoke<void>('stop_backend'),

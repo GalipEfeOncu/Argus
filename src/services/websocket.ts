@@ -4,14 +4,12 @@ import type { ConnectionState } from './sessionProjection';
 import { eventSimulator } from '@/services/eventSimulator';
 import { syncLegacyProjection } from '@/services/legacyProjectionBridge';
 import { useSessionRoomStore } from '@/stores/sessionRoomStore';
-import { tauriCommands } from '@/services/tauri';
+import { clearBackendConnection, ensureBackendConnection } from '@/services/backendConnection';
 import {
   SessionStreamClient,
   type SessionTransport,
   type TransportHandlers,
 } from '@/services/sessionTransport';
-
-const WS_BASE = 'ws://127.0.0.1:8000';
 
 /** Live implementation of the same transport boundary used by EventSimulator. */
 export class WebSocketSessionTransport implements SessionTransport {
@@ -19,6 +17,7 @@ export class WebSocketSessionTransport implements SessionTransport {
   private intentionalClose = false;
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private readonly pendingWireCommands: ArgusSessionCommand[] = [];
+  private connectionGeneration = 0;
 
   connect(sessionId: string, afterSequence: number, handlers: TransportHandlers): void {
     this.disconnect();
@@ -26,8 +25,27 @@ export class WebSocketSessionTransport implements SessionTransport {
     // In the desktop shell this transparently wakes an idle sidecar. In a
     // browser development build the native invoke simply rejects and the
     // already-running development backend remains the transport source.
-    void tauriCommands.startBackend().catch(() => undefined);
-    const socket = new WebSocket(`${WS_BASE}/ws/sessions/${encodeURIComponent(sessionId)}?after_sequence=${afterSequence}`);
+    const generation = ++this.connectionGeneration;
+    void this.openAuthenticatedSocket(sessionId, afterSequence, handlers, generation);
+  }
+
+  private async openAuthenticatedSocket(sessionId: string, afterSequence: number, handlers: TransportHandlers, generation: number): Promise<void> {
+    let connection;
+    try {
+      connection = await ensureBackendConnection();
+    } catch {
+      if (generation === this.connectionGeneration && !this.intentionalClose) {
+        handlers.onConnectionState('reconnecting');
+        this.reconnectTimer = setTimeout(() => handlers.onReconnectRequested(), 1_000);
+      }
+      return;
+    }
+    if (generation !== this.connectionGeneration || this.intentionalClose) return;
+    const query = new URLSearchParams({ after_sequence: String(afterSequence) });
+    const protocols = connection.accessToken.length > 0
+      ? ['argus.v1', `argus.token.${connection.accessToken}`]
+      : ['argus.v1'];
+    const socket = new WebSocket(`${connection.websocketUrl}/ws/sessions/${encodeURIComponent(sessionId)}?${query}`, protocols);
     this.socket = socket;
     socket.onopen = () => {
       handlers.onConnectionState('connected');
@@ -42,6 +60,7 @@ export class WebSocketSessionTransport implements SessionTransport {
     };
     socket.onclose = () => {
       if (this.socket === socket && !this.intentionalClose) {
+        clearBackendConnection();
         handlers.onConnectionState('reconnecting');
         this.reconnectTimer = setTimeout(() => handlers.onReconnectRequested(), 1_000);
       }
@@ -53,6 +72,7 @@ export class WebSocketSessionTransport implements SessionTransport {
 
   disconnect(): void {
     this.intentionalClose = true;
+    this.connectionGeneration += 1;
     if (this.reconnectTimer !== null) {
       clearTimeout(this.reconnectTimer);
       this.reconnectTimer = null;

@@ -41,7 +41,7 @@ export const StatusBar: React.FC<StatusBarProps> = ({ backendStatus }) => {
 
       {/* Right: WS endpoint */}
       <div className="statusbar-section statusbar-section--right">
-        <span className="statusbar-ws">ws://127.0.0.1:8000</span>
+        <span className="statusbar-ws">authenticated localhost</span>
       </div>
     </footer>
   );

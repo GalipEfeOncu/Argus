@@ -11,6 +11,9 @@ const paths = {
   cargoManifest: join(repositoryRoot, 'src-tauri', 'Cargo.toml'),
   cargoLock: join(repositoryRoot, 'src-tauri', 'Cargo.lock'),
   tauriConfig: join(repositoryRoot, 'src-tauri', 'tauri.conf.json'),
+  backendManifest: join(repositoryRoot, 'backend', 'pyproject.toml'),
+  backendVersion: join(repositoryRoot, 'backend', 'app', 'version.py'),
+  backendLock: join(repositoryRoot, 'backend', 'uv.lock'),
 };
 
 const semverPattern = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-(?:0|[1-9]\d*|\d*[A-Za-z-][0-9A-Za-z-]*)(?:\.(?:0|[1-9]\d*|\d*[A-Za-z-][0-9A-Za-z-]*))*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/;
@@ -40,6 +43,13 @@ function cargoPackageBlock(text) {
   if (!block) {
     throw new Error('Missing Argus package in src-tauri/Cargo.lock');
   }
+  return block;
+}
+
+function backendPackageBlock(text) {
+  const blocks = text.split(/(?=^\[\[package\]\]$)/m);
+  const block = blocks.find((candidate) => /^name = "argus-backend"$/m.test(candidate));
+  if (!block) throw new Error('Missing argus-backend package in backend/uv.lock');
   return block;
 }
 
@@ -84,13 +94,26 @@ function replaceSectionVersion(text, heading, version) {
   return text.slice(0, section.start) + updated + text.slice(section.end);
 }
 
+function versionFromPython(text) {
+  const match = text.match(/^APP_VERSION\s*=\s*"([^"]+)"$/m);
+  if (!match) throw new Error('Missing APP_VERSION in backend/app/version.py');
+  return match[1];
+}
+
+function replacePythonVersion(text, version) {
+  return text.replace(/^APP_VERSION\s*=\s*"[^"]+"$/m, `APP_VERSION = "${version}"`);
+}
+
 async function readSources() {
-  const [packageText, lockText, cargoText, cargoLockText, tauriText] = await Promise.all([
+  const [packageText, lockText, cargoText, cargoLockText, tauriText, backendManifestText, backendVersionText, backendLockText] = await Promise.all([
     readFile(paths.packageJson, 'utf8'),
     readFile(paths.packageLock, 'utf8'),
     readFile(paths.cargoManifest, 'utf8'),
     readFile(paths.cargoLock, 'utf8'),
     readFile(paths.tauriConfig, 'utf8'),
+    readFile(paths.backendManifest, 'utf8'),
+    readFile(paths.backendVersion, 'utf8'),
+    readFile(paths.backendLock, 'utf8'),
   ]);
   return {
     packageText,
@@ -101,6 +124,9 @@ async function readSources() {
     packageJson: parseJson(packageText, 'package.json'),
     packageLock: parseJson(lockText, 'package-lock.json'),
     tauriConfig: parseJson(tauriText, 'src-tauri/tauri.conf.json'),
+    backendManifestText,
+    backendVersionText,
+    backendLockText,
   };
 }
 
@@ -114,6 +140,9 @@ function collectVersions(sources) {
     ['src-tauri/Cargo.toml', versionFromToml(sources.cargoText, 'package')],
     ['src-tauri/Cargo.lock', versionFromCargoPackage(cargoLockBlock)],
     ['src-tauri/tauri.conf.json', sources.tauriConfig.version],
+    ['backend/pyproject.toml', versionFromToml(sources.backendManifestText, 'project')],
+    ['backend/app/version.py', versionFromPython(sources.backendVersionText)],
+    ['backend/uv.lock', versionFromCargoPackage(backendPackageBlock(sources.backendLockText))],
   ]);
 }
 
@@ -149,6 +178,11 @@ async function setVersion(version) {
   const cargoLockBlock = cargoPackageBlock(sources.cargoLockText);
   const updatedCargoLockBlock = replaceCargoPackageVersion(cargoLockBlock, version);
   const updatedCargoLock = sources.cargoLockText.replace(cargoLockBlock, updatedCargoLockBlock);
+  const backendLockBlock = backendPackageBlock(sources.backendLockText);
+  const updatedBackendLock = sources.backendLockText.replace(
+    backendLockBlock,
+    replaceCargoPackageVersion(backendLockBlock, version),
+  );
 
   await Promise.all([
     writeFile(paths.packageJson, `${JSON.stringify(sources.packageJson, null, 2)}\n`),
@@ -156,6 +190,9 @@ async function setVersion(version) {
     writeFile(paths.cargoManifest, replaceSectionVersion(sources.cargoText, 'package', version)),
     writeFile(paths.cargoLock, updatedCargoLock),
     writeFile(paths.tauriConfig, `${JSON.stringify(sources.tauriConfig, null, 2)}\n`),
+    writeFile(paths.backendManifest, replaceSectionVersion(sources.backendManifestText, 'project', version)),
+    writeFile(paths.backendVersion, replacePythonVersion(sources.backendVersionText, version)),
+    writeFile(paths.backendLock, updatedBackendLock),
   ]);
   await check();
 }

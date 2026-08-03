@@ -34,6 +34,10 @@ All notable user-visible changes to Argus are recorded here. The project follows
 - Local runtime diagnostics and an explicit redacted support-bundle export,
   including queue/lease status, provider latency, event lag, usage, and safe
   degraded-mode guidance without project content or credentials.
+- Hardened desktop lifecycle with a version-matched frozen sidecar, dynamic
+  authenticated localhost transport, origin checks, bounded crash restart,
+  graceful shutdown fallback, single-instance coordination, least-privilege
+  Tauri capabilities, and reproducible binary-size attribution.
 
 No stable Argus version has been published yet. The manifest version `0.1.0` is
 the current development baseline, not a stable release claim.

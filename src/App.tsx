@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import { useUIStore } from '@/stores/uiStore';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { StatusBar } from '@/components/layout/StatusBar';
@@ -24,10 +24,6 @@ const PageRenderer: React.FC = () => {
 
 const App: React.FC = () => {
   const { status, errorMsg, startBackend } = useTauri();
-
-  useEffect(() => {
-    startBackend();
-  }, [startBackend]);
 
   const banner = (() => {
     switch (status) {

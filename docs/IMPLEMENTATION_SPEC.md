@@ -410,6 +410,15 @@ must remain labelled as non-release calibration.
   plugins unless benchmarks or required functionality justify them.
 - No periodic status polling while WebSocket/native events are healthy. Timers
   must have ownership, cleanup, visibility behavior, and a test.
+- The packaged Python runtime is a target-triple-named PyInstaller one-file
+  sidecar built from base dependencies plus the packaging tool only. Packaging
+  excludes test tools, development-server accelerators, unused provider groups,
+  and the optional agent loop. Each build emits byte and SHA-256 attribution;
+  each supported release target must still supply its own native measurement.
+- Tauri uses a narrow dialog-only webview capability, single-instance
+  coordination, a process-owned fixed sidecar command, reduced Tokio features,
+  and no opener or JavaScript shell permission. Authenticated readiness checks
+  the dynamic loopback endpoint and exact manifest version before data I/O.
 
 ## 13. Supported desktop targets
 
@@ -437,7 +446,9 @@ Argus uses [Semantic Versioning 2.0.0](https://semver.org/) for every distribute
 desktop application and update. `package.json` is the authoritative application
 version. The release tooling keeps its root `package-lock.json` entries,
 `src-tauri/Cargo.toml`, the Argus package in `src-tauri/Cargo.lock`, and
-`src-tauri/tauri.conf.json` synchronized. CI runs `npm run check:version` and
+`src-tauri/tauri.conf.json`, `backend/pyproject.toml`, the Argus backend package
+in `backend/uv.lock`, and `backend/app/version.py` synchronized. CI runs
+`npm run check:version` and
 rejects drift. Use this command to prepare a version change:
 
 ```bash

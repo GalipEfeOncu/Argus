@@ -1,6 +1,5 @@
 import type { components, operations } from '@/types/generated/rest';
-
-const API_BASE = 'http://127.0.0.1:8000';
+import { authorizationHeaders, ensureBackendConnection } from '@/services/backendConnection';
 
 type RequestMethod = 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
 type SessionCreateRequest = components['schemas']['SessionCreateRequest'];
@@ -20,9 +19,10 @@ type RuntimeHealth = operations['runtime_health_runtime_health_get']['responses'
 type SupportBundle = operations['support_bundle_runtime_support_bundle_get']['responses'][200]['content']['application/json'];
 
 async function request<T>(method: RequestMethod, path: string, body?: unknown): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`, {
+  const connection = await ensureBackendConnection();
+  const res = await fetch(`${connection.baseUrl}${path}`, {
     method,
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...authorizationHeaders(connection) },
     body: body !== undefined ? JSON.stringify(body) : undefined,
   });
   

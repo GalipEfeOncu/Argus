@@ -965,7 +965,7 @@ user can safely evaluate and apply or export the final isolated result.
 
 ## Phase 7 — Desktop integration and release hardening
 
-### 7.1 Tauri and sidecar lifecycle
+### 7.1 Tauri and sidecar lifecycle (✅ Completed)
 
 Deliverables:
 
@@ -982,6 +982,26 @@ Deliverables:
   process tree terminates on normal exit, forced close, update, and uninstall.
 - Reduce Rust/Tokio feature flags and Tauri plugins to those proven necessary;
   produce a binary-size attribution report after each change.
+
+Completion evidence (2026-08-03):
+
+- Source: this change
+- Verification: full repository verification passed (documentation, version,
+  frontend type-check/test/build, backend import/test, and Cargo check); 55
+  frontend and 268 backend tests passed. Contract drift, Cargo fmt/clippy/test
+  (4 lifecycle tests), independent reviewer re-review, read-only test review,
+  frozen-sidecar authentication/shutdown smoke, and a release-equivalent Tauri
+  no-bundle build also passed.
+- Artifacts/benchmarks: PyInstaller 6.21.0 produced the
+  `x86_64-unknown-linux-gnu` sidecar at 40,459,296 bytes with SHA-256
+  `ad682a71e9edeefc476d84762902eb5712f9df217bb1f7ceece525f10649b1b6`;
+  the generated composition report separates Argus code, base dependencies,
+  Python runtime, and platform runtime and records excluded provider/dev groups.
+- Deferred/unavailable: Windows and macOS frozen-sidecar/native lifecycle
+  runners, signed installers, real updater/uninstall/forced-close process-tree
+  probes, and the packaged native release benchmark are unavailable on this
+  Linux development host. They remain Phase 7.2/7.3 and Phase 7 exit gates; this
+  host result does not certify those targets.
 
 ### 7.2 Cross-platform quality
 

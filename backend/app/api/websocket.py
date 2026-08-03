@@ -1,5 +1,6 @@
 import asyncio
 from datetime import datetime
+import hmac
 import uuid
 from fastapi import APIRouter, Query, WebSocket, WebSocketDisconnect
 from app.db.database import get_db
@@ -98,7 +99,18 @@ async def canonical_session_websocket(
 ) -> None:
     """Canonical replayable transport; each command is committed before it is sent."""
 
-    await websocket.accept()
+    allowed_origins = {origin.strip() for origin in settings.allowed_origins.split(",") if origin.strip()}
+    origin = websocket.headers.get("origin")
+    valid_origin = origin is None or origin in allowed_origins
+    protocols = [value.strip() for value in websocket.headers.get("sec-websocket-protocol", "").split(",")]
+    access_token = next((value.removeprefix("argus.token.") for value in protocols if value.startswith("argus.token.")), None)
+    valid_token = not settings.access_token or (
+        access_token is not None and hmac.compare_digest(settings.access_token.encode(), access_token.encode())
+    )
+    if not valid_origin or not valid_token:
+        await websocket.close(code=1008, reason="Native runtime authentication required")
+        return
+    await websocket.accept(subprotocol="argus.v1" if "argus.v1" in protocols else None)
     db = await get_db()
     try:
         session = await SessionRepository(db).get_runtime_session(session_id)

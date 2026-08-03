@@ -1,7 +1,10 @@
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI
+import hmac
+
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
@@ -13,6 +16,7 @@ from app.services.workspace_service import ProjectWorkspaceService
 from app.services.agent_definition_service import AgentDefinitionService
 from app.services.recovery_service import RecoveryService
 from app.services.observability_service import observability
+from app.version import APP_VERSION
 
 
 @asynccontextmanager
@@ -37,7 +41,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="Argus Backend",
-    version="0.1.0",
+    version=APP_VERSION,
     description="Multi-Agent Orchestration Backend",
     lifespan=lifespan,
 )
@@ -45,11 +49,30 @@ app = FastAPI(
 # CORS — allow Tauri webview and local dev
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["tauri://localhost", "http://localhost:1420", "http://127.0.0.1:1420"],
+    allow_origins=[origin.strip() for origin in settings.allowed_origins.split(",") if origin.strip()],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.middleware("http")
+async def protect_local_runtime(request: Request, call_next):
+    """Bind the localhost API to the native shell that launched this process."""
+
+    allowed_origins = {origin.strip() for origin in settings.allowed_origins.split(",") if origin.strip()}
+    origin = request.headers.get("origin")
+    if origin is not None and origin not in allowed_origins:
+        return JSONResponse(status_code=403, content={"detail": "Unexpected request origin."})
+    if request.method == "OPTIONS" and origin is not None:
+        return await call_next(request)
+    expected = settings.access_token
+    if expected:
+        authorization = request.headers.get("authorization", "")
+        scheme, _, supplied = authorization.partition(" ")
+        if scheme.lower() != "bearer" or not hmac.compare_digest(expected.encode(), supplied.encode()):
+            return JSONResponse(status_code=401, content={"detail": "Native runtime authentication required."})
+    return await call_next(request)
 
 # Routers
 app.include_router(sessions.router, prefix="/sessions", tags=["sessions"])
@@ -79,4 +102,4 @@ async def structured_request_log(request, call_next):
 
 @app.get("/health")
 async def health():
-    return {"status": "ok", "version": "0.1.0"}
+    return {"status": "ok", "version": APP_VERSION}

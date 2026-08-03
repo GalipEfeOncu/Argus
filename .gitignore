@@ -25,6 +25,8 @@ dist/
 
 # ─── Tauri / Rust ─────────────────────────────────────────────
 src-tauri/target/
+src-tauri/binaries/
+benchmarks/results/*-attribution.json
 *.pdb
 
 # ─── Database / Runtime ───────────────────────────────────────

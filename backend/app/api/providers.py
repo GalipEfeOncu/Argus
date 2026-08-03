@@ -86,5 +86,5 @@ async def native_credential_reference(profile_id: str, x_argus_bridge_token: str
 
 def _require_native_bridge(token: str | None) -> None:
     expected = settings.native_bridge_token
-    if not expected or token is None or not hmac.compare_digest(expected, token):
+    if not expected or token is None or not hmac.compare_digest(expected.encode(), token.encode()):
         raise HTTPException(403, {"code": "native_bridge_required", "message": "Credential handoff requires the native bridge."})

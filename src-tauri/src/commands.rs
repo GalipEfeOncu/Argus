@@ -8,7 +8,7 @@ use tauri::State;
 pub async fn start_backend(
     app: tauri::AppHandle,
     state: State<'_, SidecarState>,
-) -> Result<String, String> {
+) -> Result<crate::sidecar::BackendConnection, String> {
     crate::sidecar::start(app, state).await
 }
 
@@ -48,7 +48,8 @@ fn credential_entry(reference: &str) -> Result<keyring::Entry, String> {
     if !reference.starts_with("argus-provider-") || reference.len() > 256 {
         return Err("Invalid credential reference".to_string());
     }
-    keyring::Entry::new(CREDENTIAL_SERVICE, reference).map_err(|_| "Credential store is unavailable".to_string())
+    keyring::Entry::new(CREDENTIAL_SERVICE, reference)
+        .map_err(|_| "Credential store is unavailable".to_string())
 }
 
 /// Probe whether the native credential-service backend can create an entry.
@@ -66,19 +67,41 @@ pub async fn store_provider_credential(credential: String) -> Result<String, Str
         return Err("Credential must not be empty".to_string());
     }
     let reference = format!("argus-provider-{}", uuid::Uuid::new_v4());
-    credential_entry(&reference)?.set_password(&credential).map_err(|_| "Credential could not be saved".to_string())?;
+    credential_entry(&reference)?
+        .set_password(&credential)
+        .map_err(|_| "Credential could not be saved".to_string())?;
     Ok(reference)
 }
 
-async fn native_credential_reference(profile_id: &str, state: &SidecarState) -> Result<Option<String>, String> {
-    if !profile_id.starts_with("prv_") || profile_id.len() > 160 { return Err("Invalid provider profile".to_string()); }
-    let response = reqwest::Client::builder().timeout(std::time::Duration::from_secs(5)).build()
+async fn native_credential_reference(
+    profile_id: &str,
+    state: &SidecarState,
+) -> Result<Option<String>, String> {
+    if !profile_id.starts_with("prv_") || profile_id.len() > 160 {
+        return Err("Invalid provider profile".to_string());
+    }
+    let connection = backend_connection(state)?;
+    let response = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(5))
+        .build()
         .map_err(|_| "Credential store is unavailable".to_string())?
-        .get(format!("http://127.0.0.1:8000/providers/{profile_id}/credential-reference"))
+        .get(format!(
+            "{}/providers/{profile_id}/credential-reference",
+            connection.base_url
+        ))
+        .bearer_auth(connection.access_token)
         .header("X-Argus-Bridge-Token", crate::sidecar::bridge_token(state))
-        .send().await.map_err(|_| "Credential store is unavailable".to_string())?;
-    if !response.status().is_success() { return Err("Credential lookup was rejected".to_string()); }
-    Ok(response.json::<CredentialReferenceResponse>().await.map_err(|_| "Credential lookup was invalid".to_string())?.credential_reference)
+        .send()
+        .await
+        .map_err(|_| "Credential store is unavailable".to_string())?;
+    if !response.status().is_success() {
+        return Err("Credential lookup was rejected".to_string());
+    }
+    Ok(response
+        .json::<CredentialReferenceResponse>()
+        .await
+        .map_err(|_| "Credential lookup was invalid".to_string())?
+        .credential_reference)
 }
 
 /// Resolve a key only inside the native process and hand it to its authenticated
@@ -88,13 +111,18 @@ pub async fn refresh_provider_credential(
     profile_id: String,
     state: State<'_, SidecarState>,
 ) -> Result<(), String> {
-    let credential_reference = native_credential_reference(&profile_id, &state).await?
+    let credential_reference = native_credential_reference(&profile_id, &state)
+        .await?
         .ok_or("Provider does not have a credential reference")?;
-    let credential = credential_entry(&credential_reference)?.get_password().map_err(|_| "Credential is unavailable".to_string())?;
+    let credential = credential_entry(&credential_reference)?
+        .get_password()
+        .map_err(|_| "Credential is unavailable".to_string())?;
+    let connection = backend_connection(&state)?;
     let response = reqwest::Client::builder()
         .timeout(std::time::Duration::from_secs(5))
         .build().map_err(|_| "Credential handoff is unavailable".to_string())?
-        .put(format!("http://127.0.0.1:8000/providers/{profile_id}/credential"))
+        .put(format!("{}/providers/{profile_id}/credential", connection.base_url))
+        .bearer_auth(connection.access_token)
         .header("X-Argus-Bridge-Token", crate::sidecar::bridge_token(&state))
         .json(&serde_json::json!({ "credential": credential, "credentialReference": credential_reference }))
         .send().await.map_err(|_| "Credential handoff is unavailable".to_string())?;
@@ -106,16 +134,30 @@ pub async fn refresh_provider_credential(
 
 #[tauri::command]
 pub async fn delete_provider_credential(credential_reference: String) -> Result<(), String> {
-    credential_entry(&credential_reference)?.delete_credential().map_err(|_| "Credential could not be removed".to_string())
+    credential_entry(&credential_reference)?
+        .delete_credential()
+        .map_err(|_| "Credential could not be removed".to_string())
 }
 
 #[derive(serde::Deserialize)]
-struct CredentialReferenceResponse { #[serde(rename = "credentialReference")] credential_reference: Option<String> }
+struct CredentialReferenceResponse {
+    #[serde(rename = "credentialReference")]
+    credential_reference: Option<String>,
+}
 
 /// Look up an opaque reference through the authenticated native bridge, then
 /// delete it from the OS store without revealing that reference to the webview.
 #[tauri::command]
-pub async fn remove_provider_credential(profile_id: String, state: State<'_, SidecarState>) -> Result<(), String> {
-    if let Some(reference) = native_credential_reference(&profile_id, &state).await? { delete_provider_credential(reference).await?; }
+pub async fn remove_provider_credential(
+    profile_id: String,
+    state: State<'_, SidecarState>,
+) -> Result<(), String> {
+    if let Some(reference) = native_credential_reference(&profile_id, &state).await? {
+        delete_provider_credential(reference).await?;
+    }
     Ok(())
+}
+
+fn backend_connection(state: &SidecarState) -> Result<crate::sidecar::BackendConnection, String> {
+    crate::sidecar::connection(state).ok_or_else(|| "Backend is not ready".to_string())
 }

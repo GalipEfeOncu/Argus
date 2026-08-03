@@ -9,6 +9,8 @@ class Settings(BaseSettings):
     db_path: str = str(Path.home() / ".argus" / "argus.db")
     state_db_path: str = str(Path.home() / ".argus" / "argus_state.db")
     native_bridge_token: str = ""
+    access_token: str = ""
+    allowed_origins: str = "tauri://localhost,http://tauri.localhost,http://localhost:1420,http://127.0.0.1:1420"
 
     class Config:
         env_prefix = "ARGUS_"

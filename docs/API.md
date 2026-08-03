@@ -44,6 +44,23 @@ emits `session.snapshot`, then a bounded ordered page of events after `n`.
 Clients use the returned cursor through the timeline resource when more history
 is needed, so a connection never hydrates an unbounded event log.
 
+### Native localhost transport
+
+Packaged desktop clients discover the runtime endpoint through the
+`start_backend` Tauri command; the port is dynamic and must not be cached or
+hard-coded. The returned process-memory connection contains `baseUrl`,
+`websocketUrl`, `accessToken`, and the version verified at readiness. HTTP calls
+send `Authorization: Bearer <accessToken>`. WebSocket connections send the same
+token in an `argus.token.<accessToken>` `Sec-WebSocket-Protocol` offer alongside
+`argus.v1`; putting the token in a URL would leak it to access logs. These
+native lifecycle values are not OpenAPI persistence contracts and must never
+appear in logs, exports, or browser storage. A standalone development runtime
+may omit authentication only when no `ARGUS_ACCESS_TOKEN` was configured.
+
+The runtime accepts only the exact origins configured by the native/development
+allowlist. `/runtime/idle` and `/runtime/shutdown` are authenticated native
+lifecycle endpoints omitted from OpenAPI.
+
 ### Client projection and recovery
 
 The client applies canonical events through one pure projection reducer.  It

@@ -1,6 +1,8 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { open } from '@tauri-apps/plugin-dialog';
+import { listen } from '@tauri-apps/api/event';
+import { authorizationHeaders, clearBackendConnection, ensureBackendConnection, restartBackendAfterCrash } from '@/services/backendConnection';
 
 export type BackendStatus = 'starting' | 'running' | 'stopped' | 'error';
 
@@ -18,7 +20,8 @@ export function useTauri() {
     if (pollRef.current) return; // already polling
     pollRef.current = setInterval(async () => {
       try {
-        const res = await fetch('http://127.0.0.1:8000/health');
+        const connection = await ensureBackendConnection();
+        const res = await fetch(`${connection.baseUrl}/health`, { headers: authorizationHeaders(connection) });
         if (res.ok) {
           setStatus('running');
           setErrorMsg(null);
@@ -40,11 +43,6 @@ export function useTauri() {
     }
   }, []);
 
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => stopHealthPoll();
-  }, [stopHealthPoll]);
-
   // ── Start backend ──────────────────────────────────────────────────────────
   const startBackend = useCallback(async () => {
     setStatus('starting');
@@ -56,10 +54,10 @@ export function useTauri() {
     startHealthPoll();
 
     try {
-      const result = await invoke<string>('start_backend');
+      const result = await ensureBackendConnection();
       // Rust side already waited for the port to be reachable before
       // returning "started".  If we're here, the backend is up.
-      if (result === 'started' || result === 'already_running' || result === 'port_in_use') {
+      if (result.baseUrl.startsWith('http://127.0.0.1:')) {
         setStatus('running');
         setErrorMsg(null);
         stopHealthPoll(); // no need to keep polling
@@ -73,11 +71,53 @@ export function useTauri() {
     }
   }, [startHealthPoll, stopHealthPoll]);
 
+  useEffect(() => {
+    let disposed = false;
+    let unlistenCrash: (() => void) | null = null;
+    let unlistenExhausted: (() => void) | null = null;
+    let unlistenStopped: (() => void) | null = null;
+    const markReady = () => setStatus('running');
+    window.addEventListener('argus:sidecar-ready', markReady);
+    void listen<number>('argus://sidecar-crashed', () => {
+      clearBackendConnection();
+      if (disposed) return;
+      setStatus('starting');
+      void restartBackendAfterCrash().then(() => {
+        if (!disposed) setStatus('running');
+      }).catch((error: unknown) => {
+        if (!disposed) {
+          setErrorMsg(String(error));
+          setStatus('error');
+        }
+      });
+    }).then((stopListening) => { unlistenCrash = stopListening; }).catch(() => undefined);
+    void listen<number>('argus://sidecar-crash-exhausted', () => {
+      clearBackendConnection();
+      if (!disposed) {
+        setErrorMsg('The backend stopped after repeated quick crashes. Click to retry.');
+        setStatus('error');
+      }
+    }).then((stopListening) => { unlistenExhausted = stopListening; }).catch(() => undefined);
+    void listen<string>('argus://sidecar-stopped', () => {
+      clearBackendConnection();
+      if (!disposed) setStatus('stopped');
+    }).then((stopListening) => { unlistenStopped = stopListening; }).catch(() => undefined);
+    return () => {
+      disposed = true;
+      window.removeEventListener('argus:sidecar-ready', markReady);
+      unlistenCrash?.();
+      unlistenExhausted?.();
+      unlistenStopped?.();
+      stopHealthPoll();
+    };
+  }, [startBackend, stopHealthPoll]);
+
   // ── Stop backend ───────────────────────────────────────────────────────────
   const stopBackend = useCallback(async () => {
     stopHealthPoll();
     try {
       await invoke('stop_backend');
+      clearBackendConnection();
       setStatus('stopped');
     } catch (e) {
       console.error('[useTauri] stop_backend invoke failed:', e);

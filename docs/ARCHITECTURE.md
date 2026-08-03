@@ -96,6 +96,21 @@ The following rules keep that stack lightweight:
 - compile only required Tauri/Tokio/plugin features and package one native
   sidecar per target triple.
 
+The current native lifecycle allocates an operating-system-selected loopback
+port for each sidecar process and injects two independent random secrets: a
+webview API access token and a native-only credential-bridge token. Readiness
+requires an authenticated `/health` response with the exact application
+version. The shell owns the child handle, requests graceful shutdown before a
+bounded forced-kill fallback, clears stale handles on exit, and permits at most
+three quick crash restarts. Tauri's single-instance plugin coordinates a second
+launch by focusing the existing window.
+
+Release packaging runs `npm run sidecar:build` to create one PyInstaller binary
+named with Rust's target triple. The build excludes development, unused
+provider, agent-loop, and development-server packages and emits a SHA-256/byte
+attribution report. Tauri consumes that binary only through the release config
+overlay in `src-tauri/tauri.sidecar.conf.json`.
+
 The Python boundary is intentionally replaceable. A Rust rewrite is considered
 only if representative packaged builds cannot meet the budgets after dependency
 splitting, lazy imports, frozen-sidecar optimization, and profiling. Such a
