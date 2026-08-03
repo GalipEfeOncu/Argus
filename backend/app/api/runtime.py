@@ -2,16 +2,41 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Query
 
 from app.api.websocket import connection_hub
 from app.db.database import get_db
 from app.db.repositories import _now_ms
+from app.config import settings
+from app.schemas.runtime import RuntimeHealthResponse, SupportBundleResponse
+from app.services.observability_service import observability
 
-router = APIRouter(include_in_schema=False)
+router = APIRouter()
 
 
-@router.get("/idle")
+@router.get("/health", response_model=RuntimeHealthResponse)
+async def runtime_health() -> dict[str, object]:
+    """Return bounded health facts without project content or provider secrets."""
+
+    db = await get_db()
+    try:
+        return await observability.health(db, db_path=settings.db_path)
+    finally:
+        await db.close()
+
+
+@router.get("/support-bundle", response_model=SupportBundleResponse)
+async def support_bundle(session_id: list[str] = Query(default=[])) -> dict[str, object]:
+    """Export only redacted local support diagnostics; never project contents."""
+
+    db = await get_db()
+    try:
+        return await observability.support_bundle(db, db_path=settings.db_path, session_ids=session_id)
+    finally:
+        await db.close()
+
+
+@router.get("/idle", include_in_schema=False)
 async def idle_status() -> dict[str, bool]:
     """Report whether a local sidecar can stop without abandoning work."""
 
@@ -20,7 +45,7 @@ async def idle_status() -> dict[str, bool]:
         now = _now_ms()
         checks = (
             ("SELECT 1 FROM sessions WHERE status IN ('preparing', 'running', 'waiting_approval', 'waiting_decision') LIMIT 1", ()),
-            ("SELECT 1 FROM approvals WHERE decision IS NULL LIMIT 1", ()),
+            ("SELECT 1 FROM approvals WHERE decision = 'pending' OR decision IS NULL LIMIT 1", ()),
             ("SELECT 1 FROM tool_executions WHERE exit_state IN ('requested', 'running') LIMIT 1", ()),
             ("SELECT 1 FROM assignment_attempts WHERE state = 'running' LIMIT 1", ()),
             ("SELECT 1 FROM limit_reservations WHERE state = 'reserved' LIMIT 1", ()),

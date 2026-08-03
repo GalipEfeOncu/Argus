@@ -9,6 +9,8 @@ export const tauriCommands = {
 
   /** Check if backend is running */
   getBackendStatus: () => invoke<boolean>('get_backend_status'),
+  /** Probe the native credential store without accessing any credential. */
+  credentialStoreAvailable: () => invoke<boolean>('credential_store_available'),
 
   /** Open native folder picker and return selected path */
   selectDirectory: () => invoke<string | null>('select_directory'),

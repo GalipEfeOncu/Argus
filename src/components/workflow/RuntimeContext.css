@@ -25,3 +25,11 @@
 .runtime-decision { background: var(--bg-card); border: 1px solid var(--status-warning); border-radius: var(--radius-sm); margin-top: 10px; padding: 8px; }
 .runtime-decision p { margin-top: 4px; }
 .runtime-decision button { margin: 0 4px 4px 0; }
+.runtime-diagnostics { border-top: 1px solid var(--border-subtle); margin-top: 10px; padding-top: 8px; }
+.runtime-diagnostics__heading { align-items: center; display: flex; justify-content: space-between; gap: 8px; }
+.runtime-diagnostics__heading button, .runtime-diagnostics > button { background: var(--bg-element); border: 1px solid var(--border-medium); border-radius: var(--radius-sm); color: var(--text-primary); cursor: pointer; font: inherit; padding: 5px 6px; }
+.runtime-diagnostics__heading button:focus-visible, .runtime-diagnostics > button:focus-visible { outline: 2px solid var(--accent-primary); outline-offset: 2px; }
+.runtime-diagnostics__alert { background: var(--bg-card); border: 1px solid var(--status-warning); border-radius: var(--radius-sm); margin: 8px 0; padding: 8px; }
+.runtime-diagnostics__alert ul { margin: 5px 0 0; padding-left: 16px; }
+.runtime-diagnostics__alert small { display: block; margin-top: 3px; color: var(--text-muted); }
+.runtime-diagnostics__note { color: var(--text-muted); font-size: 10px; margin-top: 6px !important; }

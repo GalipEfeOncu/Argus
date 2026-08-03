@@ -877,7 +877,7 @@ Completion evidence (2026-07-29):
   native credential-store smoke probes require Phase 7 release runners. This
   development-host check does not certify those targets.
 
-## Phase 6 — Recovery, observability, and project completion workflow
+## Phase 6 — Recovery, observability, and project completion workflow (✅ Completed; Beta distribution deferred to Phase 7)
 
 ### 6.1 Crash and reconnect recovery (✅ Completed)
 
@@ -930,7 +930,7 @@ Completion evidence (2026-08-03):
   probes require Phase 7 release runners; development-host checks do not
   certify those targets.
 
-### 6.3 Local observability
+### 6.3 Local observability (✅ Completed)
 
 Deliverables:
 
@@ -941,6 +941,24 @@ Deliverables:
   project file contents without explicit selection.
 - Add degraded-mode UI for provider outage, disk full, database lock, corrupted
   event, sidecar crash, and credential-store unavailability.
+
+Completion evidence (2026-08-03):
+
+- Source: this change
+- Verification: full repository verification passed (documentation, version,
+  frontend type-check/test/build, backend import/test, and Cargo check); 51
+  frontend and 266 backend tests passed; generated OpenAPI/TypeScript contracts,
+  benchmark-fixture tests, Cargo clippy/test, and focused observability/security
+  regressions passed; clean focused diff check passed.
+- Artifacts/benchmarks: bounded process-local redacted diagnostic log; generated
+  `/runtime/health` and `/runtime/support-bundle` contracts; native
+  credential-store availability probe; runtime/degraded-mode UI and redaction,
+  pending-approval, support-bundle failure regression tests.
+- Deferred/unavailable: `npm run benchmark:release` reported the native packaged
+  Tauri-plus-sidecar release runner unavailable on this Linux development host.
+  Signed/installable Windows, macOS, and Linux packaging, upgrade/install, and
+  target credential-store smoke probes remain Phase 7 release-runner risks;
+  no development-host result certifies Beta distribution.
 
 Phase 6 exit: an interrupted task recovers without duplicate mutation, and the
 user can safely evaluate and apply or export the final isolated result.

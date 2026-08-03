@@ -184,6 +184,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/runtime/health": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Runtime Health
+         * @description Return bounded health facts without project content or provider secrets.
+         */
+        get: operations["runtime_health_runtime_health_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/runtime/support-bundle": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Support Bundle
+         * @description Export only redacted local support diagnostics; never project contents.
+         */
+        get: operations["support_bundle_runtime_support_bundle_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/sessions/": {
         parameters: {
             query?: never;
@@ -1210,6 +1250,15 @@ export interface components {
             /** Summary */
             summary: string;
         };
+        /** EventLagResponse */
+        EventLagResponse: {
+            /** Invalidpayloads */
+            invalidPayloads: number;
+            /** Newesteventagems */
+            newestEventAgeMs?: number | null;
+            /** Sessionswithevents */
+            sessionsWithEvents: number;
+        };
         /** Evidence */
         Evidence: {
             /** Artifactids */
@@ -1674,6 +1723,19 @@ export interface components {
             /** Updatedatms */
             updatedAtMs: number;
         };
+        /** ProviderLatencyResponse */
+        ProviderLatencyResponse: {
+            /** Averagelatencyms */
+            averageLatencyMs?: number | null;
+            /** Completed */
+            completed: number;
+            /** Failed */
+            failed: number;
+            /** Maximumlatencyms */
+            maximumLatencyMs?: number | null;
+            /** Operationkind */
+            operationKind: string;
+        };
         /** ProviderModelListResponse */
         ProviderModelListResponse: {
             /**
@@ -1763,6 +1825,53 @@ export interface components {
             providerId?: string | null;
             /** Role */
             role: string;
+        };
+        /** RuntimeCheckResponse */
+        RuntimeCheckResponse: {
+            /** Action */
+            action?: string | null;
+            /** Code */
+            code: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ok" | "degraded";
+            /** Summary */
+            summary: string;
+        };
+        /** RuntimeHealthResponse */
+        RuntimeHealthResponse: {
+            /** Checks */
+            checks: components["schemas"]["RuntimeCheckResponse"][];
+            eventLag: components["schemas"]["EventLagResponse"];
+            /** Observedatms */
+            observedAtMs: number;
+            /** Providerlatency */
+            providerLatency: components["schemas"]["ProviderLatencyResponse"][];
+            queues: components["schemas"]["RuntimeQueueResponse"];
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "healthy" | "degraded";
+            usage: components["schemas"]["UsageDiagnosticsResponse"];
+            writerLeases: components["schemas"]["WriterLeaseStatusResponse"];
+        };
+        /** RuntimeQueueResponse */
+        RuntimeQueueResponse: {
+            /** Activeprovideroperations */
+            activeProviderOperations: number;
+            /** Activetoolexecutions */
+            activeToolExecutions: number;
+            /** Pendingapprovals */
+            pendingApprovals: number;
+            /** Pendingdecisions */
+            pendingDecisions: number;
+            /** Reservedlimits */
+            reservedLimits: number;
+            /** Runnableassignments */
+            runnableAssignments: number;
         };
         /** SessionAgentInput */
         SessionAgentInput: {
@@ -2088,6 +2197,56 @@ export interface components {
              */
             trustState: "review_required" | "enabled";
         };
+        /** SupportBundleLogResponse */
+        SupportBundleLogResponse: {
+            /** Details */
+            details: {
+                [key: string]: unknown;
+            };
+            /** Event */
+            event: string;
+            /**
+             * Level
+             * @enum {string}
+             */
+            level: "INFO" | "WARNING" | "ERROR";
+            /** Timestampms */
+            timestampMs: number;
+        };
+        /** SupportBundleResponse */
+        SupportBundleResponse: {
+            /** Createdatms */
+            createdAtMs: number;
+            /** Excluded */
+            excluded: string[];
+            /**
+             * Formatversion
+             * @constant
+             */
+            formatVersion: 1;
+            /** Logs */
+            logs: components["schemas"]["SupportBundleLogResponse"][];
+            runtime: components["schemas"]["RuntimeHealthResponse"];
+            /** Sessions */
+            sessions: components["schemas"]["SupportBundleSessionResponse"][];
+        };
+        /** SupportBundleSessionResponse */
+        SupportBundleSessionResponse: {
+            /** Configurationshape */
+            configurationShape: {
+                [key: string]: unknown;
+            };
+            /** Eventcounts */
+            eventCounts?: {
+                [key: string]: number;
+            };
+            /** Lastsequence */
+            lastSequence: number;
+            /** Sessionid */
+            sessionId: string;
+            /** Status */
+            status: string;
+        };
         /** TimelinePageResponse */
         TimelinePageResponse: {
             /** Events */
@@ -2225,6 +2384,19 @@ export interface components {
             /** Toolname */
             toolName: string;
         };
+        /** UsageDiagnosticsResponse */
+        UsageDiagnosticsResponse: {
+            /** Durationms */
+            durationMs: number;
+            /** Inputtokens */
+            inputTokens: number;
+            /** Normalizedcost */
+            normalizedCost?: number | null;
+            /** Outputtokens */
+            outputTokens: number;
+            /** Samples */
+            samples: number;
+        };
         /** UsageUpdatedEvent */
         UsageUpdatedEvent: {
             /** Actorid */
@@ -2294,6 +2466,13 @@ export interface components {
         /** WorkspacePolicy */
         WorkspacePolicy: {
             mode?: components["schemas"]["WorkspaceMode"] | null;
+        };
+        /** WriterLeaseStatusResponse */
+        WriterLeaseStatusResponse: {
+            /** Active */
+            active: number;
+            /** Expiredunreleased */
+            expiredUnreleased: number;
         };
     };
     responses: never;
@@ -2629,6 +2808,57 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ProviderModelListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    runtime_health_runtime_health_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RuntimeHealthResponse"];
+                };
+            };
+        };
+    };
+    support_bundle_runtime_support_bundle_get: {
+        parameters: {
+            query?: {
+                session_id?: string[];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SupportBundleResponse"];
                 };
             };
             /** @description Validation Error */

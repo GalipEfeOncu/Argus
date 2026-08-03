@@ -16,6 +16,8 @@ type AcceptanceReview = components['schemas']['AcceptanceReviewResponse'];
 type AcceptanceActionRequest = components['schemas']['AcceptanceActionRequest'];
 type AcceptanceAction = components['schemas']['AcceptanceActionResponse'];
 type AcceptancePatch = components['schemas']['AcceptancePatchResponse'];
+type RuntimeHealth = operations['runtime_health_runtime_health_get']['responses'][200]['content']['application/json'];
+type SupportBundle = operations['support_bundle_runtime_support_bundle_get']['responses'][200]['content']['application/json'];
 
 async function request<T>(method: RequestMethod, path: string, body?: unknown): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
@@ -35,6 +37,10 @@ async function request<T>(method: RequestMethod, path: string, body?: unknown): 
 // ── Health ──────────────────────────────────────────────────
 export const api = {
   health: () => request<{ status: string }>('GET', '/health'),
+  runtime: {
+    health: () => request<RuntimeHealth>('GET', '/runtime/health'),
+    supportBundle: (sessionIds: string[] = []) => request<SupportBundle>('GET', `/runtime/support-bundle${sessionIds.length === 0 ? '' : `?${sessionIds.map((id) => `session_id=${encodeURIComponent(id)}`).join('&')}`}`),
+  },
 
   // ── Sessions ──────────────────────────────────────────────
   sessions: {

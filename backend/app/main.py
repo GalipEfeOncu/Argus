@@ -8,9 +8,11 @@ from app.config import settings
 from app.api import agent_definitions, contracts, models_router, projects, providers, runtime, sessions, skills, websocket as ws_router
 from app.db.database import init_db
 from app.db.database import get_db
+from app.db.repositories import _now_ms
 from app.services.workspace_service import ProjectWorkspaceService
 from app.services.agent_definition_service import AgentDefinitionService
 from app.services.recovery_service import RecoveryService
+from app.services.observability_service import observability
 
 
 @asynccontextmanager
@@ -23,6 +25,7 @@ async def lifespan(app: FastAPI):
         await AgentDefinitionService(db).ensure_builtin_templates()
         await ProjectWorkspaceService(db, managed_root=Path(settings.db_path).expanduser().resolve().parent / "workspaces").recover_after_restart()
         report = await RecoveryService(db).recover_after_restart()
+        observability.record("INFO", "runtime.recovery_checked", {"sessions": report.sessions, "orphanedAttempts": report.orphaned_attempts})
         print(f"[Argus] Recovery checked {report.sessions} sessions; orphaned attempts={report.orphaned_attempts}")
     finally:
         await db.close()
@@ -58,6 +61,20 @@ app.include_router(models_router.router, prefix="/models", tags=["models"])
 app.include_router(contracts.router, prefix="/contracts", tags=["contracts"])
 app.include_router(ws_router.router, tags=["websocket"])
 app.include_router(runtime.router, prefix="/runtime", tags=["runtime"])
+
+
+@app.middleware("http")
+async def structured_request_log(request, call_next):
+    """Emit path-level local telemetry without headers, query values, or bodies."""
+
+    started = _now_ms()
+    try:
+        response = await call_next(request)
+    except Exception:
+        observability.record("ERROR", "http.request_failed", {"method": request.method, "durationMs": _now_ms() - started})
+        raise
+    observability.record("INFO", "http.request_completed", {"method": request.method, "statusCode": response.status_code, "durationMs": _now_ms() - started})
+    return response
 
 
 @app.get("/health")

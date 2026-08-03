@@ -51,6 +51,13 @@ fn credential_entry(reference: &str) -> Result<keyring::Entry, String> {
     keyring::Entry::new(CREDENTIAL_SERVICE, reference).map_err(|_| "Credential store is unavailable".to_string())
 }
 
+/// Probe whether the native credential-service backend can create an entry.
+/// This never reads, writes, or exposes a provider credential.
+#[tauri::command]
+pub async fn credential_store_available() -> bool {
+    credential_entry("argus-provider-health-check").is_ok()
+}
+
 /// Store a provider secret in the platform credential service. The secret is
 /// intentionally not returned to JavaScript or persisted by the application.
 #[tauri::command]

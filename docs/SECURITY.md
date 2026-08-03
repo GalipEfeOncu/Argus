@@ -117,6 +117,24 @@ An interrupted mutating tool or provider request is recorded as an unknown
 outcome and cannot be retried merely because its response was lost. A later
 retry must pass the usual scheduler, budget, workspace, and approval checks.
 
+## Local diagnostics and support exports
+
+Runtime observability records bounded, process-local structured logs using
+redacted event names and metadata. Request bodies, headers, query values,
+credentials, raw prompts/messages, private reasoning, project paths, and file
+contents are not diagnostic-log fields. Health and support-bundle endpoints are
+read-only and cannot resolve credential-store references or trigger provider,
+tool, workspace, or retry actions.
+
+The desktop shell may probe whether the operating-system credential service can
+create an entry, but that probe never reads, writes, or exposes a credential.
+
+Support bundles contain only configuration shapes, event-type counts, and
+redacted runtime/log metadata. They exclude all credential material (including
+references), raw prompt/message text, private reasoning, project paths, event
+payload bodies, and project file contents. Export is an explicit user action;
+there is no automatic upload or telemetry path.
+
 ## Applying reviewed work
 
 Only a human acceptance action may copy an isolated worktree or snapshot back

@@ -31,6 +31,9 @@ All notable user-visible changes to Argus are recorded here. The project follows
   changes, evidence, gates, limits, usage, and Coordinator summaries; safely
   apply policy-checked changes, reject, export a patch, or start a fresh
   follow-up session. Original-project drift blocks automatic writes.
+- Local runtime diagnostics and an explicit redacted support-bundle export,
+  including queue/lease status, provider latency, event lag, usage, and safe
+  degraded-mode guidance without project content or credentials.
 
 No stable Argus version has been published yet. The manifest version `0.1.0` is
 the current development baseline, not a stable release claim.

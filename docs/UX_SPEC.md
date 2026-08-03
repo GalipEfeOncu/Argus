@@ -82,6 +82,21 @@ reasoning.
 lists unmet gates, limits reached, skipped verification, and how the user can
 resume in a new assignment or session.
 
+## Local diagnostics and degraded mode
+
+The context panel provides a compact, keyboard-accessible local diagnostics
+section. It shows runtime health plus bounded queue, lease, provider-latency,
+event-lag, and usage facts on demand. A provider outage, low disk space,
+database lock, corrupt event, unavailable credential store, or unavailable
+sidecar becomes a clear degraded-state alert with a safe next action; it never
+pretends a request was retried or a mutation completed.
+
+Users can explicitly download a redacted support bundle. Its visible privacy
+note states that it contains only configuration shapes, event summaries, and
+redacted diagnostics—not credentials, raw prompts, private reasoning, project
+paths, or project file contents. A support export must not silently include
+project data.
+
 ## Diff review and acceptance
 
 At a completed or human-accepted partial result, the context panel provides one

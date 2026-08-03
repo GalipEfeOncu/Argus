@@ -61,6 +61,7 @@ Tauri Desktop App
     ├── Coordinator and agent execution workers
     ├── Provider adapters and skill registry
     ├── Workspace, worktree, tool, and approval services
+    ├── Redacted observability and support-bundle service
     └── SQLite persistence
 ```
 

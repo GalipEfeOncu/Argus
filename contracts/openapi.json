@@ -2438,6 +2438,39 @@
         "title": "ErrorCreatedPayload",
         "type": "object"
       },
+      "EventLagResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "invalidPayloads": {
+            "minimum": 0.0,
+            "title": "Invalidpayloads",
+            "type": "integer"
+          },
+          "newestEventAgeMs": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Newesteventagems"
+          },
+          "sessionsWithEvents": {
+            "minimum": 0.0,
+            "title": "Sessionswithevents",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "sessionsWithEvents",
+          "invalidPayloads"
+        ],
+        "title": "EventLagResponse",
+        "type": "object"
+      },
       "Evidence": {
         "additionalProperties": false,
         "properties": {
@@ -3727,6 +3760,58 @@
         "title": "ProjectResponse",
         "type": "object"
       },
+      "ProviderLatencyResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "averageLatencyMs": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Averagelatencyms"
+          },
+          "completed": {
+            "minimum": 0.0,
+            "title": "Completed",
+            "type": "integer"
+          },
+          "failed": {
+            "minimum": 0.0,
+            "title": "Failed",
+            "type": "integer"
+          },
+          "maximumLatencyMs": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Maximumlatencyms"
+          },
+          "operationKind": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Operationkind",
+            "type": "string"
+          }
+        },
+        "required": [
+          "operationKind",
+          "completed",
+          "failed"
+        ],
+        "title": "ProviderLatencyResponse",
+        "type": "object"
+      },
       "ProviderModelListResponse": {
         "additionalProperties": false,
         "properties": {
@@ -4009,6 +4094,153 @@
           "role"
         ],
         "title": "RoleConfigSchema",
+        "type": "object"
+      },
+      "RuntimeCheckResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Action"
+          },
+          "code": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Code",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "ok",
+              "degraded"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "summary": {
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Summary",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "status",
+          "summary"
+        ],
+        "title": "RuntimeCheckResponse",
+        "type": "object"
+      },
+      "RuntimeHealthResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "checks": {
+            "items": {
+              "$ref": "#/components/schemas/RuntimeCheckResponse"
+            },
+            "maxItems": 20,
+            "title": "Checks",
+            "type": "array"
+          },
+          "eventLag": {
+            "$ref": "#/components/schemas/EventLagResponse"
+          },
+          "observedAtMs": {
+            "minimum": 0.0,
+            "title": "Observedatms",
+            "type": "integer"
+          },
+          "providerLatency": {
+            "items": {
+              "$ref": "#/components/schemas/ProviderLatencyResponse"
+            },
+            "maxItems": 100,
+            "title": "Providerlatency",
+            "type": "array"
+          },
+          "queues": {
+            "$ref": "#/components/schemas/RuntimeQueueResponse"
+          },
+          "status": {
+            "enum": [
+              "healthy",
+              "degraded"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "usage": {
+            "$ref": "#/components/schemas/UsageDiagnosticsResponse"
+          },
+          "writerLeases": {
+            "$ref": "#/components/schemas/WriterLeaseStatusResponse"
+          }
+        },
+        "required": [
+          "status",
+          "observedAtMs",
+          "checks",
+          "queues",
+          "writerLeases",
+          "providerLatency",
+          "eventLag",
+          "usage"
+        ],
+        "title": "RuntimeHealthResponse",
+        "type": "object"
+      },
+      "RuntimeQueueResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "activeProviderOperations": {
+            "minimum": 0.0,
+            "title": "Activeprovideroperations",
+            "type": "integer"
+          },
+          "activeToolExecutions": {
+            "minimum": 0.0,
+            "title": "Activetoolexecutions",
+            "type": "integer"
+          },
+          "pendingApprovals": {
+            "minimum": 0.0,
+            "title": "Pendingapprovals",
+            "type": "integer"
+          },
+          "pendingDecisions": {
+            "minimum": 0.0,
+            "title": "Pendingdecisions",
+            "type": "integer"
+          },
+          "reservedLimits": {
+            "minimum": 0.0,
+            "title": "Reservedlimits",
+            "type": "integer"
+          },
+          "runnableAssignments": {
+            "minimum": 0.0,
+            "title": "Runnableassignments",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "runnableAssignments",
+          "activeToolExecutions",
+          "activeProviderOperations",
+          "pendingApprovals",
+          "pendingDecisions",
+          "reservedLimits"
+        ],
+        "title": "RuntimeQueueResponse",
         "type": "object"
       },
       "SessionAgentInput": {
@@ -5131,6 +5363,140 @@
         "title": "SkillPackageResponse",
         "type": "object"
       },
+      "SupportBundleLogResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "details": {
+            "additionalProperties": true,
+            "title": "Details",
+            "type": "object"
+          },
+          "event": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Event",
+            "type": "string"
+          },
+          "level": {
+            "enum": [
+              "INFO",
+              "WARNING",
+              "ERROR"
+            ],
+            "title": "Level",
+            "type": "string"
+          },
+          "timestampMs": {
+            "minimum": 0.0,
+            "title": "Timestampms",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "timestampMs",
+          "level",
+          "event",
+          "details"
+        ],
+        "title": "SupportBundleLogResponse",
+        "type": "object"
+      },
+      "SupportBundleResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "createdAtMs": {
+            "minimum": 0.0,
+            "title": "Createdatms",
+            "type": "integer"
+          },
+          "excluded": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 20,
+            "minItems": 1,
+            "title": "Excluded",
+            "type": "array"
+          },
+          "formatVersion": {
+            "const": 1,
+            "title": "Formatversion",
+            "type": "integer"
+          },
+          "logs": {
+            "items": {
+              "$ref": "#/components/schemas/SupportBundleLogResponse"
+            },
+            "maxItems": 200,
+            "title": "Logs",
+            "type": "array"
+          },
+          "runtime": {
+            "$ref": "#/components/schemas/RuntimeHealthResponse"
+          },
+          "sessions": {
+            "items": {
+              "$ref": "#/components/schemas/SupportBundleSessionResponse"
+            },
+            "maxItems": 25,
+            "title": "Sessions",
+            "type": "array"
+          }
+        },
+        "required": [
+          "formatVersion",
+          "createdAtMs",
+          "runtime",
+          "sessions",
+          "logs",
+          "excluded"
+        ],
+        "title": "SupportBundleResponse",
+        "type": "object"
+      },
+      "SupportBundleSessionResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "configurationShape": {
+            "additionalProperties": true,
+            "title": "Configurationshape",
+            "type": "object"
+          },
+          "eventCounts": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "maxProperties": 100,
+            "title": "Eventcounts",
+            "type": "object"
+          },
+          "lastSequence": {
+            "minimum": 0.0,
+            "title": "Lastsequence",
+            "type": "integer"
+          },
+          "sessionId": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Sessionid",
+            "type": "string"
+          },
+          "status": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "sessionId",
+          "status",
+          "lastSequence",
+          "configurationShape"
+        ],
+        "title": "SupportBundleSessionResponse",
+        "type": "object"
+      },
       "TimelinePageResponse": {
         "additionalProperties": false,
         "properties": {
@@ -5621,6 +5987,51 @@
         "title": "ToolStartedPayload",
         "type": "object"
       },
+      "UsageDiagnosticsResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "durationMs": {
+            "minimum": 0.0,
+            "title": "Durationms",
+            "type": "integer"
+          },
+          "inputTokens": {
+            "minimum": 0.0,
+            "title": "Inputtokens",
+            "type": "integer"
+          },
+          "normalizedCost": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Normalizedcost"
+          },
+          "outputTokens": {
+            "minimum": 0.0,
+            "title": "Outputtokens",
+            "type": "integer"
+          },
+          "samples": {
+            "minimum": 0.0,
+            "title": "Samples",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "inputTokens",
+          "outputTokens",
+          "durationMs",
+          "samples"
+        ],
+        "title": "UsageDiagnosticsResponse",
+        "type": "object"
+      },
       "UsageUpdatedEvent": {
         "additionalProperties": false,
         "properties": {
@@ -5813,6 +6224,27 @@
           }
         },
         "title": "WorkspacePolicy",
+        "type": "object"
+      },
+      "WriterLeaseStatusResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "active": {
+            "minimum": 0.0,
+            "title": "Active",
+            "type": "integer"
+          },
+          "expiredUnreleased": {
+            "minimum": 0.0,
+            "title": "Expiredunreleased",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "active",
+          "expiredUnreleased"
+        ],
+        "title": "WriterLeaseStatusResponse",
         "type": "object"
       }
     }
@@ -6232,6 +6664,75 @@
         "summary": "Discover Models",
         "tags": [
           "providers"
+        ]
+      }
+    },
+    "/runtime/health": {
+      "get": {
+        "description": "Return bounded health facts without project content or provider secrets.",
+        "operationId": "runtime_health_runtime_health_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RuntimeHealthResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Runtime Health",
+        "tags": [
+          "runtime"
+        ]
+      }
+    },
+    "/runtime/support-bundle": {
+      "get": {
+        "description": "Export only redacted local support diagnostics; never project contents.",
+        "operationId": "support_bundle_runtime_support_bundle_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "session_id",
+            "required": false,
+            "schema": {
+              "default": [],
+              "items": {
+                "type": "string"
+              },
+              "title": "Session Id",
+              "type": "array"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SupportBundleResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Support Bundle",
+        "tags": [
+          "runtime"
         ]
       }
     },

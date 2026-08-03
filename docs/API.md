@@ -460,6 +460,8 @@ The REST API manages durable configuration; real-time execution uses WebSocket c
 | Resource | Responsibilities |
 | --- | --- |
 | `/health` | Runtime health and version |
+| `/runtime/health` | Redacted local health, queue/lease, provider-latency, event-lag, and usage diagnostics |
+| `/runtime/support-bundle` | User-exportable, redacted configuration shapes, event summaries, and local diagnostic logs |
 | `/projects` | Register, validate, and list local projects |
 | `/sessions` | Create, list, inspect, review/accept isolated results, archive, and delete sessions |
 | `/agent-definitions` | Built-in templates, overrides, and custom roles |
@@ -478,6 +480,22 @@ hydrates artifact bodies or the complete event log.
 
 `GET /sessions/{sessionId}/configuration` returns the latest normalized,
 immutable configuration snapshot after process restart.
+
+### Local observability and support bundles
+
+`GET /runtime/health` returns bounded, read-only local diagnostics. It reports
+database/event-integrity and storage checks; queue and writer-lease counts;
+completed provider-operation latency; event age; and normalized usage totals.
+Each degraded check includes a plain-language recovery action. A provider,
+database-lock, disk, or corrupt-event state is a diagnostic signal, never an
+implicit retry or policy override.
+
+`GET /runtime/support-bundle?session_id={id}` returns at most 25 selected
+session summaries together with the same runtime facts and up to 200 redacted,
+process-local structured log records. Session entries contain event-type counts
+and configuration *shapes*, never event bodies, session goals, project paths,
+credentials, raw prompts, private reasoning, or file content. The client saves
+this JSON only after the user explicitly requests export.
 
 ### Diff review and acceptance
 
