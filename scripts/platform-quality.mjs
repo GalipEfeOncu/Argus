@@ -192,14 +192,26 @@ export async function runPlatformQuality({ requireWebview = false } = {}) {
 async function main() {
   const outputIndex = process.argv.indexOf('--output');
   const outputPath = outputIndex >= 0 ? process.argv[outputIndex + 1] : undefined;
-  const result = await runPlatformQuality({ requireWebview: process.argv.includes('--require-webview') });
-  const content = `${JSON.stringify(result, null, 2)}\n`;
-  if (outputPath) {
-    await mkdir(dirname(outputPath), { recursive: true });
-    await writeFile(outputPath, content, 'utf8');
+  try {
+    const result = await runPlatformQuality({ requireWebview: process.argv.includes('--require-webview') });
+    const content = `${JSON.stringify(result, null, 2)}\n`;
+    if (outputPath) {
+      await mkdir(dirname(outputPath), { recursive: true });
+      await writeFile(outputPath, content, 'utf8');
+    }
+    process.stdout.write(content);
+    if (result.status !== 'passed') {
+      for (const check of result.checks.filter((candidate) => candidate.status === 'failed')) {
+        process.stdout.write(`::error title=platform quality ${check.id}::${check.detail.replaceAll('%', '%25').replaceAll('\r', '%0D').replaceAll('\n', '%0A')}\n`);
+      }
+      process.exitCode = 1;
+    }
+  } catch (error) {
+    const detail = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
+    process.stderr.write(`${detail}\n`);
+    process.stdout.write(`::error title=platform quality exception::${detail.replaceAll('%', '%25').replaceAll('\r', '%0D').replaceAll('\n', '%0A')}\n`);
+    process.exitCode = 1;
   }
-  process.stdout.write(content);
-  if (result.status !== 'passed') process.exitCode = 1;
 }
 
 if (process.argv[1] && pathToFileURL(process.argv[1]).href === import.meta.url) await main();
