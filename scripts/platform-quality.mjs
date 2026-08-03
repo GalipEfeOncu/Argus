@@ -32,6 +32,10 @@ export function versionAtLeast(actual, minimum) {
   return true;
 }
 
+export function hasEmbeddedWebViewBootstrapper(config) {
+  return config?.bundle?.windows?.webviewInstallMode?.type === 'embedBootstrapper';
+}
+
 async function command(command, args = []) {
   try {
     const result = await execute(command, args, { timeout: 15_000, windowsHide: true });
@@ -88,7 +92,7 @@ async function webviewCheck(osName) {
   let embeddedBootstrapper = false;
   try {
     const config = JSON.parse(await readFile(TAURI_CONFIG_PATH, 'utf8'));
-    embeddedBootstrapper = config?.bundle?.windows?.webviewInstallMode?.type === 'embeddedBootstrapper';
+    embeddedBootstrapper = hasEmbeddedWebViewBootstrapper(config);
   } catch {
     embeddedBootstrapper = false;
   }

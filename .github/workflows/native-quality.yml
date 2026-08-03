@@ -75,7 +75,7 @@ jobs:
       - run: npm run type-check
       - run: npm run test
       - run: npm run test:benchmarks
-      - run: uv run --project backend --extra dev pytest -q
+      - run: uv run --project backend --extra dev python scripts/run-pytest-ci.py backend
       - run: cargo test --target ${{ matrix.target }}
         working-directory: src-tauri
       - name: Build target sidecar

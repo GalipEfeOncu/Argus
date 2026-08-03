@@ -44,8 +44,7 @@ jobs:
         working-directory: backend
       - run: python -c "import app.main; print('backend import OK')"
         working-directory: backend
-      - run: python -m pytest -q
-        working-directory: backend
+      - run: python scripts/run-pytest-ci.py backend
 
   contracts:
     name: Generated contract drift

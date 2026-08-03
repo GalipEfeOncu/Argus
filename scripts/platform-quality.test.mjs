@@ -3,7 +3,12 @@ import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import test from 'node:test';
 
-import { isSupportedTarget, parseVersion, versionAtLeast } from './platform-quality.mjs';
+import {
+  hasEmbeddedWebViewBootstrapper,
+  isSupportedTarget,
+  parseVersion,
+  versionAtLeast,
+} from './platform-quality.mjs';
 
 test('declared desktop targets exclude Linux ARM64 until its separate gate exists', () => {
   assert.equal(isSupportedTarget('win32', 'x64'), true);
@@ -34,6 +39,8 @@ test('native CI and bundle configuration cover every declared target and package
   assert.match(workflow, /container: debian:stable-slim/);
   const config = JSON.parse(configSource);
   assert.equal(config.identifier, 'com.argus.desktop');
+  assert.equal(hasEmbeddedWebViewBootstrapper(config), true);
+  assert.equal(hasEmbeddedWebViewBootstrapper({}), false);
   assert.ok(config.bundle.icon.includes('icons/icon.icns'));
   assert.ok(config.bundle.icon.includes('icons/icon.ico'));
   assert.deepEqual(config.bundle.windows.webviewInstallMode, { type: 'embedBootstrapper', silent: true });
