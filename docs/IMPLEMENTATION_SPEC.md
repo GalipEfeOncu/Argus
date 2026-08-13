@@ -514,3 +514,20 @@ Every distributed update uses one auditable release change:
    that exact commit, and build/sign artifacts from the tag.
 7. Publish checksums and release notes. Never move or reuse a published version
    or tag; a correction receives a new patch or prerelease number.
+
+The executable transaction is documented in [RELEASE.md](RELEASE.md). Continuous
+supply-chain CI consumes committed npm, uv, and Cargo lockfiles; emits a
+CycloneDX SBOM and dependency-license inventory; scans vulnerabilities and
+secrets; and compares two clean frontend builds. All workflow actions and audit
+tool versions are immutable pins. The protected manual release workflow accepts
+only an annotated `v<version>` tag matching synchronized manifests plus a durable
+pre-publish evidence reference. It builds on native targets, signs/notarizes
+credentialed platforms, generates SHA-256 checksums and versioned notes, and
+never creates or moves the tag.
+
+Before any pending SQLite migration, startup verifies the existing database and
+creates a consistent checksummed backup under its local `backups/` directory.
+Recovery is explicit, checksum/integrity verified, refuses symlinks, and retains
+the displaced database. Provider credentials are outside this backup in the OS
+credential store. The operator procedure and rollback limits are authoritative
+in [OPERATIONS.md](OPERATIONS.md).

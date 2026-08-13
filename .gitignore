@@ -54,4 +54,5 @@ Thumbs.db
 npm-debug.log*
 
 # ─── Build Artifacts ──────────────────────────────────────────
+artifacts/
 src-tauri/gen/

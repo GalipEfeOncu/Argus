@@ -1,0 +1,61 @@
+{
+  "forbidden": ["GPL", "AGPL", "SSPL"],
+  "metadataOverrides": [
+    {
+      "ecosystem": "npm",
+      "namePattern": "@esbuild/*",
+      "version": "0.25.12",
+      "license": "MIT",
+      "source": "https://www.npmjs.com/package/@esbuild/win32-x64/v/0.25.12"
+    },
+    {
+      "ecosystem": "npm",
+      "namePattern": "@rollup/rollup-*",
+      "version": "4.62.2",
+      "license": "MIT",
+      "source": "https://www.npmjs.com/package/@rollup/rollup-win32-x64-msvc/v/4.62.2"
+    },
+    {
+      "ecosystem": "npm",
+      "namePattern": "@tauri-apps/cli-*",
+      "version": "2.11.4",
+      "license": "Apache-2.0 OR MIT",
+      "source": "https://www.npmjs.com/package/@tauri-apps/cli-win32-x64-msvc/v/2.11.4"
+    },
+    {
+      "ecosystem": "npm",
+      "namePattern": "fsevents",
+      "version": "2.3.3",
+      "license": "MIT",
+      "source": "https://www.npmjs.com/package/fsevents/v/2.3.3"
+    },
+    {
+      "ecosystem": "pypi",
+      "namePattern": "colorama",
+      "version": "0.4.6",
+      "license": "BSD-3-Clause",
+      "source": "https://pypi.org/project/colorama/0.4.6/"
+    },
+    {
+      "ecosystem": "pypi",
+      "namePattern": "macholib",
+      "version": "1.16.4",
+      "license": "MIT",
+      "source": "https://pypi.org/project/macholib/1.16.4/"
+    },
+    {
+      "ecosystem": "pypi",
+      "namePattern": "pefile",
+      "version": "2024.8.26",
+      "license": "MIT",
+      "source": "https://pypi.org/project/pefile/2024.8.26/"
+    },
+    {
+      "ecosystem": "pypi",
+      "namePattern": "pywin32-ctypes",
+      "version": "0.2.3",
+      "license": "BSD-3-Clause",
+      "source": "https://pypi.org/project/pywin32-ctypes/0.2.3/"
+    }
+  ]
+}

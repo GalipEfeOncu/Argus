@@ -169,4 +169,7 @@ audited user choice; a crash during apply is marked unknown and never replayed.
 
 ## Reporting
 
-Until a dedicated security contact is published, report vulnerabilities privately to the repository owner and do not include exploitable details in public issues.
+Report vulnerabilities through the private process in the
+[repository security policy](../SECURITY.md); do not include exploitable details
+in public issues. The [threat model](THREAT_MODEL.md) owns adversaries and
+residual risks, while the [privacy statement](PRIVACY.md) owns data handling.

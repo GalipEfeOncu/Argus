@@ -4,11 +4,13 @@ from __future__ import annotations
 
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 import aiosqlite
 
 from app.config import settings
-from app.db.migrations import apply_migrations
+from app.db.backup import create_pre_migration_backup
+from app.db.migrations import MIGRATIONS, apply_migrations
 
 
 async def get_db() -> aiosqlite.Connection:
@@ -38,6 +40,9 @@ async def transaction(db: aiosqlite.Connection) -> AsyncIterator[None]:
 async def init_db() -> None:
     """Bring the configured database to the newest known schema version."""
 
+    database_path = Path(settings.db_path)
+    database_path.parent.mkdir(parents=True, exist_ok=True)
+    await create_pre_migration_backup(database_path, MIGRATIONS)
     db = await get_db()
     try:
         await apply_migrations(db)

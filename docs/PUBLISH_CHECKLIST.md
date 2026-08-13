@@ -33,6 +33,13 @@ result from another platform or from cross-compilation.
   variants without exposing secrets in logs, events, exports, or crash reports.
 - [ ] Verify sleep/resume, forced close, restart/reconnect, sidecar cleanup,
   update, and uninstall leave no orphaned process or duplicate mutation.
+- [ ] On every supported client, import a local skill package and reject
+  symlink/reparse-point and non-regular-file escapes; verify runtime disk-health
+  diagnostics use the native filesystem API; apply added, changed, and deleted
+  files while preserving the platform's declared line-ending policy.
+- [ ] Create and restore a pre-migration backup on every supported client;
+  verify checksums, stale SQLite journal handling, and that the backup directory
+  is accessible only to the current OS user (including inherited Windows ACLs).
 - [ ] Run keyboard-only and screen-reader smoke tests using Narrator on Windows,
   VoiceOver on macOS, and the supported Linux accessibility stack.
 - [ ] Verify native zoom, reduced motion, focus recovery, contrast, and the
@@ -54,6 +61,11 @@ result from another platform or from cross-compilation.
 
 ## Release transaction
 
+- [ ] Confirm the source tag's **Supply chain** run passed with locked npm/uv/Cargo
+  installs, SBOM, license inventory, vulnerability audits, secret scanning, and
+  reproducible frontend-build comparison.
+- [ ] Verify the protected `release` environment required an independent approval
+  and the workflow's recorded checklist evidence points to this exact tag.
 - [ ] Run all repository verification scopes, generated-contract/version drift,
   security scanning, provider conformance, fake-provider end-to-end, recovery,
   workspace-escape, approval-bypass, loop-limit, required-gate, migration, and
@@ -66,4 +78,3 @@ result from another platform or from cross-compilation.
   [Implementation Specification section 14](IMPLEMENTATION_SPEC.md#14-versioning-and-release-train).
 - [ ] Retain a durable release summary. Expiring CI artifacts alone are not
   sufficient evidence.
-

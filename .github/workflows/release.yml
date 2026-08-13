@@ -1,0 +1,235 @@
+name: Publish immutable release
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Immutable annotated vX.Y.Z tag to publish
+        required: true
+        type: string
+      checklist_evidence:
+        description: Durable PUBLISH_CHECKLIST evidence reference
+        required: true
+        type: string
+      prerelease:
+        description: Publish as a prerelease
+        required: true
+        default: true
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ inputs.tag }}
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    name: Validate immutable release transaction
+    runs-on: ubuntu-24.04
+    environment: release
+    outputs:
+      commit: ${{ steps.tag.outputs.commit }}
+      tag-object: ${{ steps.tag.outputs.tag-object }}
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          fetch-depth: 0
+          ref: ${{ inputs.tag }}
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: 24.18.1
+      - name: Verify annotated tag, version, and checklist evidence
+        id: tag
+        env:
+          RELEASE_TAG: ${{ inputs.tag }}
+          CHECKLIST_EVIDENCE: ${{ inputs.checklist_evidence }}
+          WORKFLOW_REF: ${{ github.ref }}
+        shell: bash
+        run: |
+          test -n "$CHECKLIST_EVIDENCE"
+          test "$WORKFLOW_REF" = "refs/tags/$RELEASE_TAG"
+          test "$(git cat-file -t "$RELEASE_TAG")" = tag
+          version="$(node -p "require('./package.json').version")"
+          test "$RELEASE_TAG" = "v$version"
+          commit="$(git rev-parse "$RELEASE_TAG^{commit}")"
+          test "$commit" = "$(git rev-parse HEAD)"
+          echo "commit=$commit" >> "$GITHUB_OUTPUT"
+          echo "tag-object=$(git rev-parse "$RELEASE_TAG")" >> "$GITHUB_OUTPUT"
+      - run: npm run check:version
+
+  supply-chain:
+    needs: validate
+    uses: ./.github/workflows/supply-chain.yml
+    with:
+      ref: ${{ needs.validate.outputs.commit }}
+
+  build:
+    name: Sign and bundle ${{ matrix.name }}
+    needs: [supply-chain, validate]
+    environment: release
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Windows x86_64
+            runner: windows-2022
+            target: x86_64-pc-windows-msvc
+            bundles: nsis
+            artifact_glob: src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/*.exe
+          - name: macOS Intel
+            runner: macos-15-intel
+            target: x86_64-apple-darwin
+            bundles: dmg
+            artifact_glob: src-tauri/target/x86_64-apple-darwin/release/bundle/dmg/*.dmg
+          - name: macOS Apple Silicon
+            runner: macos-14
+            target: aarch64-apple-darwin
+            bundles: dmg
+            artifact_glob: src-tauri/target/aarch64-apple-darwin/release/bundle/dmg/*.dmg
+          - name: Linux x86_64
+            runner: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
+            bundles: appimage,deb
+            artifact_glob: |
+              src-tauri/target/x86_64-unknown-linux-gnu/release/bundle/appimage/*.AppImage
+              src-tauri/target/x86_64-unknown-linux-gnu/release/bundle/deb/*.deb
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          ref: ${{ needs.validate.outputs.commit }}
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: 24.18.1
+          cache: npm
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: '3.12'
+      - uses: astral-sh/setup-uv@94527f2e458b27549849d47d273a16bec83a01e9 # v7
+        with:
+          version: 0.11.28
+      - uses: dtolnay/rust-toolchain@4360b52568e2003a75bf9bc1d59f33a8e3fc893c # stable
+        with:
+          toolchain: 1.97.0
+          targets: ${{ matrix.target }}
+      - name: Install Linux native dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf
+      - run: npm ci
+      - name: Import Windows signing certificate
+        if: runner.os == 'Windows'
+        id: windows-cert
+        shell: pwsh
+        env:
+          WINDOWS_CERTIFICATE: ${{ secrets.WINDOWS_CERTIFICATE }}
+          WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
+        run: |
+          if (-not $env:WINDOWS_CERTIFICATE -or -not $env:WINDOWS_CERTIFICATE_PASSWORD) { throw 'Windows signing credentials are required' }
+          $pfx = Join-Path $env:RUNNER_TEMP 'argus-release.pfx'
+          [IO.File]::WriteAllBytes($pfx, [Convert]::FromBase64String($env:WINDOWS_CERTIFICATE))
+          try {
+            $password = ConvertTo-SecureString $env:WINDOWS_CERTIFICATE_PASSWORD -AsPlainText -Force
+            $certificates = @(Import-PfxCertificate -FilePath $pfx -CertStoreLocation Cert:\CurrentUser\My -Password $password)
+            $signing = @($certificates | Where-Object {
+              $_.HasPrivateKey -and @($_.EnhancedKeyUsageList | Where-Object { $_.ObjectId.Value -eq '1.3.6.1.5.5.7.3.3' }).Count -gt 0
+            })
+            if ($signing.Count -ne 1 -or -not $signing[0].Thumbprint) { throw 'Exactly one code-signing certificate with a private key is required' }
+            "thumbprint=$($signing[0].Thumbprint)" >> $env:GITHUB_OUTPUT
+          } finally { Remove-Item $pfx -Force -ErrorAction SilentlyContinue }
+      - name: Prepare Windows signing configuration
+        if: runner.os == 'Windows'
+        shell: pwsh
+        env:
+          CERTIFICATE_THUMBPRINT: ${{ steps.windows-cert.outputs.thumbprint }}
+        run: |
+          New-Item -ItemType Directory -Force artifacts | Out-Null
+          @{ bundle = @{ windows = @{ certificateThumbprint = $env:CERTIFICATE_THUMBPRINT; digestAlgorithm = 'sha256'; timestampUrl = 'http://timestamp.digicert.com' } } } |
+            ConvertTo-Json -Depth 4 | Set-Content artifacts/windows-signing.json
+      - name: Prepare Apple notarization key
+        if: runner.os == 'macOS'
+        shell: bash
+        env:
+          APPLE_API_KEY_BASE64: ${{ secrets.APPLE_API_KEY_BASE64 }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+          APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          KEY_PATH: ${{ runner.temp }}/AuthKey_${{ secrets.APPLE_API_KEY }}.p8
+        run: |
+          test -n "$APPLE_API_KEY_BASE64" && test -n "$APPLE_API_ISSUER" && test -n "$APPLE_API_KEY"
+          test -n "$APPLE_CERTIFICATE" && test -n "$APPLE_CERTIFICATE_PASSWORD" && test -n "$APPLE_SIGNING_IDENTITY"
+          python -c "import base64, os, pathlib; pathlib.Path(os.environ['KEY_PATH']).write_bytes(base64.b64decode(os.environ['APPLE_API_KEY_BASE64'], validate=True))"
+          chmod 600 "$KEY_PATH"
+          echo "APPLE_API_KEY_PATH=$KEY_PATH" >> "$GITHUB_ENV"
+      - name: Build signed native bundle
+        shell: bash
+        env:
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+          APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+        run: |
+          npm run sidecar:build -- ${{ matrix.target }}
+          signing_config=()
+          if [[ "${{ runner.os }}" == Windows ]]; then signing_config=(--config artifacts/windows-signing.json); fi
+          npx tauri build --config src-tauri/tauri.sidecar.conf.json "${signing_config[@]}" --target ${{ matrix.target }} --bundles ${{ matrix.bundles }}
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: argus-release-${{ matrix.target }}
+          if-no-files-found: error
+          path: ${{ matrix.artifact_glob }}
+
+  publish:
+    name: Checksums, versioned notes, and GitHub release
+    needs: [validate, build]
+    runs-on: ubuntu-24.04
+    environment: release
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          fetch-depth: 0
+          ref: ${{ needs.validate.outputs.commit }}
+      - uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
+        with:
+          path: release-artifacts
+      - name: Record evidence and checksums
+        env:
+          CHECKLIST_EVIDENCE: ${{ inputs.checklist_evidence }}
+          RELEASE_TAG: ${{ inputs.tag }}
+          SOURCE_COMMIT: ${{ needs.validate.outputs.commit }}
+          EXPECTED_TAG_OBJECT: ${{ needs.validate.outputs.tag-object }}
+        run: |
+          remote_tag_object="$(git ls-remote --tags origin "refs/tags/$RELEASE_TAG" | awk '{print $1}')"
+          remote_commit="$(git ls-remote --tags origin "refs/tags/$RELEASE_TAG^{}" | awk '{print $1}')"
+          test "$remote_tag_object" = "$EXPECTED_TAG_OBJECT"
+          test "$remote_commit" = "$SOURCE_COMMIT"
+          python scripts/supply_chain.py stage-artifacts release-artifacts release-staging
+          python - <<'PY'
+          import json, os
+          from pathlib import Path
+          Path('release-staging/release-evidence.json').write_text(json.dumps({
+              'tag': os.environ['RELEASE_TAG'],
+              'sourceCommit': os.environ['SOURCE_COMMIT'],
+              'publishChecklistEvidence': os.environ['CHECKLIST_EVIDENCE'],
+          }, indent=2, sort_keys=True) + '\n')
+          PY
+          python scripts/supply_chain.py checksums release-staging release-staging/SHA256SUMS
+      - name: Publish immutable release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.tag }}
+          CHECKLIST_EVIDENCE: ${{ inputs.checklist_evidence }}
+          PRERELEASE: ${{ inputs.prerelease }}
+        run: |
+          prerelease=()
+          if [[ "$PRERELEASE" == true ]]; then prerelease=(--prerelease); fi
+          mapfile -d '' assets < <(find release-staging -type f -print0)
+          gh release create "$RELEASE_TAG" "${assets[@]}" --verify-tag --generate-notes "${prerelease[@]}" --notes "Publish checklist evidence: $CHECKLIST_EVIDENCE"

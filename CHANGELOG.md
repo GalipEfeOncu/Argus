@@ -43,6 +43,12 @@ All notable user-visible changes to Argus are recorded here. The project follows
   bootstrap; and improved keyboard, contrast, screen-reader, reduced-motion,
   Unicode/long-path, symlink, line-ending, and process-cancellation coverage.
   Workspace search now has a bounded literal fallback when ripgrep is absent.
+- Supply-chain and protected release automation with immutable dependency/tool
+  pins, SBOM and license evidence, vulnerability/secret audits, reproducible
+  frontend builds, native signing/notarization, checksums, and versioned notes.
+  Existing databases now receive a verified pre-migration backup with an
+  explicit checksum-checked recovery path; threat, privacy, operations, known
+  limits, and private vulnerability-reporting guidance are published.
 
 No stable Argus version has been published yet. The manifest version `0.1.0` is
 the current development baseline, not a stable release claim.

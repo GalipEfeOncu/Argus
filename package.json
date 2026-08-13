@@ -28,7 +28,9 @@
     "platform:quality": "node scripts/platform-quality.mjs",
     "test:platform-quality": "node --test scripts/platform-quality.test.mjs",
     "accessibility:quality": "node scripts/accessibility-quality.mjs",
-    "test:accessibility-quality": "node --test scripts/accessibility-quality.test.mjs"
+    "test:accessibility-quality": "node --test scripts/accessibility-quality.test.mjs",
+    "supply-chain:sbom": "python scripts/supply_chain.py sbom artifacts/argus.cdx.json",
+    "supply-chain:licenses": "python scripts/supply_chain.py licenses artifacts/licenses.json"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.1.14",
@@ -49,7 +51,7 @@
     "framer-motion": "^12.19.1",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
-    "react-router-dom": "^7.6.3",
+    "react-router-dom": "^7.18.2",
     "shiki": "^3.7.0",
     "zustand": "^5.0.6"
   },

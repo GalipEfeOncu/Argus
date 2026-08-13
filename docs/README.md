@@ -13,6 +13,10 @@ prompts or implementation notes.
 | Which layer owns a responsibility? | [ARCHITECTURE.md](ARCHITECTURE.md) | Target architecture |
 | Which desktop versions and prerequisites are supported? | [PLATFORM_SUPPORT.md](PLATFORM_SUPPORT.md) | Operational support guide |
 | What must pass immediately before publishing desktop artifacts? | [PUBLISH_CHECKLIST.md](PUBLISH_CHECKLIST.md) | Publication gate |
+| How is an approved release built and published? | [RELEASE.md](RELEASE.md) | Release operator guide |
+| What data leaves the device and what stays local? | [PRIVACY.md](PRIVACY.md) | Privacy statement |
+| What threats and residual risks are in scope? | [THREAT_MODEL.md](THREAT_MODEL.md) | Threat model |
+| How are migration recovery and common failures handled? | [OPERATIONS.md](OPERATIONS.md) | Operations guide |
 | What crosses REST or WebSocket? | [API.md](API.md) | Target protocol; transitional endpoints are labeled |
 | What must the user see and control? | [UX_SPEC.md](UX_SPEC.md) | UX contract |
 | What is allowed and where is it enforced? | [SECURITY.md](SECURITY.md) | Security contract |

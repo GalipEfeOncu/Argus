@@ -43,8 +43,8 @@ only and are not bundled as user-facing shell permissions.
 ## Native quality evidence
 
 The `Native quality` workflow builds a target-triple frozen sidecar, runs its
-authenticated lifecycle smoke test, executes the frontend/backend/Rust and
-platform probes, and produces release-equivalent native bundles for:
+authenticated lifecycle smoke test, executes the frontend/Rust and platform
+probes, and produces release-equivalent native bundles for:
 
 - Windows Server 2022 x86_64 as the native Windows build environment;
 - macOS 15 Intel and macOS 14 Apple Silicon;
@@ -59,6 +59,12 @@ CI combines axe structural checks, keyboard-operable recovery controls, WCAG AA
 semantic-token contrast, global reduced-motion handling, screen-reader live
 regions, native zoom hotkeys with a scalable viewport, and the existing
 10,000-event virtualization bound.
+
+The complete Python backend suite runs once in the standard Python 3.12 CI job.
+Client-OS integration paths that require native filesystem behavior—local skill
+package import, disk diagnostics, and CRLF-aware diff application—run on clean
+supported clients through the pre-publish checklist rather than being inferred
+from hosted package builders.
 
 Hosted build runners do not certify Windows 10/11 client installation,
 hardware keychain variants, real suspend/resume, screen-reader application

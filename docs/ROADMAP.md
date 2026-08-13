@@ -1057,7 +1057,7 @@ Completion evidence (2026-08-03):
   on CachyOS is incompatible with linuxdeploy's RELR stripping; the declared
   Ubuntu 22.04 native CI environment owns that artifact.
 
-### 7.3 Supply chain and release
+### 7.3 Supply chain and release (✅ Completed)
 
 Deliverables:
 
@@ -1066,12 +1066,36 @@ Deliverables:
 - Configure signing/notarization, checksum, and versioned-release-note
   automation. Execute credential-dependent signing and clean-client
   install/upgrade/uninstall verification through the pre-publish checklist.
-- Select the release version from the compatibility impact, synchronize every
-  application manifest, update the changelog, and create one immutable `vX.Y.Z`
-  tag according to the versioning and release-train contract.
+- Automate and validate the release transaction that selects a version from
+  compatibility impact, synchronizes manifests, updates the changelog, and
+  accepts only one immutable `vX.Y.Z` tag. Execute that version/tag transaction
+  only after the pre-publish checklist passes.
 - Add database/config backup before migrations and documented rollback/recovery.
 - Publish threat model, privacy statement, vulnerability contact, known limits,
   and operator troubleshooting.
+
+Completion evidence (2026-08-13):
+
+- Source: this change
+- Verification: full repository verification passed (27 documentation files,
+  synchronized `0.1.0` manifests, 57 frontend tests and production build, 282
+  backend tests, and Cargo check/fmt/clippy plus 4 Rust tests). Generated
+  contracts, workflow actionlint, 14 focused backup/supply-chain tests, native
+  sidecar smoke, npm/pip/Cargo vulnerability audits, full-history secret scan,
+  and independent reviewer/read-only test re-review passed.
+- Artifacts/benchmarks: deterministic CycloneDX 1.6 SBOM and license inventory
+  covered 944 locked dependencies with zero forbidden or unresolved licenses;
+  two clean frontend builds matched byte-for-byte. The Linux frozen sidecar was
+  38,232,432 bytes with SHA-256
+  `daa3b933d6bdb37859261190df76074ee3b3285e95abb74435b6f041ed680ca1`
+  and passed authenticated startup/shutdown smoke.
+- Deferred/unavailable: protected-environment signing/notarization,
+  clean-client install/upgrade/uninstall, native backup ACL checks, and
+  reference-hardware measurements require release credentials or target
+  machines and remain publication-blocking in `PUBLISH_CHECKLIST.md`. No release
+  version or tag was created because this is roadmap completion, not an approved
+  release transaction. RustSec reports 17 reviewed warnings in Tauri's required
+  Linux GTK3 dependency chain; known limits and upgrade ownership are documented.
 
 Phase 7 exit: implementation, supply-chain automation, contracts, and standard
 CI are ready to produce a release candidate. Publishing any candidate or stable
