@@ -55,10 +55,14 @@ All notable user-visible changes to Argus are recorded here. The project follows
 - Release governance now supports a documented solo-maintainer approval mode
   while preserving separate credential and publication gates. Releases use
   independent review whenever another maintainer is available.
+- Release automation now supports a zero-cost, prominently labelled unsigned
+  community Alpha mode while preserving immutable tags, native builds, SBOM,
+  checksums, clean-client evidence, and separate publication approval. Beta,
+  release-candidate, and stable publication still require platform signing.
 
 ### Fixed
 
-- Release automation now stages signed, checksummed artifacts behind a separate
+- Release automation now stages checksummed artifacts behind a separate
   publication approval so clean-client and reference-hardware evidence can be
   completed before a GitHub Release is created.
 - Sidecar shutdown now owns, drains, and awaits in-flight vertical worker tasks;

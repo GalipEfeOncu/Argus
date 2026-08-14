@@ -16,6 +16,14 @@ on:
         required: true
         default: true
         type: boolean
+      signing_mode:
+        description: Signed release or explicitly unsigned community Alpha
+        required: true
+        default: unsigned-community-alpha
+        type: choice
+        options:
+          - unsigned-community-alpha
+          - signed
 
 permissions:
   contents: read
@@ -45,10 +53,17 @@ jobs:
         env:
           RELEASE_TAG: ${{ inputs.tag }}
           CHECKLIST_EVIDENCE: ${{ inputs.checklist_evidence }}
+          PRERELEASE: ${{ inputs.prerelease }}
+          SIGNING_MODE: ${{ inputs.signing_mode }}
           WORKFLOW_REF: ${{ github.ref }}
         shell: bash
         run: |
           test -n "$CHECKLIST_EVIDENCE"
+          case "$SIGNING_MODE" in signed|unsigned-community-alpha) ;; *) exit 1 ;; esac
+          if [[ "$SIGNING_MODE" == unsigned-community-alpha ]]; then
+            test "$PRERELEASE" = true
+            [[ "$RELEASE_TAG" == *-alpha.* ]]
+          fi
           test "$WORKFLOW_REF" = "refs/tags/$RELEASE_TAG"
           test "$(git cat-file -t "$RELEASE_TAG")" = tag
           version="$(node -p "require('./package.json').version")"
@@ -66,7 +81,7 @@ jobs:
       ref: ${{ needs.validate.outputs.commit }}
 
   build:
-    name: Sign and bundle ${{ matrix.name }}
+    name: Build and bundle ${{ matrix.name }}
     needs: [supply-chain, validate]
     environment: release
     strategy:
@@ -121,7 +136,7 @@ jobs:
           sudo apt-get install --yes libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf
       - run: npm ci
       - name: Import Windows signing certificate
-        if: runner.os == 'Windows'
+        if: inputs.signing_mode == 'signed' && runner.os == 'Windows'
         id: windows-cert
         shell: pwsh
         env:
@@ -141,7 +156,7 @@ jobs:
             "thumbprint=$($signing[0].Thumbprint)" >> $env:GITHUB_OUTPUT
           } finally { Remove-Item $pfx -Force -ErrorAction SilentlyContinue }
       - name: Prepare Windows signing configuration
-        if: runner.os == 'Windows'
+        if: inputs.signing_mode == 'signed' && runner.os == 'Windows'
         shell: pwsh
         env:
           CERTIFICATE_THUMBPRINT: ${{ steps.windows-cert.outputs.thumbprint }}
@@ -150,7 +165,7 @@ jobs:
           @{ bundle = @{ windows = @{ certificateThumbprint = $env:CERTIFICATE_THUMBPRINT; digestAlgorithm = 'sha256'; timestampUrl = 'http://timestamp.digicert.com' } } } |
             ConvertTo-Json -Depth 4 | Set-Content artifacts/windows-signing.json
       - name: Prepare Apple notarization key
-        if: runner.os == 'macOS'
+        if: inputs.signing_mode == 'signed' && runner.os == 'macOS'
         shell: bash
         env:
           APPLE_API_KEY_BASE64: ${{ secrets.APPLE_API_KEY_BASE64 }}
@@ -166,7 +181,10 @@ jobs:
           python -c "import base64, os, pathlib; pathlib.Path(os.environ['KEY_PATH']).write_bytes(base64.b64decode(os.environ['APPLE_API_KEY_BASE64'], validate=True))"
           chmod 600 "$KEY_PATH"
           echo "APPLE_API_KEY_PATH=$KEY_PATH" >> "$GITHUB_ENV"
+      - name: Build frozen sidecar
+        run: npm run sidecar:build -- ${{ matrix.target }}
       - name: Build signed native bundle
+        if: inputs.signing_mode == 'signed'
         shell: bash
         env:
           APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
@@ -175,10 +193,13 @@ jobs:
           APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
           APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
         run: |
-          npm run sidecar:build -- ${{ matrix.target }}
           signing_config=()
-          if [[ "${{ runner.os }}" == Windows ]]; then signing_config=(--config artifacts/windows-signing.json); fi
+          if [[ "$RUNNER_OS" == Windows ]]; then signing_config=(--config artifacts/windows-signing.json); fi
           npx tauri build --config src-tauri/tauri.sidecar.conf.json "${signing_config[@]}" --target ${{ matrix.target }} --bundles ${{ matrix.bundles }}
+      - name: Build unsigned community Alpha bundle
+        if: inputs.signing_mode == 'unsigned-community-alpha'
+        shell: bash
+        run: npx tauri build --config src-tauri/tauri.sidecar.conf.json --target ${{ matrix.target }} --bundles ${{ matrix.bundles }}
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: argus-release-${{ matrix.target }}
@@ -201,6 +222,7 @@ jobs:
         env:
           CHECKLIST_EVIDENCE: ${{ inputs.checklist_evidence }}
           RELEASE_TAG: ${{ inputs.tag }}
+          SIGNING_MODE: ${{ inputs.signing_mode }}
           SOURCE_COMMIT: ${{ needs.validate.outputs.commit }}
           EXPECTED_TAG_OBJECT: ${{ needs.validate.outputs.tag-object }}
         run: |
@@ -212,10 +234,18 @@ jobs:
           python - <<'PY'
           import json, os
           from pathlib import Path
+          if os.environ['SIGNING_MODE'] == 'unsigned-community-alpha':
+              Path('release-staging/UNSIGNED-RELEASE.txt').write_text(
+                  'UNSIGNED COMMUNITY ALPHA\n\n'
+                  'The Windows and macOS packages in this release are not code-signed or notarized.\n'
+                  'Verify SHA256SUMS against the assets on the official GitHub release before use.\n'
+                  'Operating-system trust warnings are expected. This is not a stable release.\n'
+              )
           Path('release-staging/release-evidence.json').write_text(json.dumps({
               'tag': os.environ['RELEASE_TAG'],
               'sourceCommit': os.environ['SOURCE_COMMIT'],
               'publishChecklistEvidence': os.environ['CHECKLIST_EVIDENCE'],
+              'signingMode': os.environ['SIGNING_MODE'],
           }, indent=2, sort_keys=True) + '\n')
           PY
           python scripts/supply_chain.py checksums release-staging release-staging/SHA256SUMS
@@ -245,14 +275,17 @@ jobs:
       - name: Reverify staged source and checksums
         env:
           RELEASE_TAG: ${{ inputs.tag }}
+          SIGNING_MODE: ${{ inputs.signing_mode }}
           SOURCE_COMMIT: ${{ needs.validate.outputs.commit }}
         run: |
           python - <<'PY'
           import json, os
           from pathlib import Path
           evidence = json.loads(Path('release-staging/release-evidence.json').read_text())
-          if evidence.get('tag') != os.environ['RELEASE_TAG'] or evidence.get('sourceCommit') != os.environ['SOURCE_COMMIT']:
-              raise SystemExit('Staged release evidence does not match the approved tag and commit')
+          if (evidence.get('tag') != os.environ['RELEASE_TAG']
+                  or evidence.get('sourceCommit') != os.environ['SOURCE_COMMIT']
+                  or evidence.get('signingMode') != os.environ['SIGNING_MODE']):
+              raise SystemExit('Staged release evidence does not match the approved tag, commit, or signing mode')
           PY
           (cd release-staging && sha256sum --check SHA256SUMS)
       - name: Publish immutable release
@@ -261,8 +294,14 @@ jobs:
           RELEASE_TAG: ${{ inputs.tag }}
           CHECKLIST_EVIDENCE: ${{ inputs.checklist_evidence }}
           PRERELEASE: ${{ inputs.prerelease }}
+          SIGNING_MODE: ${{ inputs.signing_mode }}
         run: |
           prerelease=()
           if [[ "$PRERELEASE" == true ]]; then prerelease=(--prerelease); fi
+          notes="Publish checklist evidence: $CHECKLIST_EVIDENCE"
+          if [[ "$SIGNING_MODE" == unsigned-community-alpha ]]; then
+            unsigned_guide="https://github.com/$GITHUB_REPOSITORY/blob/$RELEASE_TAG/docs/PLATFORM_SUPPORT.md#installing-an-unsigned-community-alpha"
+            notes="$(printf '%s\n\nInstallation guide: %s\n\n%s' '⚠️ UNSIGNED COMMUNITY ALPHA: Windows and macOS packages are not code-signed or notarized. Operating-system trust warnings are expected. Verify SHA256SUMS before use. This is not a stable release.' "$unsigned_guide" "$notes")"
+          fi
           mapfile -d '' assets < <(find release-staging -type f -print0)
-          gh release create "$RELEASE_TAG" "${assets[@]}" --verify-tag --generate-notes "${prerelease[@]}" --notes "Publish checklist evidence: $CHECKLIST_EVIDENCE"
+          gh release create "$RELEASE_TAG" "${assets[@]}" --verify-tag --generate-notes "${prerelease[@]}" --notes "$notes"

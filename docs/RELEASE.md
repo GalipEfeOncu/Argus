@@ -41,7 +41,31 @@ Use one of these governance modes and record it in the durable release summary:
   administrator bypass, or permit approval before its corresponding evidence is
   complete. Return to team mode when another maintainer is available.
 
-Store only these credentials in `release`:
+## Signing modes
+
+The release workflow supports two explicit modes:
+
+- `unsigned-community-alpha` is the zero-cost community distribution path. It
+  is allowed only for an `-alpha.N` version published as a GitHub prerelease.
+  Windows and macOS artifacts are neither code-signed nor notarized. The
+  workflow records the mode in `release-evidence.json`, adds
+  `UNSIGNED-RELEASE.txt` to the checksummed artifact set, and places a prominent
+  warning in the GitHub Release notes. The immutable tag, native builds, SBOM,
+  checksums, clean-client checks, and both manual environment approvals remain
+  mandatory.
+- `signed` is required for Beta, release-candidate, and stable publication. It
+  signs Windows artifacts and signs/notarizes macOS artifacts using credentials
+  held only by the protected `release` environment.
+
+An unsigned community Alpha does not establish operating-system publisher trust.
+Users must expect Windows SmartScreen and macOS Gatekeeper warnings and verify
+files downloaded from the official Argus repository against the published
+`SHA256SUMS`. A co-hosted checksum detects download corruption or an accidental
+mismatch; it does not replace a platform signature or protect against compromise
+of the repository itself. Do not describe such a build as signed, notarized,
+stable, or suitable for unattended/managed rollout.
+
+For `signed` mode, store only these credentials in `release`:
 
 - `WINDOWS_CERTIFICATE`: base64 PKCS#12 code-signing certificate;
 - `WINDOWS_CERTIFICATE_PASSWORD`;
@@ -52,24 +76,28 @@ Store only these credentials in `release`:
   App Store Connect notarization key.
 
 Normal CI has read-only repository permission and cannot access either
-environment. Release jobs fail when a required target credential is absent.
-Do not store signing credentials in `release-publication`.
+environment. Signed release jobs fail when a required target credential is
+absent; unsigned community Alpha jobs do not read signing credentials. Do not
+store signing credentials in `release-publication`.
 
 ## Release transaction
 
 Follow the staged transaction in
 [Implementation Specification section 14](IMPLEMENTATION_SPEC.md#14-versioning-and-release-train):
 
-1. complete all source/preflight rows that do not require the final signed
+1. complete all source/preflight rows that do not require the final staged
    packages; choose the SemVer, move `Unreleased` changelog entries, run
    `npm run version:set -- <version>`, verify, merge, and create the annotated
    immutable tag `v<version>` on that exact commit;
 2. dispatch **Publish immutable release** from that exact tag ref (for example,
    `gh workflow run release.yml --ref v<version>`) with the same tag input, the
-   stable durable-checklist evidence reference, and the correct prerelease flag;
+   stable durable-checklist evidence reference, the correct prerelease flag, and
+   the explicit signing mode. Use `unsigned-community-alpha` only with an
+   `-alpha.N` tag and `prerelease: true`;
 3. approve `release` only after comparing the tag, source commit, and preflight
-   evidence. The workflow builds, signs, notarizes, checksums, and uploads one
-   staged artifact set but cannot publish it yet;
+   evidence. The workflow builds the native matrix, applies signing/notarization
+   only in `signed` mode, checksums everything, and uploads one staged artifact
+   set but cannot publish it yet;
 4. download that staged set from the workflow run, verify `SHA256SUMS`, and use
    those exact files to complete every remaining clean-client, accessibility,
    lifecycle, backup, and reference-performance row. Update the durable evidence
@@ -79,21 +107,24 @@ Follow the staged transaction in
    mode this approver must be independent; in recorded solo-maintainer mode the
    initiating maintainer may perform this second, separate approval only after
    all pre-publication evidence is complete. After the workflow publishes,
-   independently reverify the GitHub Release assets, SBOM, installer signatures,
-   notarization result, and versioned generated notes.
+   independently reverify the GitHub Release assets, SBOM, checksums, versioned
+   generated notes, and either the expected signatures/notarization or the
+   expected unsigned warnings for the selected mode.
 
-The workflow refuses a lightweight tag or tag/version mismatch, re-runs supply
-chain evidence at the tag, builds every package natively, signs Windows and
-macOS artifacts, notarizes macOS packages, and records checksums/evidence before
-the publication approval. It publishes only that staged set and never creates
-or moves the source tag. If a staged candidate fails a gate, do not approve
-publication and do not reuse its tag or version; prepare the correction under a
-new patch or prerelease number.
+The workflow refuses a lightweight tag, tag/version mismatch, or an unsigned
+mode used outside a prerelease `-alpha.N` tag. It re-runs supply-chain evidence
+at the tag, builds every package natively, and records the selected signing
+mode, checksums, and evidence before publication approval. It publishes only
+that staged set and never creates or moves the source tag. If a staged candidate
+fails a gate, do not approve publication and do not reuse its tag or version;
+prepare the correction under a new patch or prerelease number.
 
-Native artifacts are not assumed reproducible across signing/notarization
-systems because timestamps and platform tooling intentionally add metadata.
-Their immutable source tag, SBOM, native build logs, signatures, and checksums
-provide provenance; unsigned frontend output is compared reproducibly in CI.
+Native artifacts are not assumed reproducible across packaging or
+signing/notarization systems because timestamps and platform tooling
+intentionally add metadata. Their immutable source tag, SBOM, native build logs,
+declared signing mode, and checksums provide provenance; signed mode additionally
+provides platform signatures and notarization. Unsigned frontend output is
+compared reproducibly in CI.
 
 RustSec currently reports maintenance warnings for Tauri's required Linux GTK3
 binding chain, including the upstream `glib` iterator advisory. Cargo audit

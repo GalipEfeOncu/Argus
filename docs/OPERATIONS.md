@@ -72,9 +72,10 @@ diagnostic sources. Reports must follow the private process in
 - An already-compromised OS account is outside the application sandbox model.
 - Provider data handling is controlled by the selected provider after bounded
   context leaves the device.
-- Native keychain variants, suspend/resume, screen-reader pairings, signed
-  install/upgrade/uninstall, and reference-hardware performance require the
-  per-release checks in [PUBLISH_CHECKLIST.md](PUBLISH_CHECKLIST.md).
+- Native keychain variants, suspend/resume, screen-reader pairings,
+  selected-signing-mode install/upgrade/uninstall, and reference-hardware
+  performance require the per-release checks in
+  [PUBLISH_CHECKLIST.md](PUBLISH_CHECKLIST.md).
 - Linux ARM64 and distributions outside the declared matrix are not supported.
 - Linux packaging currently inherits Tauri's GTK3 Rust binding chain. RustSec
   marks that chain unmaintained and reports an upstream `glib` iterator

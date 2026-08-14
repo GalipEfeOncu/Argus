@@ -129,6 +129,11 @@ one host:
   at least AppImage plus one native package family; Linux ARM64 is added only
   after a native runner passes the same gates.
 
+These signing statements are the Beta/RC/stable distribution target. A
+prominently labelled, checksummed community Alpha may use the bounded unsigned
+mode in [RELEASE.md](RELEASE.md#signing-modes); that exception does not weaken
+the native build matrix or create publisher-trust claims.
+
 Platform adapters own path rules, process trees, signals, credential stores,
 shell selection, executable suffixes, line endings, webview differences, and
 installer lifecycle. Product/runtime code consumes normalized interfaces and
@@ -138,8 +143,8 @@ The executable native-quality matrix and operational prerequisites are listed
 in [Desktop platform support](PLATFORM_SUPPORT.md). Per-commit artifacts are
 release-equivalent quality evidence, not signed release candidates. Windows
 client versions, OS credential-store variants, real suspend/resume, and signed
-installer lifecycle require clean native release machines and remain distinct
-from hosted-runner build compatibility.
+or unsigned-warning installer lifecycle require clean native release machines
+and remain distinct from hosted-runner build compatibility.
 
 ## Control plane and collaboration plane
 

@@ -71,6 +71,22 @@ def test_release_workflow_stages_artifacts_before_separate_publication_approval(
     assert "(cd release-staging && sha256sum --check SHA256SUMS)" in workflow[publish:]
 
 
+def test_release_workflow_bounds_unsigned_community_alpha() -> None:
+    workflow = (SCRIPT_PATH.parents[1] / ".github" / "workflows" / "release.yml").read_text()
+
+    assert "default: unsigned-community-alpha" in workflow
+    assert '[[ "$RELEASE_TAG" == *-alpha.* ]]' in workflow
+    assert 'test "$PRERELEASE" = true' in workflow
+    assert "if: inputs.signing_mode == 'signed' && runner.os == 'Windows'" in workflow
+    assert "if: inputs.signing_mode == 'signed' && runner.os == 'macOS'" in workflow
+    assert "Path('release-staging/UNSIGNED-RELEASE.txt').write_text(" in workflow
+    assert "'signingMode': os.environ['SIGNING_MODE']" in workflow
+    assert "UNSIGNED COMMUNITY ALPHA" in workflow
+    unsigned_build = workflow.index("      - name: Build unsigned community Alpha bundle\n")
+    upload = workflow.index("      - uses: actions/upload-artifact@", unsigned_build)
+    assert "secrets." not in workflow[unsigned_build:upload]
+
+
 def test_workflows_pin_node24_artifact_and_secret_scan_actions() -> None:
     workflows = "\n".join(
         path.read_text()

@@ -11,13 +11,14 @@ it does not reopen an already completed roadmap phase. Record the application
 version, source commit, artifact checksum, operating-system version, hardware
 class, result, and evidence location for every row. Never infer one platform's
 result from another platform or from cross-compilation. The durable release
-summary must also record the release-governance mode, approving account, and
-whether GitHub's prevent-self-review protection was enabled. Solo-maintainer
-self-approval is permitted only under the bounded exception in
-[RELEASE.md](RELEASE.md#protected-release-environments).
+summary must also record the release-governance mode, approving account,
+whether GitHub's prevent-self-review protection was enabled, and the selected
+signing mode. Solo-maintainer self-approval and unsigned community Alpha
+publication are permitted only under their bounded exceptions in
+[RELEASE.md](RELEASE.md).
 
 Rows that inspect source or automation are preflight gates. Rows that require a
-signed package run against the exact checksummed artifact set staged by
+native package run against the exact checksummed artifact set staged by
 `release.yml` from the immutable tag. Keep the workflow paused at its protected
 `release-publication` environment while those rows are completed. Publication
 approval is forbidden until the durable evidence reference supplied to the
@@ -29,18 +30,24 @@ after publication. See [RELEASE.md](RELEASE.md) for the operator sequence.
 
 - [ ] Build every artifact from the immutable release tag on its native target
   and confirm the workflow has staged, but not published, the checksummed set.
-- [ ] Sign the Windows installer and executable with the release certificate;
-  verify trust and installation on clean Windows 10 22H2 and Windows 11 x86_64
-  clients with and without WebView2 already installed.
-- [ ] Sign and notarize the macOS application and DMG; verify Gatekeeper on clean
-  macOS 12+ Apple Silicon and Intel clients.
+- [ ] On clean Windows 10 22H2 and Windows 11 x86_64 clients, verify installation
+  with and without WebView2 already installed. In `signed` mode, verify the
+  installer and executable signature and publisher identity. In
+  `unsigned-community-alpha` mode, verify that the absent signature and expected
+  SmartScreen warning are accurately disclosed in both staged and published
+  warnings; never instruct users to ignore a mismatched checksum.
+- [ ] On clean macOS 12+ Apple Silicon and Intel clients, verify the app and DMG.
+  In `signed` mode, verify the Developer ID signature, notarization, and
+  Gatekeeper result. In `unsigned-community-alpha` mode, verify the expected
+  Gatekeeper warning and the documented user-controlled open flow after checksum
+  verification; never claim notarization.
 - [ ] Verify the AppImage and Debian package on clean Ubuntu 22.04, current
   Ubuntu, and Debian stable x86_64 clients.
 - [ ] Verify first launch, update, downgrade rejection, uninstall, and documented
   preservation/removal of configuration and credentials on every supported OS.
 - [ ] After publication, independently verify SHA-256 checksums, versioned
-  release notes, SBOM, and artifact/version metadata before announcing the
-  release or closing the transaction.
+  release notes, SBOM, artifact/version metadata, and the declared signing mode
+  before announcing the release or closing the transaction.
 
 ## Native behavior and accessibility
 
@@ -79,7 +86,7 @@ after publication. See [RELEASE.md](RELEASE.md) for the operator sequence.
 - [ ] Confirm the source tag's **Supply chain** run passed with locked npm/uv/Cargo
   installs, SBOM, license inventory, vulnerability audits, secret scanning, and
   reproducible frontend-build comparison.
-- [ ] Verify the protected `release` environment approved the credentialed build,
+- [ ] Verify the protected `release` environment approved the native build,
   the separate `release-publication` environment still awaits the required
   approval for the recorded governance mode, and the workflow's checklist
   evidence points to this exact tag and staged checksums. In solo-maintainer
@@ -92,8 +99,8 @@ after publication. See [RELEASE.md](RELEASE.md) for the operator sequence.
 - [ ] Confirm no credential, private model reasoning, or unintended project data
   appears in persistence, UI, logs, events, fixtures, support bundles, or
   published artifacts.
-- [ ] Complete the version, changelog, immutable tag, build, signing, checksum,
-  and release-note transaction in
+- [ ] Complete the version, changelog, immutable tag, build, selected signing
+  mode, checksum, and release-note transaction in
   [Implementation Specification section 14](IMPLEMENTATION_SPEC.md#14-versioning-and-release-train).
 - [ ] Retain a durable release summary. Expiring CI artifacts alone are not
   sufficient evidence.

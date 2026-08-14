@@ -66,10 +66,10 @@ later phase or allowing a probe to satisfy that phase's exit gate.
   provider conformance harness executable as soon as their dependencies exist.
   A feasibility probe may discover risk early, but it may not ship target
   behavior or mark a later roadmap slice complete.
-- Attach development-host results only as calibration. Clean-client, credential,
-  signing/notarization, assistive-technology, and reference-hardware checks live
-  in [PUBLISH_CHECKLIST.md](PUBLISH_CHECKLIST.md). They block publication for an
-  affected target, not roadmap phase completion.
+- Attach development-host results only as calibration. Clean-client,
+  selected-signing-mode, assistive-technology, and reference-hardware checks
+  live in [PUBLISH_CHECKLIST.md](PUBLISH_CHECKLIST.md). They block publication
+  for an affected target, not roadmap phase completion.
 
 ### Evidence-linked completion records
 
@@ -1063,9 +1063,10 @@ Deliverables:
 
 - Pin dependencies, generate SBOM, audit licenses/vulnerabilities, scan secrets,
   and verify reproducible clean builds where feasible.
-- Configure signing/notarization, checksum, and versioned-release-note
-  automation. Execute credential-dependent signing and clean-client
-  install/upgrade/uninstall verification through the pre-publish checklist.
+- Configure signed distribution, bounded unsigned community Alpha, checksum,
+  and versioned-release-note automation. Execute the selected signing-mode and
+  clean-client install/upgrade/uninstall verification through the pre-publish
+  checklist.
 - Automate and validate the release transaction that selects a version from
   compatibility impact, synchronizes manifests, updates the changelog, and
   accepts only one immutable `vX.Y.Z` tag. Execute that version/tag transaction
@@ -1089,13 +1090,14 @@ Completion evidence (2026-08-13):
   38,232,432 bytes with SHA-256
   `daa3b933d6bdb37859261190df76074ee3b3285e95abb74435b6f041ed680ca1`
   and passed authenticated startup/shutdown smoke.
-- Deferred/unavailable: protected-environment signing/notarization,
-  clean-client install/upgrade/uninstall, native backup ACL checks, and
-  reference-hardware measurements require release credentials or target
-  machines and remain publication-blocking in `PUBLISH_CHECKLIST.md`. No release
-  version or tag was created because this is roadmap completion, not an approved
-  release transaction. RustSec reports 17 reviewed warnings in Tauri's required
-  Linux GTK3 dependency chain; known limits and upgrade ownership are documented.
+- Deferred/unavailable: protected-environment signing/notarization requires
+  credentials and remains mandatory for Beta/RC/stable; clean-client
+  install/upgrade/uninstall, native backup ACL checks, and reference-hardware
+  measurements require target machines for every signing mode and remain
+  publication-blocking in `PUBLISH_CHECKLIST.md`. No release version or tag was
+  created because this is roadmap completion, not an approved release
+  transaction. RustSec reports 17 reviewed warnings in Tauri's required Linux
+  GTK3 dependency chain; known limits and upgrade ownership are documented.
 
 Phase 7 exit: implementation, supply-chain automation, contracts, and standard
 CI are ready to produce a release candidate. Publishing any candidate or stable

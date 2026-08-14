@@ -502,7 +502,7 @@ Every distributed update uses one auditable, staged release transaction:
 
 1. Open [PUBLISH_CHECKLIST.md](PUBLISH_CHECKLIST.md), create its durable evidence
    record, and complete every source/preflight row that does not require the
-   final signed artifacts. Missing evidence blocks publication, not roadmap
+   final staged artifacts. Missing evidence blocks publication, not roadmap
    phase completion.
 2. Classify user-visible and compatibility impact, choose the next version, and
    move applicable `Unreleased` changelog entries into a dated version section.
@@ -512,9 +512,12 @@ Every distributed update uses one auditable, staged release transaction:
    applicable upgrade/rollback suite, and native artifact gates for the release
    channel.
 5. Merge the release change, create the immutable annotated tag `v<version>` on
-   that exact commit, and use the protected `release` environment to build/sign
-   artifacts from the tag. The workflow stages checksums and evidence without
-   creating a GitHub Release.
+   that exact commit, and use the protected `release` environment to build
+   artifacts from the tag under an explicit signing mode. The workflow stages
+   checksums and evidence without creating a GitHub Release. The
+   `unsigned-community-alpha` mode is restricted to prerelease `-alpha.N`
+   versions and must carry prominent unsigned Windows/macOS warnings; Beta, RC,
+   and stable publications require `signed` mode.
 6. Test those exact staged artifacts on every required clean client and reference
    hardware target, then complete the durable checklist evidence. The configured
    reviewer must approve the separate protected `release-publication`
@@ -534,10 +537,11 @@ secrets; and compares two clean frontend builds. All workflow actions and audit
 tool versions are immutable pins. The protected manual release workflow accepts
 only an annotated `v<version>` tag matching synchronized manifests plus a durable
 pre-publish evidence reference. It builds on native targets, signs/notarizes
-credentialed platforms, generates SHA-256 checksums, and pauses before
-publication at a separate protected environment so the staged artifacts can be
-verified. It then publishes only that approved staged set and never creates or
-moves the tag.
+credentialed platforms in `signed` mode, or produces a prominently labelled
+unsigned community Alpha without accessing signing credentials. It generates
+SHA-256 checksums and pauses before publication at a separate protected
+environment so the staged artifacts can be verified. It then publishes only
+that approved staged set and never creates or moves the tag.
 
 Before any pending SQLite migration, startup verifies the existing database and
 creates a consistent checksummed backup under its local `backups/` directory.
