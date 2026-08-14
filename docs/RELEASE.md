@@ -21,12 +21,27 @@ invalidates the override and requires a new source-backed review.
 ## Protected release environments
 
 Create GitHub environments named `release` and `release-publication`, both with
-required reviewer approval and restricted to protected immutable tags. The
-`release` environment owns signing/notarization credentials; the separate
-`release-publication` environment is the final human gate after the staged
-artifacts pass clean-client, accessibility, and reference-performance checks.
-Add a repository ruleset that blocks tag updates/deletions for `v*`. Store only
-these credentials in `release`:
+required reviewer approval, administrator bypass disabled, and deployment
+restricted to protected immutable `v*` tags. The `release` environment owns
+signing/notarization credentials; the separate `release-publication`
+environment is the final deliberate gate after the staged artifacts pass
+clean-client, accessibility, and reference-performance checks. Add a repository
+ruleset that blocks tag updates/deletions for `v*`.
+
+Use one of these governance modes and record it in the durable release summary:
+
+- **Team mode (preferred when another maintainer is available):** configure an
+  independent required reviewer for both environments and enable GitHub's
+  prevent-self-review protection.
+- **Solo-maintainer mode:** the initiating maintainer may be the sole required
+  reviewer for both environments and prevent-self-review may be disabled. The
+  durable evidence must record `governanceMode: solo-maintainer`, the approving
+  account, and why no independent reviewer was available. This exception does
+  not combine the environments, remove either manual approval, allow
+  administrator bypass, or permit approval before its corresponding evidence is
+  complete. Return to team mode when another maintainer is available.
+
+Store only these credentials in `release`:
 
 - `WINDOWS_CERTIFICATE`: base64 PKCS#12 code-signing certificate;
 - `WINDOWS_CERTIFICATE_PASSWORD`;
@@ -59,10 +74,13 @@ Follow the staged transaction in
    those exact files to complete every remaining clean-client, accessibility,
    lifecycle, backup, and reference-performance row. Update the durable evidence
    at the reference supplied when the workflow was dispatched; and
-5. have an independent reviewer compare the completed evidence, tag, source
-   commit, and staged checksums before approving `release-publication`. After the
-   workflow publishes, independently verify the GitHub Release assets, SBOM,
-   installer signatures, notarization result, and versioned generated notes.
+5. have the configured approver compare the completed evidence, tag, source
+   commit, and staged checksums before approving `release-publication`. In team
+   mode this approver must be independent; in recorded solo-maintainer mode the
+   initiating maintainer may perform this second, separate approval only after
+   all pre-publication evidence is complete. After the workflow publishes,
+   independently reverify the GitHub Release assets, SBOM, installer signatures,
+   notarization result, and versioned generated notes.
 
 The workflow refuses a lightweight tag or tag/version mismatch, re-runs supply
 chain evidence at the tag, builds every package natively, signs Windows and

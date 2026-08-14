@@ -10,7 +10,11 @@ publication. A missing result blocks that publication for the affected target;
 it does not reopen an already completed roadmap phase. Record the application
 version, source commit, artifact checksum, operating-system version, hardware
 class, result, and evidence location for every row. Never infer one platform's
-result from another platform or from cross-compilation.
+result from another platform or from cross-compilation. The durable release
+summary must also record the release-governance mode, approving account, and
+whether GitHub's prevent-self-review protection was enabled. Solo-maintainer
+self-approval is permitted only under the bounded exception in
+[RELEASE.md](RELEASE.md#protected-release-environments).
 
 Rows that inspect source or automation are preflight gates. Rows that require a
 signed package run against the exact checksummed artifact set staged by
@@ -76,9 +80,11 @@ after publication. See [RELEASE.md](RELEASE.md) for the operator sequence.
   installs, SBOM, license inventory, vulnerability audits, secret scanning, and
   reproducible frontend-build comparison.
 - [ ] Verify the protected `release` environment approved the credentialed build,
-  the separate `release-publication` environment still awaits an independent
-  approval, and the workflow's checklist evidence points to this exact tag and
-  staged checksums.
+  the separate `release-publication` environment still awaits the required
+  approval for the recorded governance mode, and the workflow's checklist
+  evidence points to this exact tag and staged checksums. In solo-maintainer
+  mode, do not self-approve publication until every applicable pre-publication
+  result has been recorded.
 - [ ] Run all repository verification scopes, generated-contract/version drift,
   security scanning, provider conformance, fake-provider end-to-end, recovery,
   workspace-escape, approval-bypass, loop-limit, required-gate, migration, and

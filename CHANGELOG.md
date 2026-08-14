@@ -50,6 +50,12 @@ All notable user-visible changes to Argus are recorded here. The project follows
   explicit checksum-checked recovery path; threat, privacy, operations, known
   limits, and private vulnerability-reporting guidance are published.
 
+### Changed
+
+- Release governance now supports a documented solo-maintainer approval mode
+  while preserving separate credential and publication gates. Releases use
+  independent review whenever another maintainer is available.
+
 ### Fixed
 
 - Release automation now stages signed, checksummed artifacts behind a separate

@@ -516,9 +516,13 @@ Every distributed update uses one auditable, staged release transaction:
    artifacts from the tag. The workflow stages checksums and evidence without
    creating a GitHub Release.
 6. Test those exact staged artifacts on every required clean client and reference
-   hardware target, then complete the durable checklist evidence. An independent
+   hardware target, then complete the durable checklist evidence. The configured
    reviewer must approve the separate protected `release-publication`
-   environment only after every applicable result passes.
+   environment only after every applicable result passes. Use an independent
+   reviewer with prevent-self-review when another maintainer is available. A
+   sole maintainer may instead use the documented, explicitly recorded
+   self-approval exception without removing either protected environment or
+   manual gate.
 7. Publish the already staged checksums, SBOM, packages, and release notes, then
    independently verify them. Never move or reuse a staged or published version
    or tag; a correction receives a new patch or prerelease number.

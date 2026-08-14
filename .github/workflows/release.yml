@@ -227,7 +227,7 @@ jobs:
           path: release-staging
 
   publish:
-    name: Publish independently verified staged artifacts
+    name: Publish verified staged artifacts
     needs: [validate, stage]
     runs-on: ubuntu-24.04
     environment: release-publication
