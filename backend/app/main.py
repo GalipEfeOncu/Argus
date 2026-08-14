@@ -34,9 +34,11 @@ async def lifespan(app: FastAPI):
     finally:
         await db.close()
     print(f"[Argus] Backend ready on {settings.host}:{settings.port}")
-    yield
-    # Shutdown: cleanup
-    print("[Argus] Shutting down")
+    try:
+        yield
+    finally:
+        await ws_router.shutdown_vertical_tasks()
+        print("[Argus] Shutting down")
 
 
 app = FastAPI(

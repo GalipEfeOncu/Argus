@@ -179,25 +179,22 @@ jobs:
           signing_config=()
           if [[ "${{ runner.os }}" == Windows ]]; then signing_config=(--config artifacts/windows-signing.json); fi
           npx tauri build --config src-tauri/tauri.sidecar.conf.json "${signing_config[@]}" --target ${{ matrix.target }} --bundles ${{ matrix.bundles }}
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: argus-release-${{ matrix.target }}
           if-no-files-found: error
           path: ${{ matrix.artifact_glob }}
 
-  publish:
-    name: Checksums, versioned notes, and GitHub release
-    needs: [validate, build]
+  stage:
+    name: Stage checksummed release artifacts
+    needs: [validate, supply-chain, build]
     runs-on: ubuntu-24.04
-    environment: release
-    permissions:
-      contents: write
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
           fetch-depth: 0
           ref: ${{ needs.validate.outputs.commit }}
-      - uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
           path: release-artifacts
       - name: Record evidence and checksums
@@ -222,6 +219,42 @@ jobs:
           }, indent=2, sort_keys=True) + '\n')
           PY
           python scripts/supply_chain.py checksums release-staging release-staging/SHA256SUMS
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: argus-release-staged-${{ inputs.tag }}
+          if-no-files-found: error
+          retention-days: 30
+          path: release-staging
+
+  publish:
+    name: Publish independently verified staged artifacts
+    needs: [validate, stage]
+    runs-on: ubuntu-24.04
+    environment: release-publication
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          fetch-depth: 0
+          ref: ${{ needs.validate.outputs.commit }}
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: argus-release-staged-${{ inputs.tag }}
+          path: release-staging
+      - name: Reverify staged source and checksums
+        env:
+          RELEASE_TAG: ${{ inputs.tag }}
+          SOURCE_COMMIT: ${{ needs.validate.outputs.commit }}
+        run: |
+          python - <<'PY'
+          import json, os
+          from pathlib import Path
+          evidence = json.loads(Path('release-staging/release-evidence.json').read_text())
+          if evidence.get('tag') != os.environ['RELEASE_TAG'] or evidence.get('sourceCommit') != os.environ['SOURCE_COMMIT']:
+              raise SystemExit('Staged release evidence does not match the approved tag and commit')
+          PY
+          (cd release-staging && sha256sum --check SHA256SUMS)
       - name: Publish immutable release
         env:
           GH_TOKEN: ${{ github.token }}

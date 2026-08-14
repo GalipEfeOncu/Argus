@@ -12,9 +12,19 @@ version, source commit, artifact checksum, operating-system version, hardware
 class, result, and evidence location for every row. Never infer one platform's
 result from another platform or from cross-compilation.
 
+Rows that inspect source or automation are preflight gates. Rows that require a
+signed package run against the exact checksummed artifact set staged by
+`release.yml` from the immutable tag. Keep the workflow paused at its protected
+`release-publication` environment while those rows are completed. Publication
+approval is forbidden until the durable evidence reference supplied to the
+workflow contains every applicable pre-publication result. The final
+independent checks of the published assets close the transaction immediately
+after publication. See [RELEASE.md](RELEASE.md) for the operator sequence.
+
 ## Native distribution
 
-- [ ] Build every artifact from the immutable release tag on its native target.
+- [ ] Build every artifact from the immutable release tag on its native target
+  and confirm the workflow has staged, but not published, the checksummed set.
 - [ ] Sign the Windows installer and executable with the release certificate;
   verify trust and installation on clean Windows 10 22H2 and Windows 11 x86_64
   clients with and without WebView2 already installed.
@@ -24,8 +34,9 @@ result from another platform or from cross-compilation.
   Ubuntu, and Debian stable x86_64 clients.
 - [ ] Verify first launch, update, downgrade rejection, uninstall, and documented
   preservation/removal of configuration and credentials on every supported OS.
-- [ ] Publish and independently verify SHA-256 checksums, versioned release
-  notes, SBOM, and artifact/version metadata.
+- [ ] After publication, independently verify SHA-256 checksums, versioned
+  release notes, SBOM, and artifact/version metadata before announcing the
+  release or closing the transaction.
 
 ## Native behavior and accessibility
 
@@ -64,8 +75,10 @@ result from another platform or from cross-compilation.
 - [ ] Confirm the source tag's **Supply chain** run passed with locked npm/uv/Cargo
   installs, SBOM, license inventory, vulnerability audits, secret scanning, and
   reproducible frontend-build comparison.
-- [ ] Verify the protected `release` environment required an independent approval
-  and the workflow's recorded checklist evidence points to this exact tag.
+- [ ] Verify the protected `release` environment approved the credentialed build,
+  the separate `release-publication` environment still awaits an independent
+  approval, and the workflow's checklist evidence points to this exact tag and
+  staged checksums.
 - [ ] Run all repository verification scopes, generated-contract/version drift,
   security scanning, provider conformance, fake-provider end-to-end, recovery,
   workspace-escape, approval-bypass, loop-limit, required-gate, migration, and

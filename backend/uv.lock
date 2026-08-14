@@ -111,13 +111,6 @@ provider-openai = [
     { name = "langchain-openai" },
 ]
 
-[package.dev-dependencies]
-dev = [
-    { name = "httpx" },
-    { name = "pytest" },
-    { name = "pytest-asyncio" },
-]
-
 [package.metadata]
 requires-dist = [
     { name = "aiosqlite", specifier = ">=0.20.0" },
@@ -142,13 +135,6 @@ requires-dist = [
     { name = "websockets", specifier = ">=14.0" },
 ]
 provides-extras = ["dev", "provider-openai", "provider-anthropic", "provider-google", "agent-loop", "packaging"]
-
-[package.metadata.requires-dev]
-dev = [
-    { name = "httpx", specifier = ">=0.27.0" },
-    { name = "pytest", specifier = ">=8.0" },
-    { name = "pytest-asyncio", specifier = ">=0.23.0" },
-]
 
 [[package]]
 name = "certifi"

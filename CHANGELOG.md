@@ -50,5 +50,15 @@ All notable user-visible changes to Argus are recorded here. The project follows
   explicit checksum-checked recovery path; threat, privacy, operations, known
   limits, and private vulnerability-reporting guidance are published.
 
+### Fixed
+
+- Release automation now stages signed, checksummed artifacts behind a separate
+  publication approval so clean-client and reference-hardware evidence can be
+  completed before a GitHub Release is created.
+- Sidecar shutdown now owns, drains, and awaits in-flight vertical worker tasks;
+  cancellation also closes SQLite connections before the event loop exits.
+- CI artifact and secret-scan actions now use immutable Node 24 releases instead
+  of deprecated Node 20 action runtimes.
+
 No stable Argus version has been published yet. The manifest version `0.1.0` is
 the current development baseline, not a stable release claim.

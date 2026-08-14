@@ -10,6 +10,7 @@ import uuid
 from fastapi.testclient import TestClient
 import pytest
 
+from app.api import websocket as websocket_api
 from app.config import settings
 from app.db.database import get_db, transaction
 from app.db.repositories import EventRepository, SessionRepository
@@ -235,6 +236,28 @@ async def test_preauthorized_vertical_task_continues_without_an_approval_prompt(
     statuses = [event.payload["status"] for event in events if event.event_type == "session.status_changed"]
     assert "completed" in statuses
     assert "waiting_approval" not in statuses
+
+
+@pytest.mark.asyncio
+async def test_application_shutdown_cancels_and_awaits_vertical_tasks() -> None:
+    started = asyncio.Event()
+    cancelled = asyncio.Event()
+
+    async def pending_step(_session_id: str, *, after_grant: bool) -> None:
+        assert after_grant is True
+        started.set()
+        try:
+            await asyncio.Event().wait()
+        finally:
+            cancelled.set()
+
+    with patch.object(websocket_api, "_run_first_vertical_step", pending_step):
+        websocket_api._schedule_first_vertical_step("session-shutdown", after_grant=True)
+        await started.wait()
+        await websocket_api.shutdown_vertical_tasks(grace_period_seconds=0)
+
+    assert cancelled.is_set()
+    assert not websocket_api._vertical_tasks
 
 
 @pytest.mark.asyncio

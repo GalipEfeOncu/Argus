@@ -60,6 +60,31 @@ def test_release_staging_flattens_unique_assets_and_rejects_collisions(tmp_path:
         supply_chain.stage_artifacts(collision_source, tmp_path / "collision-staged")
 
 
+def test_release_workflow_stages_artifacts_before_separate_publication_approval() -> None:
+    workflow = (SCRIPT_PATH.parents[1] / ".github" / "workflows" / "release.yml").read_text()
+
+    stage = workflow.index("  stage:\n")
+    publish = workflow.index("  publish:\n")
+    assert stage < publish
+    assert "name: argus-release-staged-${{ inputs.tag }}" in workflow[stage:publish]
+    assert "environment: release-publication" in workflow[publish:]
+    assert "(cd release-staging && sha256sum --check SHA256SUMS)" in workflow[publish:]
+
+
+def test_workflows_pin_node24_artifact_and_secret_scan_actions() -> None:
+    workflows = "\n".join(
+        path.read_text()
+        for path in sorted((SCRIPT_PATH.parents[1] / ".github" / "workflows").glob("*.yml"))
+    )
+
+    assert "actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02" not in workflows
+    assert "actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0" not in workflows
+    assert "gitleaks/gitleaks-action@dcedce43c6f43de0b836d1fe38946645c9c638dc" not in workflows
+    assert "actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a" in workflows
+    assert "actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c" in workflows
+    assert "gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e" in workflows
+
+
 def test_sbom_is_reproducible_and_uses_locked_components(tmp_path: Path) -> None:
     (tmp_path / "backend").mkdir()
     (tmp_path / "src-tauri").mkdir()

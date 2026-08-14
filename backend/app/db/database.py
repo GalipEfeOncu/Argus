@@ -17,10 +17,16 @@ async def get_db() -> aiosqlite.Connection:
     """Open a configured SQLite connection with the safety settings Argus needs."""
 
     db = await aiosqlite.connect(settings.db_path)
-    db.row_factory = aiosqlite.Row
-    await db.execute("PRAGMA foreign_keys = ON")
-    await db.execute("PRAGMA busy_timeout = 5000")
-    return db
+    try:
+        db.row_factory = aiosqlite.Row
+        await db.execute("PRAGMA foreign_keys = ON")
+        await db.execute("PRAGMA busy_timeout = 5000")
+        return db
+    except BaseException:
+        # Cancellation can arrive while connection PRAGMAs are still queued on
+        # aiosqlite's worker thread. Drain the connection before its loop exits.
+        await db.close()
+        raise
 
 
 @asynccontextmanager

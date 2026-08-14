@@ -498,21 +498,29 @@ support evidence record the source commit separately.
 
 ### Release transaction
 
-Every distributed update uses one auditable release change:
+Every distributed update uses one auditable, staged release transaction:
 
-1. Open and complete [PUBLISH_CHECKLIST.md](PUBLISH_CHECKLIST.md) for every
-   applicable target; missing target-machine or credential evidence blocks the
-   publication, not roadmap phase completion.
-2. Classify user-visible and compatibility impact and choose the next version.
-3. Move applicable `Unreleased` changelog entries into a dated version section.
-4. Run `npm run version:set -- <version>` and commit every synchronized manifest
+1. Open [PUBLISH_CHECKLIST.md](PUBLISH_CHECKLIST.md), create its durable evidence
+   record, and complete every source/preflight row that does not require the
+   final signed artifacts. Missing evidence blocks publication, not roadmap
+   phase completion.
+2. Classify user-visible and compatibility impact, choose the next version, and
+   move applicable `Unreleased` changelog entries into a dated version section.
+3. Run `npm run version:set -- <version>` and commit every synchronized manifest
    and lockfile change together.
-5. Run all verification scopes, contract/version drift, security scanning, the
+4. Run all verification scopes, contract/version drift, security scanning, the
    applicable upgrade/rollback suite, and native artifact gates for the release
    channel.
-6. Merge the release change, create the immutable annotated tag `v<version>` on
-   that exact commit, and build/sign artifacts from the tag.
-7. Publish checksums and release notes. Never move or reuse a published version
+5. Merge the release change, create the immutable annotated tag `v<version>` on
+   that exact commit, and use the protected `release` environment to build/sign
+   artifacts from the tag. The workflow stages checksums and evidence without
+   creating a GitHub Release.
+6. Test those exact staged artifacts on every required clean client and reference
+   hardware target, then complete the durable checklist evidence. An independent
+   reviewer must approve the separate protected `release-publication`
+   environment only after every applicable result passes.
+7. Publish the already staged checksums, SBOM, packages, and release notes, then
+   independently verify them. Never move or reuse a staged or published version
    or tag; a correction receives a new patch or prerelease number.
 
 The executable transaction is documented in [RELEASE.md](RELEASE.md). Continuous
@@ -522,8 +530,10 @@ secrets; and compares two clean frontend builds. All workflow actions and audit
 tool versions are immutable pins. The protected manual release workflow accepts
 only an annotated `v<version>` tag matching synchronized manifests plus a durable
 pre-publish evidence reference. It builds on native targets, signs/notarizes
-credentialed platforms, generates SHA-256 checksums and versioned notes, and
-never creates or moves the tag.
+credentialed platforms, generates SHA-256 checksums, and pauses before
+publication at a separate protected environment so the staged artifacts can be
+verified. It then publishes only that approved staged set and never creates or
+moves the tag.
 
 Before any pending SQLite migration, startup verifies the existing database and
 creates a consistent checksummed backup under its local `backups/` directory.

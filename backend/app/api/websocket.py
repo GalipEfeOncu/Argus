@@ -56,6 +56,27 @@ class SessionConnectionHub:
 
 
 connection_hub = SessionConnectionHub()
+_vertical_tasks: set[asyncio.Task[None]] = set()
+
+
+def _schedule_first_vertical_step(session_id: str, *, after_grant: bool) -> None:
+    """Keep worker tasks owned so application shutdown can drain them safely."""
+
+    task = asyncio.create_task(_run_first_vertical_step(session_id, after_grant=after_grant))
+    _vertical_tasks.add(task)
+    task.add_done_callback(_vertical_tasks.discard)
+
+
+async def shutdown_vertical_tasks(*, grace_period_seconds: float = 2.0) -> None:
+    """Drain workers briefly, then cancel and await them before loop shutdown."""
+
+    tasks = tuple(_vertical_tasks)
+    if not tasks:
+        return
+    _, pending = await asyncio.wait(tasks, timeout=grace_period_seconds)
+    for task in pending:
+        task.cancel()
+    await asyncio.gather(*tasks, return_exceptions=True)
 
 
 async def _run_first_vertical_step(session_id: str, *, after_grant: bool) -> None:
@@ -90,7 +111,7 @@ async def _run_first_vertical_step(session_id: str, *, after_grant: bool) -> Non
             )
             await connection_hub.publish(session_id, [event_wire_value(error_event)])
     finally:
-        await db.close()
+        await asyncio.shield(db.close())
 
 
 @router.websocket("/ws/sessions/{session_id}")
@@ -149,9 +170,9 @@ async def canonical_session_websocket(
                 # disconnect leaves a reconnectable original correlated result.
                 await connection_hub.publish(session_id, [event_wire_value(event) for event in outcome.events])
                 if not outcome.duplicate and command.type == "session.start":
-                    asyncio.create_task(_run_first_vertical_step(session_id, after_grant=False))
+                    _schedule_first_vertical_step(session_id, after_grant=False)
                 elif not outcome.duplicate and command.type == "approval.resolve" and command.payload.resolution == "grant":
-                    asyncio.create_task(_run_first_vertical_step(session_id, after_grant=True))
+                    _schedule_first_vertical_step(session_id, after_grant=True)
             except WebSocketDisconnect:
                 return
             except CommandRejected as error:
@@ -176,4 +197,4 @@ async def canonical_session_websocket(
                 await connection_hub.publish(session_id, [event_wire_value(invalid)])
     finally:
         await connection_hub.remove(session_id, websocket)
-        await db.close()
+        await asyncio.shield(db.close())
