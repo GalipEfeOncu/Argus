@@ -6,12 +6,9 @@ All notable user-visible changes to Argus are recorded here. The project follows
 
 ## Unreleased
 
-### Fixed
+No unreleased changes.
 
-- Windows native packaging now converts PyInstaller migration inputs to native
-  paths, avoiding Git Bash drive-path corruption.
-
-## [1.0.0-alpha.1] - 2026-08-16
+## [1.0.0-alpha.2] - 2026-08-16
 
 ### Added
 
@@ -69,6 +66,8 @@ All notable user-visible changes to Argus are recorded here. The project follows
 
 ### Fixed
 
+- Windows native packaging now converts PyInstaller migration inputs to native
+  paths, avoiding Git Bash drive-path corruption.
 - Version preparation now regenerates and validates the OpenAPI contract so its
   release metadata cannot drift from synchronized application manifests.
 - Release automation now stages checksummed artifacts behind a separate
@@ -79,5 +78,11 @@ All notable user-visible changes to Argus are recorded here. The project follows
 - CI artifact and secret-scan actions now use immutable Node 24 releases instead
   of deprecated Node 20 action runtimes.
 
+## [1.0.0-alpha.1] - 2026-08-16
+
+Not published. The Windows native sidecar build failed before artifact staging;
+the immutable tag is retained as failed-candidate evidence in issue #5.
+
 No stable Argus version has been published yet. Version `1.0.0-alpha.1` is an
-unsigned community prerelease and not a stable release claim.
+unpublished failed candidate. Version `1.0.0-alpha.2` is an unsigned community
+prerelease and not a stable release claim.

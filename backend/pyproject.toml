@@ -1,6 +1,6 @@
 [project]
 name = "argus-backend"
-version = "1.0.0-alpha.1"
+version = "1.0.0-alpha.2"
 description = "Argus Multi-Agent Backend"
 requires-python = ">=3.12"
 dependencies = [
