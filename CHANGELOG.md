@@ -6,7 +6,10 @@ All notable user-visible changes to Argus are recorded here. The project follows
 
 ## Unreleased
 
-No unreleased changes.
+### Fixed
+
+- Windows native packaging now converts PyInstaller migration inputs to native
+  paths, avoiding Git Bash drive-path corruption.
 
 ## [1.0.0-alpha.1] - 2026-08-16
 

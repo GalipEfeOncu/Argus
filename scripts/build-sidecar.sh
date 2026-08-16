@@ -10,9 +10,21 @@ fi
 output_dir="$repository_root/src-tauri/binaries"
 work_dir="$repository_root/backend/build/pyinstaller-$target_triple"
 dist_dir="$repository_root/backend/dist/pyinstaller-$target_triple"
+
+native_path() {
+  case "$(uname -s)" in
+    CYGWIN*|MINGW*|MSYS*)
+      cygpath -m "$1"
+      ;;
+    *)
+      printf '%s\n' "$1"
+      ;;
+  esac
+}
+
 migration_data=()
 for migration in "$repository_root"/backend/app/db/migrations/*.py; do
-  migration_data+=(--add-data "$migration:app/db/migrations")
+  migration_data+=(--add-data "$(native_path "$migration"):app/db/migrations")
 done
 
 mkdir -p "$output_dir" "$work_dir" "$dist_dir"
