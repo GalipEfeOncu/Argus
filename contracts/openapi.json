@@ -6252,7 +6252,7 @@
   "info": {
     "description": "Multi-Agent Orchestration Backend",
     "title": "Argus Backend",
-    "version": "0.1.0"
+    "version": "1.0.0-alpha.1"
   },
   "openapi": "3.1.0",
   "paths": {

@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 
+import { execFileSync } from 'node:child_process';
 import { readFile, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -14,6 +15,8 @@ const paths = {
   backendManifest: join(repositoryRoot, 'backend', 'pyproject.toml'),
   backendVersion: join(repositoryRoot, 'backend', 'app', 'version.py'),
   backendLock: join(repositoryRoot, 'backend', 'uv.lock'),
+  openapi: join(repositoryRoot, 'contracts', 'openapi.json'),
+  contractGenerator: join(repositoryRoot, 'scripts', 'generate-contracts.mjs'),
 };
 
 const semverPattern = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-(?:0|[1-9]\d*|\d*[A-Za-z-][0-9A-Za-z-]*)(?:\.(?:0|[1-9]\d*|\d*[A-Za-z-][0-9A-Za-z-]*))*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/;
@@ -105,7 +108,7 @@ function replacePythonVersion(text, version) {
 }
 
 async function readSources() {
-  const [packageText, lockText, cargoText, cargoLockText, tauriText, backendManifestText, backendVersionText, backendLockText] = await Promise.all([
+  const [packageText, lockText, cargoText, cargoLockText, tauriText, backendManifestText, backendVersionText, backendLockText, openapiText] = await Promise.all([
     readFile(paths.packageJson, 'utf8'),
     readFile(paths.packageLock, 'utf8'),
     readFile(paths.cargoManifest, 'utf8'),
@@ -114,6 +117,7 @@ async function readSources() {
     readFile(paths.backendManifest, 'utf8'),
     readFile(paths.backendVersion, 'utf8'),
     readFile(paths.backendLock, 'utf8'),
+    readFile(paths.openapi, 'utf8'),
   ]);
   return {
     packageText,
@@ -127,6 +131,7 @@ async function readSources() {
     backendManifestText,
     backendVersionText,
     backendLockText,
+    openapi: parseJson(openapiText, 'contracts/openapi.json'),
   };
 }
 
@@ -143,6 +148,7 @@ function collectVersions(sources) {
     ['backend/pyproject.toml', versionFromToml(sources.backendManifestText, 'project')],
     ['backend/app/version.py', versionFromPython(sources.backendVersionText)],
     ['backend/uv.lock', versionFromCargoPackage(backendPackageBlock(sources.backendLockText))],
+    ['contracts/openapi.json', sources.openapi.info?.version],
   ]);
 }
 
@@ -194,6 +200,10 @@ async function setVersion(version) {
     writeFile(paths.backendVersion, replacePythonVersion(sources.backendVersionText, version)),
     writeFile(paths.backendLock, updatedBackendLock),
   ]);
+  execFileSync(process.execPath, [paths.contractGenerator], {
+    cwd: repositoryRoot,
+    stdio: 'inherit',
+  });
   await check();
 }
 

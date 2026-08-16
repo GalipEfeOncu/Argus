@@ -66,6 +66,8 @@ No unreleased changes.
 
 ### Fixed
 
+- Version preparation now regenerates and validates the OpenAPI contract so its
+  release metadata cannot drift from synchronized application manifests.
 - Release automation now stages checksummed artifacts behind a separate
   publication approval so clean-client and reference-hardware evidence can be
   completed before a GitHub Release is created.
