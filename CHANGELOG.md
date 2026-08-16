@@ -6,6 +6,10 @@ All notable user-visible changes to Argus are recorded here. The project follows
 
 ## Unreleased
 
+No unreleased changes.
+
+## [1.0.0-alpha.1] - 2026-08-16
+
 ### Added
 
 - Coordinator-first shared-room contracts, durable scheduling, isolated
@@ -70,5 +74,5 @@ All notable user-visible changes to Argus are recorded here. The project follows
 - CI artifact and secret-scan actions now use immutable Node 24 releases instead
   of deprecated Node 20 action runtimes.
 
-No stable Argus version has been published yet. The manifest version `0.1.0` is
-the current development baseline, not a stable release claim.
+No stable Argus version has been published yet. Version `1.0.0-alpha.1` is an
+unsigned community prerelease and not a stable release claim.

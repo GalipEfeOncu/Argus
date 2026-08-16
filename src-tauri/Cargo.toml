@@ -1,6 +1,6 @@
 [package]
 name = "argus"
-version = "0.1.0"
+version = "1.0.0-alpha.1"
 description = "Argus — Transparent Multi-Agent Orchestration Platform"
 authors = []
 edition = "2021"
