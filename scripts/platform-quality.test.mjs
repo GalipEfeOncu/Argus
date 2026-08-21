@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
+import { readdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import test from 'node:test';
 
@@ -9,6 +9,18 @@ import {
   parseVersion,
   versionAtLeast,
 } from './platform-quality.mjs';
+
+async function sourceFiles(directory) {
+  const entries = await readdir(directory, { withFileTypes: true });
+  const nested = await Promise.all(entries.map(async (entry) => {
+    const path = join(directory, entry.name);
+    if (entry.isDirectory()) {
+      return sourceFiles(path);
+    }
+    return /\.(?:js|jsx|mjs|ts|tsx)$/.test(entry.name) ? [path] : [];
+  }));
+  return nested.flat();
+}
 
 test('declared desktop targets exclude Linux ARM64 until its separate gate exists', () => {
   assert.equal(isSupportedTarget('win32', 'x64'), true);
@@ -62,4 +74,48 @@ test('desktop package icons have real platform formats and declared PNG dimensio
   assert.deepEqual([large.readUInt32BE(16), large.readUInt32BE(20)], [256, 256]);
   assert.equal(icns.subarray(0, 4).toString('ascii'), 'icns');
   assert.deepEqual([...ico.subarray(0, 4)], [0, 0, 1, 0]);
+});
+
+test('release metadata stays aligned with the repository, license, and native identifiers', async () => {
+  const root = join(import.meta.dirname, '..');
+  const [packageSource, lockSource, cargoSource, licenseSource, configSource, commandsSource] = await Promise.all([
+    readFile(join(root, 'package.json'), 'utf8'),
+    readFile(join(root, 'package-lock.json'), 'utf8'),
+    readFile(join(root, 'src-tauri/Cargo.toml'), 'utf8'),
+    readFile(join(root, 'LICENSE'), 'utf8'),
+    readFile(join(root, 'src-tauri/tauri.conf.json'), 'utf8'),
+    readFile(join(root, 'src-tauri/src/commands.rs'), 'utf8'),
+  ]);
+  const packageMetadata = JSON.parse(packageSource);
+  const lockMetadata = JSON.parse(lockSource);
+  const config = JSON.parse(configSource);
+  const repository = 'https://github.com/GalipEfeOncu/Argus';
+
+  assert.equal(packageMetadata.description, 'A transparent, local-first multi-agent workspace for software projects.');
+  assert.equal(packageMetadata.license, 'Apache-2.0');
+  assert.equal(packageMetadata.author, 'Galip Efe Oncu');
+  assert.deepEqual(packageMetadata.repository, { type: 'git', url: `git+${repository}.git` });
+  assert.equal(packageMetadata.homepage, `${repository}#readme`);
+  assert.deepEqual(packageMetadata.bugs, { url: `${repository}/issues` });
+  assert.equal(packageMetadata.dependencies['@tauri-apps/plugin-shell'], undefined);
+  assert.equal(lockMetadata.packages[''].dependencies['@tauri-apps/plugin-shell'], undefined);
+  assert.equal(lockMetadata.packages['node_modules/@tauri-apps/plugin-shell'], undefined);
+
+  assert.match(cargoSource, /^authors = \["Galip Efe Oncu"\]$/m);
+  assert.match(cargoSource, /^license = "Apache-2\.0"$/m);
+  assert.match(cargoSource, new RegExp(`^repository = "${repository}"$`, 'm'));
+  assert.match(cargoSource, new RegExp(`^homepage = "${repository}"$`, 'm'));
+  assert.match(cargoSource, /^tauri-plugin-shell = "2"$/m);
+  assert.match(licenseSource, /Apache License\s+Version 2\.0, January 2004/);
+  assert.equal(config.identifier, 'com.argus.desktop');
+  assert.match(commandsSource, /const CREDENTIAL_SERVICE: &str = "com\.argus\.desktop\.provider";/);
+
+  const javascriptSources = await sourceFiles(join(root, 'src'));
+  const importedShellPlugin = [];
+  for (const path of javascriptSources) {
+    if ((await readFile(path, 'utf8')).includes('@tauri-apps/plugin-shell')) {
+      importedShellPlugin.push(path);
+    }
+  }
+  assert.deepEqual(importedShellPlugin, []);
 });

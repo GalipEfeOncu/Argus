@@ -8,7 +8,17 @@ Argus is not a black-box coding assistant. It is a controllable orchestration wo
 
 ## Status
 
-Argus is in active pre-alpha development. The repository currently contains the Tauri, React, FastAPI, and LangGraph foundations plus an initial UI. The shared-room orchestration runtime described below is the active implementation target; see the [roadmap](docs/ROADMAP.md) for milestone criteria.
+Argus is currently `1.0.0-alpha.2`. The local-first desktop Alpha has a durable
+shared timeline, an explicitly configured provider-backed Coordinator, and one
+bounded read-only specialist assignment per Coordinator turn. Specialists can
+inspect the selected workspace with scoped file-reading tools and return
+evidence for a visible Coordinator follow-up. Mutating specialist execution,
+test and shell tooling, and broader team gates remain unavailable and fail
+closed. The optional profile is device-local and is not an online account.
+
+See the [current Alpha UX contract](docs/UX_SPEC.md), the
+[implementation roadmap](docs/ROADMAP.md), and the [release notes](CHANGELOG.md)
+for implemented boundaries and planned work.
 
 ## Product principles
 
@@ -103,4 +113,4 @@ one boundary.
 
 ## License
 
-MIT © Galip Efe Oncu
+[Apache License 2.0](LICENSE) © Galip Efe Oncu

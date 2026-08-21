@@ -1,6 +1,17 @@
 {
   "name": "argus",
   "version": "1.0.0-alpha.2",
+  "description": "A transparent, local-first multi-agent workspace for software projects.",
+  "license": "Apache-2.0",
+  "author": "Galip Efe Oncu",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/GalipEfeOncu/Argus.git"
+  },
+  "homepage": "https://github.com/GalipEfeOncu/Argus#readme",
+  "bugs": {
+    "url": "https://github.com/GalipEfeOncu/Argus/issues"
+  },
   "private": true,
   "type": "module",
   "scripts": {
@@ -35,7 +46,6 @@
   "dependencies": {
     "@tauri-apps/api": "^2.5.0",
     "@tauri-apps/plugin-dialog": "^2.7.1",
-    "@tauri-apps/plugin-shell": "^2.3.5",
     "ajv": "^8.17.1",
     "ajv-formats": "^3.0.1",
     "react": "^19.1.0",
