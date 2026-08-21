@@ -405,17 +405,21 @@ remain labelled as non-release calibration.
   frame while persisting every ordered event.
 - SQLite queries used by interactive views require indexes, limits, and query
   plans in tests. Do not load a complete session event log or diff into memory.
-- Python provider packages use lazy imports. Production dependency groups must
-  allow unused providers and development/test packages to be absent from a
-  target sidecar.
+- Python provider packages use lazy imports. A normal sidecar import must not
+  initialize any provider SDK. Desktop artifacts include every provider adapter
+  exposed by the shipped configuration UI, while target-specific products that
+  expose a smaller provider set may omit unused groups. Development/test
+  packages remain absent from production sidecars.
 - Avoid `uvicorn[standard]`, broad Tokio feature sets, and always-on Tauri
   plugins unless benchmarks or required functionality justify them.
 - No periodic status polling while WebSocket/native events are healthy. Timers
   must have ownership, cleanup, visibility behavior, and a test.
 - The packaged Python runtime is a target-triple-named PyInstaller one-file
-  sidecar built from base dependencies plus the packaging tool only. Packaging
-  excludes test tools, development-server accelerators, unused provider groups,
-  and the optional agent loop. Each build emits byte and SHA-256 attribution;
+  sidecar built from base dependencies, all provider groups exposed by the
+  desktop UI, and the packaging tool. Packaging excludes test tools,
+  development-server accelerators, and the optional agent loop. Each build must
+  pass the credential-free, network-free provider construction and synthetic
+  stream smoke before it emits provider-separated byte and SHA-256 attribution;
   each supported release target must still supply its own native measurement.
 - Tauri uses a narrow dialog-only webview capability, single-instance
   coordination, a process-owned fixed sidecar command, reduced Tokio features,

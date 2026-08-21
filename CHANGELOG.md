@@ -20,6 +20,9 @@ All notable user-visible changes to Argus are recorded here. The project follows
 
 ### Fixed
 
+- Packaged desktop sidecars now include the provider adapters exposed by the
+  application and verify them offline during the frozen build, instead of
+  failing only after a configured provider session starts.
 - The workspace shell and session context now remain usable at narrow window
   sizes, expose truthful runtime status and keyboard navigation, and provide
   retryable provider, model, project, and session catalogue failure states.

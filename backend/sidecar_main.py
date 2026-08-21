@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import sys
+
 import uvicorn
 
 from app.config import settings
@@ -9,6 +11,11 @@ from app.main import app
 
 
 def main() -> None:
+    if sys.argv[1:] == ["--provider-packaging-smoke"]:
+        from app.providers.packaging_smoke import run_provider_packaging_smoke
+
+        print(run_provider_packaging_smoke())
+        return
     config = uvicorn.Config(
         app=app,
         host=settings.host,

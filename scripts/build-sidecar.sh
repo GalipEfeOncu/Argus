@@ -40,9 +40,12 @@ uv run --no-dev --extra packaging pyinstaller \
   --specpath "$work_dir" \
   --exclude-module pytest \
   --exclude-module langgraph \
-  --exclude-module langchain_openai \
-  --exclude-module langchain_anthropic \
-  --exclude-module langchain_google_genai \
+  --hidden-import langchain_openai \
+  --hidden-import langchain_anthropic \
+  --hidden-import langchain_google_genai \
+  --copy-metadata langchain-openai \
+  --copy-metadata langchain-anthropic \
+  --copy-metadata langchain-google-genai \
   --exclude-module httptools \
   --exclude-module uvloop \
   --exclude-module watchfiles \
@@ -51,8 +54,11 @@ uv run --no-dev --extra packaging pyinstaller \
 install -m 755 \
   "$dist_dir/argus-backend-$target_triple$binary_suffix" \
   "$output_dir/argus-backend-$target_triple$binary_suffix"
+python "$repository_root/scripts/smoke-sidecar.py" \
+  "$output_dir/argus-backend-$target_triple$binary_suffix" \
+  --providers-only
 uv run --no-dev --extra packaging python "$repository_root/scripts/sidecar-attribution.py" \
   "$output_dir/argus-backend-$target_triple$binary_suffix" \
-  "$work_dir/argus-backend-$target_triple/PKG-00.toc" \
+  "$work_dir/argus-backend-$target_triple/Analysis-00.toc" \
   "$target_triple" \
   "$repository_root/benchmarks/results/sidecar-$target_triple-attribution.json"

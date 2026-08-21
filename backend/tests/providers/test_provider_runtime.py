@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import subprocess
 import sys
 from pathlib import Path
@@ -9,6 +10,7 @@ from types import SimpleNamespace
 import pytest
 
 from app.providers.adapters import ProviderDependencyUnavailable, ResilientProvider, create_chat_model, create_provider
+from app.providers.packaging_smoke import run_provider_packaging_smoke
 from app.providers.protocol import (
     Cancelled,
     Finished,
@@ -211,6 +213,13 @@ def test_minimal_sidecar_import_avoids_optional_provider_and_langgraph_modules()
         check=True,
     )
     assert result.stdout.strip() == ""
+
+
+def test_provider_packaging_smoke_constructs_all_adapters_without_network_or_persistence() -> None:
+    assert json.loads(run_provider_packaging_smoke()) == {
+        "providerPackagingSmoke": "ok",
+        "providers": ["openai", "openai_compat", "anthropic", "google"],
+    }
 
 
 @pytest.mark.asyncio

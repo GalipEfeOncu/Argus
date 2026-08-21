@@ -107,9 +107,13 @@ launch by focusing the existing window.
 
 Release packaging runs `npm run sidecar:build` to create one PyInstaller binary
 named with Rust's target triple. The build excludes development, unused
-provider, agent-loop, and development-server packages and emits a SHA-256/byte
-attribution report. Tauri consumes that binary only through the release config
-overlay in `src-tauri/tauri.sidecar.conf.json`.
+agent-loop, and development-server packages. It includes the lazy OpenAI,
+Anthropic, and Google adapter groups required by the provider kinds available in
+the shipped UI; OpenAI-compatible profiles share the OpenAI adapter. The build
+runs an offline frozen-binary smoke that constructs each supported adapter and
+normalizes a synthetic stream, then emits a SHA-256/byte attribution report with
+provider adapters separated from base dependencies. Tauri consumes that binary
+only through the release config overlay in `src-tauri/tauri.sidecar.conf.json`.
 
 The Python boundary is intentionally replaceable. A Rust rewrite is considered
 only if representative packaged builds cannot meet the budgets after dependency

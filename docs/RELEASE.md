@@ -97,7 +97,10 @@ Follow the staged transaction in
 3. approve `release` only after comparing the tag, source commit, and preflight
    evidence. The workflow builds the native matrix, applies signing/notarization
    only in `signed` mode, checksums everything, and uploads one staged artifact
-   set but cannot publish it yet;
+   set but cannot publish it yet. Each target sidecar build first runs a fixed,
+   offline provider-packaging smoke; this proves the supported adapter modules
+   can be constructed and normalize a synthetic stream without resolving a
+   credential, opening a database, or contacting a provider;
 4. download that staged set from the workflow run, verify `SHA256SUMS`, and use
    those exact files to complete every remaining clean-client, accessibility,
    lifecycle, backup, and reference-performance row. Update the durable evidence

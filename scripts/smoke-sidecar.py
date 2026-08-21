@@ -29,11 +29,27 @@ def status(url: str, *, token: str | None = None, origin: str | None = None, met
 
 
 def main() -> None:
-    if len(sys.argv) != 2:
-        raise SystemExit("Usage: smoke-sidecar.py <frozen-sidecar>")
+    if len(sys.argv) not in {2, 3} or len(sys.argv) == 3 and sys.argv[2] != "--providers-only":
+        raise SystemExit("Usage: smoke-sidecar.py <frozen-sidecar> [--providers-only]")
     binary = Path(sys.argv[1]).resolve()
     if not binary.is_file():
         raise SystemExit(f"Sidecar does not exist: {binary}")
+    provider_smoke = subprocess.run(
+        [str(binary), "--provider-packaging-smoke"],
+        capture_output=True,
+        text=True,
+        timeout=30,
+        check=True,
+    )
+    expected_provider_smoke = json.dumps({
+        "providerPackagingSmoke": "ok",
+        "providers": ["openai", "openai_compat", "anthropic", "google"],
+    }, sort_keys=True)
+    if provider_smoke.stdout.strip() != expected_provider_smoke or provider_smoke.stderr.strip():
+        raise RuntimeError("Frozen provider packaging smoke returned unexpected output.")
+    if len(sys.argv) == 3:
+        print(expected_provider_smoke)
+        return
     with socket.socket() as reservation:
         reservation.bind(("127.0.0.1", 0))
         port = reservation.getsockname()[1]

@@ -21,7 +21,12 @@ provider-openai = ["langchain-core>=0.3.0", "langchain-openai>=0.3.0"]
 provider-anthropic = ["langchain-core>=0.3.0", "langchain-anthropic>=0.3.0"]
 provider-google = ["langchain-core>=0.3.0", "langchain-google-genai>=2.0.0"]
 agent-loop = ["langgraph>=1.2.0"]
-packaging = ["pyinstaller>=6.15.0"]
+packaging = [
+    "pyinstaller>=6.15.0",
+    "langchain-openai>=0.3.0",
+    "langchain-anthropic>=0.3.0",
+    "langchain-google-genai>=2.0.0",
+]
 
 [build-system]
 requires = ["hatchling"]

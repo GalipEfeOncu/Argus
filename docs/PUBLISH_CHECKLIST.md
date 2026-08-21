@@ -30,6 +30,9 @@ after publication. See [RELEASE.md](RELEASE.md) for the operator sequence.
 
 - [ ] Build every artifact from the immutable release tag on its native target
   and confirm the workflow has staged, but not published, the checksummed set.
+- [ ] Confirm each frozen sidecar passed the offline provider-packaging smoke
+  for OpenAI, OpenAI-compatible, Anthropic, and Google, and record the
+  provider-adapter size attribution without relaxing an artifact budget.
 - [ ] On clean Windows 10 22H2 and Windows 11 x86_64 clients, verify installation
   with and without WebView2 already installed. In `signed` mode, verify the
   installer and executable signature and publisher identity. In
@@ -69,7 +72,9 @@ after publication. See [RELEASE.md](RELEASE.md) for the operator sequence.
 - [ ] Run the clean-machine user journey: install, configure a provider, select
   a project, complete a Coordinator task with a restricted pool and bounded
   preauthorization, recover after forced restart, inspect the audit trail, and
-  safely apply or export the diff.
+  safely apply or export the diff. Exercise every provider kind claimed for the
+  target with a user-supplied test credential; the offline packaging smoke is
+  necessary but does not replace these networked checks.
 
 ## Reference performance
 
