@@ -20,6 +20,8 @@ All notable user-visible changes to Argus are recorded here. The project follows
 
 ### Fixed
 
+- Typography now uses local operating-system font stacks, avoiding an external
+  font request and preserving the desktop interface when offline.
 - Session setup and runtime copy now match the production read-only worker:
   Coordinator can route one specialist inspection per turn, unsupported write,
   test, gate, direct-write, and pre-authorization controls are no longer offered,

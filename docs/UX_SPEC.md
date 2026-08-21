@@ -10,6 +10,11 @@ Argus uses an evolvable three-panel desktop layout:
 
 The layout preserves the existing dark, high-density visual direction while prioritizing readable information hierarchy over decorative effects.
 
+Typography uses cross-platform operating-system sans-serif and monospace stacks
+through the shared design tokens. The application does not fetch fonts or font
+stylesheets at startup, so the hierarchy remains available offline and within
+the desktop content-security policy.
+
 ## Offline local profile
 
 The navigation footer opens an optional profile stored only on the current
