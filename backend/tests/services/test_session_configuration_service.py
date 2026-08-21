@@ -229,6 +229,11 @@ def test_post_sessions_returns_normalized_defaults_validation_codes_and_restart_
         },
     }
     with TestClient(app) as client:
+        profile_id = client.post("/providers/", json={"providerKind": "openai", "displayName": "Test provider"}).json()["id"]
+        payload["agents"] = [
+            {**agent, "modelBinding": {"providerProfileId": profile_id, "modelId": "test-model"}}
+            for agent in payload["agents"]
+        ]
         created = client.post("/sessions/", json=payload)
         second = client.post("/sessions/", json=payload)
         invalid = client.post("/sessions/", json={

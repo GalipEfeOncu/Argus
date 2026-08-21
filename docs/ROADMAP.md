@@ -641,17 +641,16 @@ Current status (2026-07-26):
   replayable WebSocket reducer rather than launching simulator data. A created
   live session starts once its canonical snapshot arrives; reconnect replays
   the same persisted room events.
-- ✅ The provider-neutral reference task now runs from live session commands:
-  Coordinator routes an isolated Builder assignment, the user grants the
-  bounded `workspace.write` capability, and the Builder records tool activity,
-  a reviewable diff artifact, evidence, and terminal status without modifying
-  the selected project.
+- Superseded reference evidence: the deterministic provider-neutral task remains
+  a test fixture for isolated workspace, approval, artifact, and evidence
+  contracts. Production `session.start` no longer launches that fixed task;
+  runtime work requires an explicitly configured provider profile and model.
 - ✅ Pause, resume, cancel, human correction, and reconnect are covered on the
   live transport. Cancellation and participant interruption serialize with an
   in-flight workspace mutation, so accepted cancellation fences later output.
 
-Phase 3 exit: the static fixed pipeline is no longer session orchestration and a
-Coordinator dynamically completes one provider-neutral isolated coding task.
+Phase 3 exit evidence established the isolated task contracts. The deterministic
+reference runner is now fixture-only and is not production orchestration.
 
 ## Phase 4 — Gates, customizable limits, and approval autonomy (✅ Completed)
 

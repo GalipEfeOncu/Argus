@@ -21,6 +21,7 @@ from app.services.session_configuration_service import ConfigurationError, Sessi
 from app.schemas.session import SessionAgentInput
 from app.services.agent_definition_service import AgentDefinitionService
 from app.services.acceptance_service import AcceptanceError, AcceptanceService
+from app.services.provider_profile_service import ProviderProfileError, ProviderProfileService
 from app.api.websocket import connection_hub
 
 router = APIRouter()
@@ -59,10 +60,26 @@ async def create_session(req: SessionCreateRequest):
         agents = await AgentDefinitionService(db).resolve_session_agents(agents)
         # Validate before provisioning an isolated workspace so invalid input
         # never leaves a worktree/snapshot behind.
-        SessionConfigurationService._validate(
+        selected_agent_ids = set(SessionConfigurationService._validate(
             agents, coordinator_id, req.configuration, mode.value,
             acknowledged_direct_write=req.acknowledge_direct_write,
-        )
+        ))
+        runtime_agents = [agent for agent in agents if agent.id == coordinator_id or agent.id in selected_agent_ids]
+        profile_service = ProviderProfileService(db)
+        for agent in runtime_agents:
+            binding = agent.model_binding
+            if binding is None or binding.provider_profile_id == "builtin":
+                raise ConfigurationError(
+                    "provider_model_required",
+                    f"{agent.name or agent.role} requires a configured provider profile and model.",
+                )
+            try:
+                await profile_service.get(binding.provider_profile_id)
+            except ProviderProfileError as error:
+                raise ConfigurationError(
+                    "provider_profile_not_configured",
+                    f"{agent.name or agent.role} references a provider profile that is not configured.",
+                ) from error
         await SessionRepository(db).create_legacy_session(
             session_id=session_id, name=name, project_path=project["canonicalPath"], task=goal,
             role_configs=[role_config.model_dump() for role_config in req.role_configs],

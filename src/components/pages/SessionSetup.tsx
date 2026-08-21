@@ -81,10 +81,10 @@ function liveAgentInfos(
   configuration: SessionConfiguration,
   snapshots: Array<{ id: string; sourceAgentId: string; role: string }>,
 ): AgentInfo[] {
-  const fallbackModel: ModelRef = { providerId: 'local', modelId: 'provider-neutral', displayName: 'Provider-neutral task' };
   return snapshots.map((snapshot) => {
     const source = configuration.availableAgents.find((agent) => agent.id === snapshot.sourceAgentId);
-    const modelRef = source?.modelRef ?? configuration.coordinatorModel ?? fallbackModel;
+    const modelRef = snapshot.sourceAgentId === 'coordinator' ? configuration.coordinatorModel : source?.modelRef;
+    if (modelRef === null || modelRef === undefined) throw new Error(`Missing configured model for ${snapshot.sourceAgentId}.`);
     return {
       instanceId: snapshot.id,
       label: source?.label ?? (snapshot.role === 'coordinator' ? 'Coordinator' : snapshot.role),
@@ -116,6 +116,7 @@ export const SessionSetup: React.FC = () => {
   }>>([]);
   const [skillError, setSkillError] = useState<string | null>(null);
   const [providerModels, setProviderModels] = useState<ModelRef[]>([]);
+  const [modelsLoaded, setModelsLoaded] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -125,8 +126,10 @@ export const SessionSetup: React.FC = () => {
       await Promise.all(profiles.filter((profile) => profile.credentialConfigured).map((profile) => tauriCommands.refreshProviderCredential(profile.id).catch(() => undefined)));
       const listed = await Promise.all(profiles.map(async (profile) => ({ profile, response: await providerApi.listModels(profile.id) })));
       if (!active) return;
-      setProviderModels([...listed.flatMap(({ profile, response }) => response.models.map((model) => ({ providerId: profile.id, modelId: model.id, displayName: `${profile.displayName} · ${model.displayName}${model.supportsStructuredOutput === false ? ' · structured output unavailable' : ''}` }))), ...manualProviderModels]);
-    }).catch(() => { if (active) setProviderModels([]); });
+      const profileIds = new Set(profiles.map((profile) => profile.id));
+      setProviderModels([...listed.flatMap(({ profile, response }) => response.models.map((model) => ({ providerId: profile.id, modelId: model.id, displayName: `${profile.displayName} · ${model.displayName}${model.supportsStructuredOutput === false ? ' · structured output unavailable' : ''}` }))), ...manualProviderModels.filter((model) => profileIds.has(model.providerId))]);
+      setModelsLoaded(true);
+    }).catch(() => { if (active) { setProviderModels([]); setModelsLoaded(true); } });
     return () => { active = false; };
   }, [manualProviderModels]);
 
@@ -173,8 +176,16 @@ export const SessionSetup: React.FC = () => {
     return () => { active = false; };
   }, []);
 
-  const validation = useMemo(() => validateConfiguration(configuration), [configuration]);
-  const canStart = projectPath.trim().length > 0 && goal.trim().length > 0 && validation.length === 0;
+  const validation = useMemo(() => {
+    const errors = validateConfiguration(configuration);
+    const availableModels = new Set(providerModels.map((model) => `${model.providerId}:${model.modelId}`));
+    const selectedModels = [configuration.coordinatorModel, ...configuration.availableAgents.filter((agent) => configuration.availableAgentIds.includes(agent.id)).map((agent) => agent.modelRef)];
+    if (modelsLoaded && selectedModels.some((model) => model !== null && !availableModels.has(`${model.providerId}:${model.modelId}`))) {
+      errors.push('Every selected model must belong to a configured provider profile and its available model list.');
+    }
+    return errors;
+  }, [configuration, modelsLoaded, providerModels]);
+  const canStart = modelsLoaded && projectPath.trim().length > 0 && goal.trim().length > 0 && validation.length === 0;
   const update = (change: (current: SessionConfiguration) => SessionConfiguration) => setConfiguration((current) => markCustom(change(current)));
 
   const handleSelectFolder = async () => {
@@ -339,7 +350,7 @@ export const SessionSetup: React.FC = () => {
 
           <section className="setup-card" aria-labelledby="setup-team">
             <h2 id="setup-team" className="setup-card-label">3 — Available team</h2><p className="setup-static">These are agent instances the Coordinator may select; roles are not a fixed pipeline.</p>
-            <div className="agent-config-list">{configuration.availableAgents.map((agent) => { const selected = configuration.availableAgentIds.includes(agent.id); const required = configuration.requiredRoleRules.some((rule) => rule.role === agent.role); return <div className="agent-config-row" key={agent.id}><label><input type="checkbox" checked={selected} disabled={required} onChange={() => toggleAgent(agent)} /> <strong>{agent.label}</strong><span>{agent.modelRef?.displayName ?? 'Model missing'}</span></label><span className="agent-capabilities">{agent.capabilities.join(' · ')}</span>{agent.agentDefinitionId.startsWith('builtin.') ? null : <span className="setup-muted">Custom definition</span>}{required && <span className="required-lock">Required gate</span>}</div>; })}</div>
+            <div className="agent-config-list">{configuration.availableAgents.map((agent) => { const selected = configuration.availableAgentIds.includes(agent.id); const required = configuration.requiredRoleRules.some((rule) => rule.role === agent.role); const modelValue = agent.modelRef === null ? 'missing' : `${agent.modelRef.providerId}:${agent.modelRef.modelId}`; return <div className="agent-config-row" key={agent.id}><label><input type="checkbox" checked={selected} disabled={required} onChange={() => toggleAgent(agent)} /> <strong>{agent.label}</strong></label><label className="setup-label" htmlFor={`agent-model-${agent.id}`}>Model<select id={`agent-model-${agent.id}`} className="setup-select" value={modelValue} disabled={!selected} onChange={(event) => { const model = providerModels.find((item) => `${item.providerId}:${item.modelId}` === event.target.value) ?? null; update((current) => ({ ...current, availableAgents: current.availableAgents.map((item) => item.id === agent.id ? { ...item, modelRef: model } : item) })); }}><option value="missing">No model configured</option>{agent.modelRef !== null && !providerModels.some((model) => model.providerId === agent.modelRef?.providerId && model.modelId === agent.modelRef.modelId) && <option value={modelValue}>{agent.modelRef.displayName}</option>}{providerModels.map((model) => <option key={`${model.providerId}:${model.modelId}`} value={`${model.providerId}:${model.modelId}`}>{model.displayName}</option>)}</select></label><span className="agent-capabilities">{agent.capabilities.join(' · ')}</span>{agent.agentDefinitionId.startsWith('builtin.') ? null : <span className="setup-muted">Custom definition</span>}{required && <span className="required-lock">Required gate</span>}</div>; })}</div>
             <p className="setup-muted">Selected: {visibleAgentNames(configuration)}</p>
           </section>
 
@@ -368,6 +379,7 @@ export const SessionSetup: React.FC = () => {
             <h2 id="setup-review" className="setup-card-label">7 — Review</h2>
             <ul className="review-summary">{authoritySummary(configuration).map((item) => <li key={item}>{item}</li>)}</ul>
             {validation.length > 0 && <div className="setup-validation" role="alert"><strong>Resolve before starting</strong><ul>{validation.map((error) => <li key={error}>{error}</li>)}</ul></div>}
+            {!modelsLoaded && <p className="setup-muted">Loading configured provider models…</p>}
             {!projectPath && <p className="setup-muted">Select a workspace to start.</p>}{!goal.trim() && <p className="setup-muted">Describe the goal to start.</p>}
             {startError !== null && <p className="setup-validation" role="alert">{startError}</p>}
             <button className="setup-init-btn" type="button" onClick={() => void handleStart()} disabled={!canStart || isStarting}>{isStarting ? 'Creating isolated session…' : 'Start Coordinator session'}</button>

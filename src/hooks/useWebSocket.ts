@@ -12,7 +12,7 @@ export function useWebSocket(sessionId: string | null) {
 
   return {
     sendMessage: (content: string, mentionIds?: string[]) => wsManager.sendMessage(content, mentionIds),
-    sendApproval: (approved: boolean, approvalId?: string) => wsManager.sendApproval(approved, approvalId),
+    sendApproval: (approved: boolean, approvalId: string) => wsManager.sendApproval(approved, approvalId),
     sendInterrupt: (participantId?: string) => wsManager.sendInterrupt(participantId),
     controlSession: (action: 'pause' | 'resume' | 'cancel') => wsManager.controlSession(action),
     updateConfiguration: (configurationVersion: number, patch: SessionConfigurationPatch, confirmConsequences?: boolean) => wsManager.updateConfiguration(configurationVersion, patch, confirmConsequences),

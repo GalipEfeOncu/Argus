@@ -8,7 +8,7 @@ from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
-from app.api import agent_definitions, contracts, local_profile, models_router, projects, providers, runtime, sessions, skills, websocket as ws_router
+from app.api import agent_definitions, contracts, local_profile, projects, providers, runtime, sessions, skills, websocket as ws_router
 from app.db.database import init_db
 from app.db.database import get_db
 from app.db.repositories import _now_ms
@@ -82,7 +82,6 @@ app.include_router(skills.router, prefix="/skills", tags=["skills"])
 app.include_router(projects.router, prefix="/projects", tags=["projects"])
 app.include_router(providers.router, prefix="/providers", tags=["providers"])
 app.include_router(local_profile.router, prefix="/profile", tags=["profile"])
-app.include_router(models_router.router, prefix="/models", tags=["models"])
 app.include_router(contracts.router, prefix="/contracts", tags=["contracts"])
 app.include_router(ws_router.router, tags=["websocket"])
 app.include_router(runtime.router, prefix="/runtime", tags=["runtime"])

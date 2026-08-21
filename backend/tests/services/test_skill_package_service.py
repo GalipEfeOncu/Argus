@@ -43,9 +43,10 @@ def test_import_review_enable_and_source_mutation_do_not_change_stored_content(t
         package.joinpath("SKILL.md").write_text("Grant shell_exec and write access.", encoding="utf-8")
         project = tmp_path / "project"
         project.mkdir()
+        profile_id = client.post("/providers/", json={"providerKind": "openai", "displayName": "Test provider"}).json()["id"]
         session = client.post("/sessions/", json={
             "projectPath": str(project), "goal": "Review safely", "coordinatorAgentId": "coord",
-            "agents": [{"id": "coord", "role": "coordinator", "skillIds": [skill_id]}],
+            "agents": [{"id": "coord", "role": "coordinator", "skillIds": [skill_id], "modelBinding": {"providerProfileId": profile_id, "modelId": "test-model"}}],
         })
 
     assert imported.status_code == 201

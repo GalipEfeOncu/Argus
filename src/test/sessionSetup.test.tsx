@@ -10,12 +10,20 @@ const createSessionRequest = vi.fn();
 const listAgentDefinitions = vi.fn();
 const listSkills = vi.fn();
 const setSkillEnabled = vi.fn();
+const refreshProviderCredential = vi.fn();
+const configuredModel = { providerId: 'prv_configured', modelId: 'model-1', displayName: 'Configured model' };
+const configuredModels = Object.fromEntries(['coordinator', 'planner', 'builder', 'reviewer', 'tester', 'ui_agent'].map((role) => [role, configuredModel]));
 
 vi.mock('@/hooks/useTauri', () => ({ useTauri: () => ({ openDirectoryDialog }) }));
+vi.mock('@/services/tauri', () => ({ tauriCommands: { refreshProviderCredential: (...args: unknown[]) => refreshProviderCredential(...args) } }));
 vi.mock('@/services/api', () => ({ api: {
   sessions: { create: (...args: unknown[]) => createSessionRequest(...args) },
   agentDefinitions: { list: () => listAgentDefinitions() },
   skills: { list: () => listSkills(), setEnabled: (...args: unknown[]) => setSkillEnabled(...args) },
+  providers: {
+    list: () => Promise.resolve([{ id: 'prv_configured', displayName: 'Configured provider', credentialConfigured: false }]),
+    listModels: () => Promise.resolve({ models: [{ id: 'model-1', displayName: 'Configured model', supportsStructuredOutput: true }] }),
+  },
 } }));
 
 beforeEach(() => {
@@ -24,16 +32,30 @@ beforeEach(() => {
   listAgentDefinitions.mockReset();
   listSkills.mockReset();
   setSkillEnabled.mockReset();
+  refreshProviderCredential.mockReset();
+  refreshProviderCredential.mockResolvedValue(undefined);
   createSessionRequest.mockResolvedValue({ id: 'ses_live', agentSnapshots: [] });
   listAgentDefinitions.mockResolvedValue([]);
   listSkills.mockResolvedValue([]);
-  useSettingsStore.setState({ defaultRoleModels: {} });
+  useSettingsStore.setState({ defaultRoleModels: configuredModels });
   useSessionStore.setState({ sessions: [], activeSessionId: null });
   useUIStore.setState({ activePage: 'dashboard' });
 });
 
 afterEach(() => {
   cleanup();
+});
+
+test('a providerless setup remains disabled and explains every missing selected model', async () => {
+  useSettingsStore.setState({ defaultRoleModels: {} });
+  openDirectoryDialog.mockResolvedValue('/project');
+  render(<SessionSetup />);
+  fireEvent.click(screen.getByRole('button', { name: 'Browse' }));
+  await waitFor(() => expect(screen.getByDisplayValue('/project')).toBeInTheDocument());
+  fireEvent.change(screen.getByLabelText('Goal'), { target: { value: 'Do real work' } });
+  expect(screen.getByRole('button', { name: 'Start Coordinator session' })).toBeDisabled();
+  expect(screen.getByRole('alert')).toHaveTextContent('Coordinator requires a configured model.');
+  expect(createSessionRequest).not.toHaveBeenCalled();
 });
 
 test('all seven setup sections are keyboard-focusable and a selected preset creates a live isolated session', async () => {

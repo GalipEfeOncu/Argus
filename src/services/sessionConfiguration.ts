@@ -3,10 +3,6 @@ import type {
   AgentInstance, ExecutionLimits, RequiredRoleRule, SessionConfiguration, SessionPreset,
 } from '@/types/session';
 
-const fallbackModel: ModelRef = {
-  providerId: 'builtin', modelId: 'argus-default', displayName: 'Argus default model',
-};
-
 const agentCapabilities: Record<Exclude<AgentRole, 'coordinator'>, string[]> = {
   planner: ['workspace.read'],
   builder: ['workspace.read', 'workspace.write', 'test.run'],
@@ -37,7 +33,7 @@ export function createAgentInstances(defaultRoleModels: Partial<Record<AgentRole
     id: `builtin-${role}`,
     role,
     label: agentLabels[role],
-    modelRef: defaultRoleModels[role] ?? fallbackModel,
+    modelRef: defaultRoleModels[role] ?? null,
     capabilities: agentCapabilities[role],
     agentDefinitionId: `builtin.${role}.v1`,
     evidenceKinds: [roleEvidence(role)],
@@ -64,7 +60,7 @@ export function createConfiguration(
   const availableAgents = createAgentInstances(defaultRoleModels);
   const base: SessionConfiguration = {
     preset: 'custom', workspaceMode: 'worktree', outputLanguage: 'en',
-    coordinatorModel: defaultRoleModels.coordinator ?? fallbackModel, coordinatorDefinitionId: 'builtin.coordinator.v1',
+    coordinatorModel: defaultRoleModels.coordinator ?? null, coordinatorDefinitionId: 'builtin.coordinator.v1',
     coordinatorPermissionProfile: 'balanced', coordinatorPromptOverride: '', enabledSkills: [], directWriteAcknowledged: false,
     preauthorizationAcknowledged: false, preauthorizationScope: '', availableAgents,
     availableAgentIds: availableAgents.map((agent) => agent.id), requiredRoleRules: [],

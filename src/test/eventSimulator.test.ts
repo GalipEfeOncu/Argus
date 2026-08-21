@@ -4,8 +4,11 @@ import { useSessionStore } from '@/stores/sessionStore';
 import type { Session } from '@/types/session';
 import { createSimulatorScenario } from './helpers/simulatorScenario';
 import { createConfiguration } from '@/services/sessionConfiguration';
+import type { AgentRole, ModelRef } from '@/types/agent';
 
 const sessionId = 'session_simulator_test';
+const simulatorModel: ModelRef = { providerId: 'fixture-provider', modelId: 'fixture-model', displayName: 'Fixture model' };
+const simulatorModels = Object.fromEntries(['coordinator', 'planner', 'builder', 'reviewer', 'tester', 'ui_agent'].map((role) => [role, simulatorModel])) as Record<AgentRole, ModelRef>;
 
 function resetStores(): void {
   useAgentStore.getState().clearSession();
@@ -39,7 +42,7 @@ test('simulator approval scenario is deterministic and projects canonical events
     task: 'Exercise an approval',
     status: 'setup',
     roleConfigs: [],
-    configuration: createConfiguration({}),
+    configuration: createConfiguration(simulatorModels),
     messages: [],
     startedAt: 1_700_000_000_000,
     tokenUsage: { inputTokens: 0, outputTokens: 0, totalTokens: 0 },
@@ -78,7 +81,7 @@ test('simulator approval scenario is deterministic and projects canonical events
 
 test('simulator honors the configured available-agent pool instead of inventing a fixed pipeline', () => {
   const scenario = createSimulatorScenario();
-  const configuration = createConfiguration({}, 'quick');
+  const configuration = createConfiguration(simulatorModels, 'quick');
   scenario.simulator.start(sessionId, configuration);
   scenario.clock.advanceBy(2_600);
 
@@ -93,7 +96,7 @@ test('simulator honors the configured available-agent pool instead of inventing 
 
 test('a pre-authorized workspace write stays prompt-free and retains the selected instance ID', () => {
   const scenario = createSimulatorScenario();
-  const base = createConfiguration({}, 'quick');
+  const base = createConfiguration(simulatorModels, 'quick');
   const originalBuilder = base.availableAgents.find((agent) => agent.role === 'builder')!;
   const namedBuilder = { ...originalBuilder, id: 'agent-builder-alpha', label: 'Builder Alpha' };
   const configuration = {
@@ -114,7 +117,7 @@ test('a pre-authorized workspace write stays prompt-free and retains the selecte
 
 test('deny-interactive mode emits a visible denial and replan without an approval prompt', () => {
   const scenario = createSimulatorScenario();
-  const base = createConfiguration({}, 'quick');
+  const base = createConfiguration(simulatorModels, 'quick');
   scenario.simulator.start(sessionId, {
     ...base,
     approvalPolicy: { ...base.approvalPolicy, behavior: 'deny_interactive' },
@@ -128,7 +131,7 @@ test('deny-interactive mode emits a visible denial and replan without an approva
 
 test('two same-role instances retain distinct legacy-store keys while canonical assignments use an instance ID', () => {
   const scenario = createSimulatorScenario();
-  const base = createConfiguration({}, 'quick');
+  const base = createConfiguration(simulatorModels, 'quick');
   const builder = base.availableAgents.find((agent) => agent.role === 'builder')!;
   const secondBuilder = { ...builder, id: 'agent-builder-beta', label: 'Builder Beta' };
   scenario.simulator.start(sessionId, { ...base, availableAgents: [...base.availableAgents, secondBuilder], availableAgentIds: [builder.id, secondBuilder.id] });
@@ -140,7 +143,7 @@ test('two same-role instances retain distinct legacy-store keys while canonical 
 
 test('simulator rejects invalid pre-authorization when invoked outside the setup UI', () => {
   const scenario = createSimulatorScenario();
-  const base = createConfiguration({}, 'quick');
+  const base = createConfiguration(simulatorModels, 'quick');
   const unsafe = {
     ...base,
     approvalPolicy: { ...base.approvalPolicy, permissionProfile: 'autonomous' as const, behavior: 'preauthorize_session' as const, preauthorizedCapabilities: ['workspace.write'] },

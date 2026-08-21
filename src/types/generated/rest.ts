@@ -97,23 +97,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/models/": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** List Available Models */
-        get: operations["list_available_models_models__get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/profile": {
         parameters: {
             query?: never;
@@ -2712,26 +2695,6 @@ export interface operations {
         };
     };
     health_health_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-        };
-    };
-    list_available_models_models__get: {
         parameters: {
             query?: never;
             header?: never;

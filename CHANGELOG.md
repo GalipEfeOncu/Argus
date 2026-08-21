@@ -14,6 +14,11 @@ All notable user-visible changes to Argus are recorded here. The project follows
 
 ### Fixed
 
+- Session setup now requires explicit models from configured provider profiles,
+  the runtime rejects placeholder or unknown provider bindings before creating
+  a workspace, and the live WebSocket bundle no longer includes simulator paths.
+- Removed the obsolete placeholder model endpoint and stale built-in model,
+  approval-ID, settings, and frontend version fallbacks.
 - Starting or approving a session no longer launches the deterministic demo
   task or writes its fixed reference file in a real project workspace.
 - The navigation shell now loads durable local projects and sessions instead of

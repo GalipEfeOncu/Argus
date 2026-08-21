@@ -219,18 +219,17 @@ includes `capability`, while other rule applicability values must omit it.
 Decision choices are `reassign`, `change_approach`, `deliver_partial`, or
 `stop`. Limit resolution is `ask_user`, `coordinator_decides`, or `stop`.
 
-### First isolated vertical task
+### Session execution
 
-For the current provider-neutral reference task, `session.start` persists the
-Coordinator handoff and then requests one bounded `workspace.write` grant.
-After a human `approval.resolve` command with `resolution: "grant"`, the
-Builder writes only inside the session worktree or snapshot, records the tool
-lifecycle and diff artifact, and completes with evidence. These worker events
-are appended before live fan-out, so reconnect uses the same ordered replay.
-Pause, resume, cancel, and human messages remain normal canonical commands;
-an accepted cancellation is serialized with an in-flight workspace mutation.
-Rejected commands are emitted as correlated `error.created` events rather than
-an out-of-band WebSocket payload, allowing clients to clear pending state.
+`session.start` changes the durable session state and emits canonical command
+events; it does not schedule a fixed demo task or write a reference file. Model
+work requires every selected participant, including the Coordinator, to carry a
+model binding whose provider profile exists in the local provider catalogue.
+Missing, built-in placeholder, or unknown provider bindings are rejected before
+an isolated workspace is provisioned. Pause, resume, cancel, approvals, and
+human messages remain canonical commands. Rejected commands are emitted as
+correlated `error.created` events rather than an out-of-band WebSocket payload,
+allowing clients to clear pending state.
 
 ### Approval and authority evaluation
 

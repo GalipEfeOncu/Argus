@@ -1,7 +1,6 @@
 import type { ArgusSessionCommand } from '@/types/events';
 import type { SessionConfigurationPatch } from '@/types/generated/session-commands';
 import type { ConnectionState } from './sessionProjection';
-import { eventSimulator } from '@/services/eventSimulator';
 import { syncLegacyProjection } from '@/services/legacyProjectionBridge';
 import { useSessionRoomStore } from '@/stores/sessionRoomStore';
 import { clearBackendConnection, ensureBackendConnection } from '@/services/backendConnection';
@@ -11,7 +10,7 @@ import {
   type TransportHandlers,
 } from '@/services/sessionTransport';
 
-/** Live implementation of the same transport boundary used by EventSimulator. */
+/** Live WebSocket implementation of the session transport boundary. */
 export class WebSocketSessionTransport implements SessionTransport {
   private socket: WebSocket | null = null;
   private intentionalClose = false;
@@ -113,7 +112,6 @@ class WebSocketManager {
     this.teardown();
     this.sessionId = sessionId;
     this.connectionConsumers = 1;
-    if (eventSimulator.isActive(sessionId)) return;
     const client = new SessionStreamClient(new WebSocketSessionTransport(), sessionId);
     let startRequested = false;
     this.client = client;
@@ -129,18 +127,10 @@ class WebSocketManager {
   }
 
   sendMessage(content: string, mentionIds: string[] = []): void {
-    if (this.sessionId !== null && eventSimulator.isActive(this.sessionId)) {
-      eventSimulator.sendHumanMessage(this.sessionId, content, mentionIds);
-      return;
-    }
     this.send({ commandId: crypto.randomUUID(), type: 'message.send', payload: { content, ...(mentionIds.length === 0 ? {} : { mentionIds }) } });
   }
 
-  sendApproval(approved: boolean, approvalId = 'active-approval'): void {
-    if (this.sessionId !== null && eventSimulator.isActive(this.sessionId)) {
-      eventSimulator.resolveApproval(this.sessionId, approved, approvalId);
-      return;
-    }
+  sendApproval(approved: boolean, approvalId: string): void {
     const pending = this.sessionId === null ? undefined : useSessionRoomStore.getState().projections[this.sessionId]?.approvals[approvalId];
     this.send({
       commandId: crypto.randomUUID(),
@@ -152,10 +142,6 @@ class WebSocketManager {
   }
 
   sendInterrupt(participantId?: string): void {
-    if (this.sessionId !== null && eventSimulator.isActive(this.sessionId)) {
-      eventSimulator.interruptActiveParticipant(this.sessionId, participantId);
-      return;
-    }
     const targetParticipantId = participantId ?? this.activeStreamingParticipantId();
     if (targetParticipantId === null) return;
     this.send({
@@ -166,10 +152,6 @@ class WebSocketManager {
   }
 
   controlSession(action: 'pause' | 'resume' | 'cancel'): void {
-    if (this.sessionId !== null && eventSimulator.isActive(this.sessionId)) {
-      eventSimulator.controlSession(this.sessionId, action);
-      return;
-    }
     const commandId = crypto.randomUUID();
     const command: ArgusSessionCommand = action === 'cancel'
       ? { commandId, type: 'session.cancel', payload: { reasonSummary: 'Cancelled by the user.' } }
@@ -178,10 +160,6 @@ class WebSocketManager {
   }
 
   updateConfiguration(configurationVersion: number, patch: SessionConfigurationPatch, confirmConsequences = false): void {
-    if (this.sessionId !== null && eventSimulator.isActive(this.sessionId)) {
-      eventSimulator.updateConfiguration(this.sessionId, configurationVersion, patch, confirmConsequences);
-      return;
-    }
     this.send({
       commandId: crypto.randomUUID(),
       type: 'session.configuration.update',
@@ -190,10 +168,6 @@ class WebSocketManager {
   }
 
   resolveDecision(decisionId: string, choice: 'reassign' | 'change_approach' | 'deliver_partial' | 'stop'): void {
-    if (this.sessionId !== null && eventSimulator.isActive(this.sessionId)) {
-      eventSimulator.resolveDecision(this.sessionId, decisionId, choice);
-      return;
-    }
     this.send({ commandId: crypto.randomUUID(), type: 'decision.resolve', payload: { decisionId, choice, reasonSummary: 'Visible human decision.' } });
   }
 

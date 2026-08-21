@@ -6709,25 +6709,6 @@
         "summary": "Health"
       }
     },
-    "/models/": {
-      "get": {
-        "operationId": "list_available_models_models__get",
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            },
-            "description": "Successful Response"
-          }
-        },
-        "summary": "List Available Models",
-        "tags": [
-          "models"
-        ]
-      }
-    },
     "/profile": {
       "get": {
         "operationId": "get_local_profile_profile_get",

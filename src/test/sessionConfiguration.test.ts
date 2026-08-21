@@ -1,7 +1,19 @@
 import { expect, test } from 'vitest';
 import { applyPreset, authoritySummary, createConfiguration, markCustom, validateConfiguration } from '@/services/sessionConfiguration';
+import type { AgentRole, ModelRef } from '@/types/agent';
 
-const models = {};
+const configuredModel: ModelRef = { providerId: 'prv_configured', modelId: 'model-1', displayName: 'Configured model' };
+const models = Object.fromEntries(['coordinator', 'planner', 'builder', 'reviewer', 'tester', 'ui_agent'].map((role) => [role, configuredModel])) as Record<AgentRole, ModelRef>;
+
+test('a providerless configuration is rejected instead of receiving a synthetic model', () => {
+  const configuration = createConfiguration({});
+  expect(configuration.coordinatorModel).toBeNull();
+  expect(configuration.availableAgents.every((agent) => agent.modelRef === null)).toBe(true);
+  expect(validateConfiguration(configuration)).toEqual(expect.arrayContaining([
+    'Coordinator requires a configured model.',
+    'Builder requires a configured model.',
+  ]));
+});
 
 test('Quick resolves to a Builder-only pool while keeping Coordinator mandatory outside the selectable pool', () => {
   const configuration = applyPreset(createConfiguration(models, 'custom'), 'quick');
