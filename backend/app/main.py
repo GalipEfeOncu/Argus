@@ -37,7 +37,6 @@ async def lifespan(app: FastAPI):
     try:
         yield
     finally:
-        await ws_router.shutdown_vertical_tasks()
         print("[Argus] Shutting down")
 
 

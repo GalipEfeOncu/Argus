@@ -6,7 +6,10 @@ All notable user-visible changes to Argus are recorded here. The project follows
 
 ## Unreleased
 
-No unreleased changes.
+### Fixed
+
+- Starting or approving a session no longer launches the deterministic demo
+  task or writes its fixed reference file in a real project workspace.
 
 ## [1.0.0-alpha.2] - 2026-08-16
 

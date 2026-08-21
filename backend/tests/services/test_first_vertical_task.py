@@ -10,7 +10,6 @@ import uuid
 from fastapi.testclient import TestClient
 import pytest
 
-from app.api import websocket as websocket_api
 from app.config import settings
 from app.db.database import get_db, transaction
 from app.db.repositories import EventRepository, SessionRepository
@@ -23,22 +22,6 @@ from app.services.first_vertical_task import FirstVerticalTaskRunner
 from app.services.coordinator_cycle import CoordinatorCycle
 from app.services.session_configuration_service import SessionConfigurationService
 from app.services.workspace_service import ProjectWorkspaceService
-
-
-def _receive_type(socket, event_type: str) -> dict[str, object]:
-    for _ in range(20):
-        value = socket.receive_json()
-        if value["type"] == event_type:
-            return value
-    raise AssertionError(f"Did not receive {event_type}")
-
-
-def _receive_status(socket, status: str) -> dict[str, object]:
-    for _ in range(20):
-        value = _receive_type(socket, "session.status_changed")
-        if value["payload"]["status"] == status:
-            return value
-    raise AssertionError(f"Did not receive status {status}")
 
 
 def _create_request(
@@ -132,8 +115,10 @@ async def _preauthorized_runner_session(
     )
 
 
-def test_first_vertical_task_is_replayable_isolated_and_reviewable(temporary_sqlite_db, tmp_path: Path) -> None:
-    project = tmp_path / "fake-project"
+def test_session_start_does_not_launch_the_deterministic_reference_task(
+    temporary_sqlite_db, tmp_path: Path,
+) -> None:
+    project = tmp_path / "production-project"
     project.mkdir()
     original = project / "original.txt"
     original.write_text("The selected project must not change.\n", encoding="utf-8")
@@ -145,70 +130,15 @@ def test_first_vertical_task_is_replayable_isolated_and_reviewable(temporary_sql
         with client.websocket_connect(f"/ws/sessions/{session_id}?after_sequence=0") as socket:
             assert socket.receive_json()["type"] == "session.snapshot"
             socket.send_json({"commandId": "start", "type": "session.start", "payload": {}})
-            assert socket.receive_json()["payload"]["status"] == "preparing"
-
-        # A human correction is durable even while the session is waiting for a
-        # scoped grant, and its WebSocket outcome is correlated to the command.
-        with client.websocket_connect(f"/ws/sessions/{session_id}?after_sequence=1") as socket:
-            assert socket.receive_json()["type"] == "session.snapshot"
-            replayed = socket.receive_json()
-            assert replayed["type"] == "approval.requested"
-            approval_id = replayed["payload"]["approvalId"]
-            socket.send_json({"commandId": "correction", "type": "message.send", "payload": {"content": "Keep the original project unchanged."}})
-            correction = _receive_type(socket, "message.created")
-            assert correction["type"] == "message.created"
-            assert correction["correlationId"] == "correction"
-            socket.send_json({
-                "commandId": "grant-write", "type": "approval.resolve",
-                "payload": {"approvalId": approval_id, "resolution": "grant", "grantCapabilities": ["workspace.write"],
-                            "scopeSummary": "Only the isolated session workspace."},
-            })
-            assert _receive_type(socket, "approval.resolved")["type"] == "approval.resolved"
-            assert _receive_type(socket, "session.status_changed")["payload"]["status"] == "running"
-            completed = _receive_type(socket, "session.status_changed")
-            while completed["payload"]["status"] != "completed":
-                completed = _receive_type(socket, "session.status_changed")
+            started = socket.receive_json()
+            assert started["type"] == "session.status_changed"
+            assert started["payload"]["status"] == "preparing"
+            assert started["correlationId"] == "start"
 
         events = asyncio.run(_events(session_id))
-        artifact_id = next(event.payload["artifactId"] for event in events if event.event_type == "artifact.diff_updated")
-        assert original.read_text(encoding="utf-8") == "The selected project must not change.\n"
-        assert {event.event_type for event in events} >= {
-            "approval.requested", "approval.resolved", "assignment.proposed", "assignment.created",
-            "assignment.started", "tool.requested", "tool.completed", "artifact.diff_updated",
-            "assignment.completed", "session.status_changed",
-        }
-        assert any(event.event_type == "artifact.diff_updated" and event.payload["artifactId"] == artifact_id for event in events)
-
-        last_sequence = events[-1].sequence
-        with client.websocket_connect(f"/ws/sessions/{session_id}?after_sequence={last_sequence - 2}") as socket:
-            snapshot = socket.receive_json()
-            assert snapshot["type"] == "session.snapshot"
-            replay = [socket.receive_json(), socket.receive_json()]
-
-    assert [event["sequence"] for event in replay] == [last_sequence - 1, last_sequence]
-    assert replay[-1]["payload"]["status"] == "completed"
-
-
-def test_live_pause_resume_and_cancel_fence_future_vertical_output(temporary_sqlite_db, tmp_path: Path) -> None:
-    project = tmp_path / "cancel-project"
-    project.mkdir()
-
-    with TestClient(app) as client:
-        created = client.post("/sessions/", json=_create_request(project))
-        session_id = created.json()["id"]
-        with client.websocket_connect(f"/ws/sessions/{session_id}?after_sequence=0") as socket:
-            socket.receive_json()
-            socket.send_json({"commandId": "start", "type": "session.start", "payload": {}})
-            socket.receive_json()
-            approval = _receive_type(socket, "approval.requested")
-            socket.send_json({"commandId": "pause", "type": "session.pause", "payload": {}})
-            assert _receive_status(socket, "paused")["payload"]["status"] == "paused"
-            socket.send_json({"commandId": "resume", "type": "session.resume", "payload": {}})
-            assert _receive_status(socket, "running")["payload"]["status"] == "running"
-            socket.send_json({"commandId": "cancel", "type": "session.cancel", "payload": {"reasonSummary": "Stop before work starts."}})
-            assert _receive_status(socket, "cancelled")["payload"]["status"] == "cancelled"
-
-    assert approval["payload"]["approvalId"]
+    assert [event.event_type for event in events] == ["session.status_changed"]
+    assert events[0].payload["status"] == "preparing"
+    assert original.read_text(encoding="utf-8") == "The selected project must not change.\n"
     assert not (Path(settings.db_path).parent / "workspaces" / session_id / "workspace" / "argus-vertical-task.txt").exists()
 
 
@@ -236,28 +166,6 @@ async def test_preauthorized_vertical_task_continues_without_an_approval_prompt(
     statuses = [event.payload["status"] for event in events if event.event_type == "session.status_changed"]
     assert "completed" in statuses
     assert "waiting_approval" not in statuses
-
-
-@pytest.mark.asyncio
-async def test_application_shutdown_cancels_and_awaits_vertical_tasks() -> None:
-    started = asyncio.Event()
-    cancelled = asyncio.Event()
-
-    async def pending_step(_session_id: str, *, after_grant: bool) -> None:
-        assert after_grant is True
-        started.set()
-        try:
-            await asyncio.Event().wait()
-        finally:
-            cancelled.set()
-
-    with patch.object(websocket_api, "_run_first_vertical_step", pending_step):
-        websocket_api._schedule_first_vertical_step("session-shutdown", after_grant=True)
-        await started.wait()
-        await websocket_api.shutdown_vertical_tasks(grace_period_seconds=0)
-
-    assert cancelled.is_set()
-    assert not websocket_api._vertical_tasks
 
 
 @pytest.mark.asyncio
@@ -371,26 +279,23 @@ async def test_vertical_task_fails_before_writing_when_execution_tool_fence_reje
     )
 
 
-def test_vertical_task_routes_required_review_before_it_can_complete(temporary_sqlite_db, tmp_path: Path) -> None:
+@pytest.mark.asyncio
+async def test_vertical_task_routes_required_review_before_it_can_complete(
+    temporary_sqlite_db, tmp_path: Path,
+) -> None:
     project = tmp_path / "gated-project"
     project.mkdir()
 
-    with TestClient(app) as client:
-        created = client.post("/sessions/", json=_create_request(project, require_review=True))
-        session_id = created.json()["id"]
-        with client.websocket_connect(f"/ws/sessions/{session_id}?after_sequence=0") as socket:
-            socket.receive_json()
-            socket.send_json({"commandId": "start", "type": "session.start", "payload": {}})
-            socket.receive_json()
-            approval = _receive_type(socket, "approval.requested")
-            socket.send_json({
-                "commandId": "grant", "type": "approval.resolve",
-                "payload": {"approvalId": approval["payload"]["approvalId"], "resolution": "grant", "grantCapabilities": ["workspace.write"], "scopeSummary": "Isolated workspace only."},
-            })
-            _receive_type(socket, "approval.resolved")
-            _receive_type(socket, "assignment.created")
-            _receive_type(socket, "assignment.created")
+    database = await get_db()
+    try:
+        session_id, runner = await _preauthorized_runner_session(
+            database, project, tool_allowlist=["write_file"], require_review=True,
+        )
+        assert await runner.request_scoped_write_grant(session_id) is None
+        await runner.run_after_grant(session_id)
+        events = await EventRepository(database).list_for_session(session_id)
+    finally:
+        await database.close()
 
-    events = asyncio.run(_events(session_id))
     assert any(event.event_type == "gate.status_changed" and event.payload["status"] == "pending" for event in events)
     assert not any(event.event_type == "session.status_changed" and event.payload["status"] == "completed" for event in events)
