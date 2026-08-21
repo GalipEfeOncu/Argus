@@ -3,6 +3,7 @@ import { useSettingsStore } from '@/stores/settingsStore';
 import { useSessionStore } from '@/stores/sessionStore';
 import { useAgentStore } from '@/stores/agentStore';
 import { useUIStore } from '@/stores/uiStore';
+import { useWorkspaceStore } from '@/stores/workspaceStore';
 import { useTauri } from '@/hooks/useTauri';
 import { api } from '@/services/api';
 import { tauriCommands } from '@/services/tauri';
@@ -100,6 +101,7 @@ export const SessionSetup: React.FC = () => {
   const { createSession } = useSessionStore();
   const { initAgents } = useAgentStore();
   const { setActivePage } = useUIStore();
+  const invalidateWorkspaceCatalog = useWorkspaceStore((state) => state.invalidate);
   const { openDirectoryDialog } = useTauri();
   const [projectPath, setProjectPath] = useState('');
   const [goal, setGoal] = useState('');
@@ -288,6 +290,7 @@ export const SessionSetup: React.FC = () => {
       // and every timeline entry arrive through the live transport.
       initAgents(liveAgentInfos(configuration, created.agentSnapshots));
       createSession({ projectPath, task: goal.trim(), roleConfigs, configuration }, created.id);
+      invalidateWorkspaceCatalog();
       setActivePage('session');
     } catch {
       setStartError('The local runtime could not create this isolated session. Check that the backend is running and try again.');

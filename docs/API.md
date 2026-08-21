@@ -480,13 +480,26 @@ The REST API manages durable configuration; real-time execution uses WebSocket c
 | `/runtime/health` | Redacted local health, queue/lease, provider-latency, event-lag, and usage diagnostics |
 | `/runtime/support-bundle` | User-exportable, redacted configuration shapes, event summaries, and local diagnostic logs |
 | `/projects` | Register, validate, and list local projects |
-| `/sessions` | Create, list, inspect, review/accept isolated results, archive, and delete sessions |
+| `/sessions` | Create, list, inspect, and review/accept isolated results |
 | `/agent-definitions` | Built-in templates, overrides, and custom roles |
 | `/skills` | List, import, validate, enable, and assign local skills |
 | `/providers` | Provider metadata, credential references, validation, and model discovery |
 | `/policies` | Permission profiles and session overrides |
 | `/session-presets` | Built-in and user-saved team, limit, gate, and approval presets |
 | `/artifacts` | Diffs, exports, and session files |
+
+`GET /sessions` returns at most 50 recent `SessionSummaryResponse` records for
+the local navigation shell. Each summary contains the stable project ID,
+registered project display name and canonical original path, goal, lifecycle
+status, and millisecond timestamps. It never substitutes the managed worktree
+or snapshot path for the original project path. `GET /sessions/{sessionId}`
+returns the same bounded metadata plus `workspacePath`, the managed path used by
+that session. Both endpoints use strict response models so the generated client
+does not infer shell state from legacy database rows.
+
+Session deletion remains unavailable until the retention-policy workflow is
+implemented. The current `DELETE /sessions/{sessionId}` endpoint returns 405;
+clients must not present it as an available action.
 
 `GET /sessions/{sessionId}/timeline?after_sequence={n}&limit={n}` returns at
 most 200 canonical events and exposes `nextAfterSequence` when more rows exist.

@@ -1,7 +1,13 @@
 import uuid
 from datetime import datetime
 from fastapi import APIRouter, HTTPException, Query
-from app.schemas.session import SessionCreateRequest, SessionCreateResponse, SessionConfigurationResponse
+from app.schemas.session import (
+    SessionConfigurationResponse,
+    SessionCreateRequest,
+    SessionCreateResponse,
+    SessionDetailResponse,
+    SessionSummaryResponse,
+)
 from app.db.database import get_db
 from app.db.repositories import EventRepository, SessionRepository
 from app.schemas.session_store import AcceptanceActionRequest, AcceptanceActionResponse, AcceptancePatchResponse, AcceptanceReviewResponse, ArtifactPageResponse, TimelinePageResponse
@@ -97,20 +103,20 @@ async def create_session(req: SessionCreateRequest):
     return {"id": session_id, "name": name, "projectId": project["id"], "goal": goal, **snapshot.wire_value()}
 
 
-@router.get("/")
+@router.get("/", response_model=list[SessionSummaryResponse])
 async def list_sessions():
     db = await get_db()
     try:
-        return await SessionRepository(db).list_legacy_sessions()
+        return await SessionRepository(db).list_session_summaries()
     finally:
         await db.close()
 
 
-@router.get("/{session_id}")
+@router.get("/{session_id}", response_model=SessionDetailResponse)
 async def get_session(session_id: str):
     db = await get_db()
     try:
-        row = await SessionRepository(db).get_legacy_session(session_id)
+        row = await SessionRepository(db).get_session_detail(session_id)
     finally:
         await db.close()
     if not row:

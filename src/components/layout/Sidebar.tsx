@@ -1,5 +1,7 @@
 import React from 'react';
 import { useUIStore } from '@/stores/uiStore';
+import { useWorkspaceStore } from '@/stores/workspaceStore';
+import { useWorkspaceCatalog } from '@/hooks/useWorkspaceCatalog';
 import './Sidebar.css';
 
 /* ── Role-specific SVG icons for agent roles ── */
@@ -25,47 +27,18 @@ const ChevronRightIcon: React.FC = () => (
 
 export const Sidebar: React.FC = () => {
   const { activePage, setActivePage, sidebarCollapsed, toggleSidebar } = useUIStore();
+  const { refresh } = useWorkspaceCatalog();
+  const projects = useWorkspaceStore((state) => state.projects);
+  const selectedProjectId = useWorkspaceStore((state) => state.selectedProjectId);
+  const loading = useWorkspaceStore((state) => state.loading);
+  const error = useWorkspaceStore((state) => state.error);
+  const selectProject = useWorkspaceStore((state) => state.selectProject);
 
   const handleNewSession = () => {
     setActivePage('session-setup');
   };
 
   const navItems = [
-    {
-      id: 'search',
-      label: 'Search',
-      icon: (
-        <svg className="nav-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <circle cx="11" cy="11" r="8" />
-          <line x1="21" y1="21" x2="16.65" y2="16.65" />
-        </svg>
-      ),
-      action: () => {},
-    },
-    {
-      id: 'history',
-      label: 'History',
-      icon: (
-        <svg className="nav-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <circle cx="12" cy="12" r="10" />
-          <polyline points="12 6 12 12 16 14" />
-        </svg>
-      ),
-      action: () => setActivePage('history'),
-    },
-    {
-      id: 'scheduled-tasks',
-      label: 'Scheduled Tasks',
-      icon: (
-        <svg className="nav-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
-          <line x1="16" y1="2" x2="16" y2="6" />
-          <line x1="8" y1="2" x2="8" y2="6" />
-          <line x1="3" y1="10" x2="21" y2="10" />
-        </svg>
-      ),
-      action: () => {},
-    },
     {
       id: 'settings',
       label: 'Settings',
@@ -79,12 +52,10 @@ export const Sidebar: React.FC = () => {
     },
   ] as const;
 
-  const mockProjects = [
-    { id: 'argus-backend', name: 'argus-backend', active: false },
-    { id: 'argus-frontend', name: 'argus-frontend', active: true },
-    { id: 'cli-tool', name: 'cli-tool', active: false },
-    { id: 'design-system', name: 'design-system', active: false },
-  ];
+  const openProject = (projectId: string) => {
+    selectProject(projectId);
+    setActivePage('dashboard');
+  };
 
   return (
     <aside className={`sidebar flex flex-col transition-all duration-200 ${sidebarCollapsed ? 'sidebar-collapsed' : 'sidebar-expanded'}`}>
@@ -154,33 +125,24 @@ export const Sidebar: React.FC = () => {
           <>
             <div className="projects-header px-4 py-1.5 flex items-center justify-between">
               <span className="projects-label">PROJECTS</span>
-              <div className="projects-actions">
-                <button className="projects-action-btn" title="Search projects">
-                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <circle cx="11" cy="11" r="8" />
-                    <line x1="21" y1="21" x2="16.65" y2="16.65" />
-                  </svg>
-                </button>
-                <button className="projects-action-btn" title="Filter">
-                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
-                  </svg>
-                </button>
-              </div>
             </div>
-            <div className="flex-1 overflow-y-auto px-2 flex flex-col gap-0.5 projects-scroll">
-              {mockProjects.map((project) => (
+            <div className="flex-1 overflow-y-auto px-2 flex flex-col gap-0.5 projects-scroll" aria-live="polite">
+              {loading && <p className="projects-state" role="status">Loading local projects…</p>}
+              {!loading && error !== null && <div className="projects-state" role="alert"><span>{error}</span><button type="button" onClick={() => void refresh()}>Retry</button></div>}
+              {!loading && error === null && projects.length === 0 && <p className="projects-state">No local projects registered.</p>}
+              {!loading && error === null && projects.map((project) => (
                 <button
                   key={project.id}
-                  onClick={() => setActivePage('session')}
+                  onClick={() => openProject(project.id)}
+                  aria-label={project.displayName}
                   className={`project-row flex items-center px-3 py-1.5 rounded-md text-sm transition-colors text-left w-full ${
-                    project.active 
+                    project.id === selectedProjectId
                       ? 'project-row--active' 
                       : 'project-row--default'
                   }`}
                 >
                   <span className="project-hash">#</span>
-                  <span className="truncate">{project.name}</span>
+                  <span className="truncate">{project.displayName}</span>
                 </button>
               ))}
             </div>
@@ -188,40 +150,24 @@ export const Sidebar: React.FC = () => {
         ) : (
           <div className="flex flex-col items-center gap-1.5 py-2 border-t border-border-subtle mt-1 px-1">
             <span className="text-muted text-[8px] font-bold tracking-wider uppercase mb-1">PRJ</span>
-            {mockProjects.map((project) => (
-              <button
-                key={project.id}
-                onClick={() => setActivePage('session')}
+            {error !== null && <button type="button" className="project-avatar-pill project-avatar-pill--default" onClick={() => void refresh()} title="Retry loading local projects">!</button>}
+            {error === null && projects.map((project) => (
+                <button
+                  key={project.id}
+                  onClick={() => openProject(project.id)}
+                  aria-label={project.displayName}
                 className={`project-avatar-pill w-7 h-7 rounded flex items-center justify-center text-[10px] font-bold transition-colors ${
-                  project.active 
+                  project.id === selectedProjectId
                     ? 'project-avatar-pill--active' 
                     : 'project-avatar-pill--default'
                 }`}
-                title={project.name}
+                title={project.displayName}
               >
-                {project.name.charAt(0).toUpperCase()}
+                {project.displayName.charAt(0).toUpperCase()}
               </button>
             ))}
           </div>
         )}
-      </div>
-
-      {/* ── User Profile Footer ──────────────────────────── */}
-      <div className="sidebar-footer border-t border-border-subtle p-3">
-        <div className={`flex items-center gap-2.5 ${sidebarCollapsed ? 'justify-center' : 'justify-start'}`}>
-          {/* Avatar */}
-          <div className="user-avatar">
-            <span>JD</span>
-            <span className="user-online-dot" />
-          </div>
-          
-          {!sidebarCollapsed && (
-            <div className="flex flex-col min-w-0">
-              <span className="user-name">John Doe</span>
-              <span className="user-plan">PRO PLAN</span>
-            </div>
-          )}
-        </div>
       </div>
 
     </aside>

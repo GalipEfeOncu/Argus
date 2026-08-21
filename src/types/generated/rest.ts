@@ -2062,6 +2062,37 @@ export interface components {
             requiredRoleRules: components["schemas"]["RequiredRoleRule"][];
             workspacePolicy: components["schemas"]["WorkspacePolicy"];
         };
+        /**
+         * SessionDetailResponse
+         * @description Shell metadata plus the managed path used by the active session.
+         */
+        SessionDetailResponse: {
+            /** Completedatms */
+            completedAtMs?: number | null;
+            /** Goal */
+            goal: string;
+            /** Id */
+            id: string;
+            /** Name */
+            name: string;
+            /** Originalprojectpath */
+            originalProjectPath: string;
+            /** Projectdisplayname */
+            projectDisplayName: string;
+            /** Projectid */
+            projectId: string;
+            /** Startedatms */
+            startedAtMs: number;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "setup" | "created" | "preparing" | "running" | "paused" | "waiting_approval" | "waiting_decision" | "completed" | "completed_partial" | "cancelled" | "failed" | "error";
+            /** Updatedatms */
+            updatedAtMs: number;
+            /** Workspacepath */
+            workspacePath: string;
+        };
         /** SessionSnapshotEvent */
         SessionSnapshotEvent: {
             /** Actorid */
@@ -2139,6 +2170,35 @@ export interface components {
              * @enum {string}
              */
             status: "created" | "preparing" | "running" | "paused" | "waiting_approval" | "waiting_decision" | "completed" | "completed_partial" | "cancelled" | "failed";
+        };
+        /**
+         * SessionSummaryResponse
+         * @description Bounded, non-secret metadata used by the local navigation shell.
+         */
+        SessionSummaryResponse: {
+            /** Completedatms */
+            completedAtMs?: number | null;
+            /** Goal */
+            goal: string;
+            /** Id */
+            id: string;
+            /** Name */
+            name: string;
+            /** Originalprojectpath */
+            originalProjectPath: string;
+            /** Projectdisplayname */
+            projectDisplayName: string;
+            /** Projectid */
+            projectId: string;
+            /** Startedatms */
+            startedAtMs: number;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "setup" | "created" | "preparing" | "running" | "paused" | "waiting_approval" | "waiting_decision" | "completed" | "completed_partial" | "cancelled" | "failed" | "error";
+            /** Updatedatms */
+            updatedAtMs: number;
         };
         /** SkillEnableRequest */
         SkillEnableRequest: {
@@ -2887,7 +2947,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["SessionSummaryResponse"][];
                 };
             };
         };
@@ -2942,7 +3002,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["SessionDetailResponse"];
                 };
             };
             /** @description Validation Error */

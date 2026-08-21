@@ -17,7 +17,6 @@ const PageRenderer: React.FC = () => {
     case 'session-setup': return <SessionSetup />;
     case 'session':       return <SessionView />;
     case 'settings':      return <Settings />;
-    case 'history':       return <div className="p-8 w-full flex items-center justify-center text-muted">History coming soon...</div>;
     default:              return <Dashboard />;
   }
 };

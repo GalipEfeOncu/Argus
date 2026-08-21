@@ -4969,6 +4969,108 @@
         "title": "SessionCreateResponse",
         "type": "object"
       },
+      "SessionDetailResponse": {
+        "additionalProperties": false,
+        "description": "Shell metadata plus the managed path used by the active session.",
+        "properties": {
+          "completedAtMs": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Completedatms"
+          },
+          "goal": {
+            "maxLength": 4000,
+            "minLength": 1,
+            "title": "Goal",
+            "type": "string"
+          },
+          "id": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "maxLength": 256,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "originalProjectPath": {
+            "maxLength": 4096,
+            "minLength": 1,
+            "title": "Originalprojectpath",
+            "type": "string"
+          },
+          "projectDisplayName": {
+            "maxLength": 256,
+            "minLength": 1,
+            "title": "Projectdisplayname",
+            "type": "string"
+          },
+          "projectId": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Projectid",
+            "type": "string"
+          },
+          "startedAtMs": {
+            "minimum": 0.0,
+            "title": "Startedatms",
+            "type": "integer"
+          },
+          "status": {
+            "enum": [
+              "setup",
+              "created",
+              "preparing",
+              "running",
+              "paused",
+              "waiting_approval",
+              "waiting_decision",
+              "completed",
+              "completed_partial",
+              "cancelled",
+              "failed",
+              "error"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "updatedAtMs": {
+            "minimum": 0.0,
+            "title": "Updatedatms",
+            "type": "integer"
+          },
+          "workspacePath": {
+            "maxLength": 4096,
+            "minLength": 1,
+            "title": "Workspacepath",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "projectId",
+          "projectDisplayName",
+          "originalProjectPath",
+          "goal",
+          "status",
+          "startedAtMs",
+          "updatedAtMs",
+          "workspacePath"
+        ],
+        "title": "SessionDetailResponse",
+        "type": "object"
+      },
       "SessionSnapshotEvent": {
         "additionalProperties": false,
         "properties": {
@@ -5182,6 +5284,101 @@
           "status"
         ],
         "title": "SessionStatusPayload",
+        "type": "object"
+      },
+      "SessionSummaryResponse": {
+        "additionalProperties": false,
+        "description": "Bounded, non-secret metadata used by the local navigation shell.",
+        "properties": {
+          "completedAtMs": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Completedatms"
+          },
+          "goal": {
+            "maxLength": 4000,
+            "minLength": 1,
+            "title": "Goal",
+            "type": "string"
+          },
+          "id": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "maxLength": 256,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "originalProjectPath": {
+            "maxLength": 4096,
+            "minLength": 1,
+            "title": "Originalprojectpath",
+            "type": "string"
+          },
+          "projectDisplayName": {
+            "maxLength": 256,
+            "minLength": 1,
+            "title": "Projectdisplayname",
+            "type": "string"
+          },
+          "projectId": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Projectid",
+            "type": "string"
+          },
+          "startedAtMs": {
+            "minimum": 0.0,
+            "title": "Startedatms",
+            "type": "integer"
+          },
+          "status": {
+            "enum": [
+              "setup",
+              "created",
+              "preparing",
+              "running",
+              "paused",
+              "waiting_approval",
+              "waiting_decision",
+              "completed",
+              "completed_partial",
+              "cancelled",
+              "failed",
+              "error"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "updatedAtMs": {
+            "minimum": 0.0,
+            "title": "Updatedatms",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "projectId",
+          "projectDisplayName",
+          "originalProjectPath",
+          "goal",
+          "status",
+          "startedAtMs",
+          "updatedAtMs"
+        ],
+        "title": "SessionSummaryResponse",
         "type": "object"
       },
       "SkillEnableRequest": {
@@ -6743,7 +6940,13 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/SessionSummaryResponse"
+                  },
+                  "title": "Response List Sessions Sessions  Get",
+                  "type": "array"
+                }
               }
             },
             "description": "Successful Response"
@@ -6850,7 +7053,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/SessionDetailResponse"
+                }
               }
             },
             "description": "Successful Response"

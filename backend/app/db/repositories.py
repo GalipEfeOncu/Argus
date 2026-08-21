@@ -117,11 +117,33 @@ class SessionRepository:
             )
             await self._db.execute("DELETE FROM sessions WHERE id = ? AND status = 'setup'", (session_id,))
 
-    async def list_legacy_sessions(self, *, limit: int = 50) -> list[dict[str, Any]]:
+    async def list_session_summaries(self, *, limit: int = 50) -> list[dict[str, Any]]:
         async with self._db.execute(
-            "SELECT id, name, status, started_at FROM sessions ORDER BY started_at DESC LIMIT ?", (limit,)
+            """SELECT s.id, s.name, s.project_id AS "projectId", p.display_name AS "projectDisplayName",
+                      p.canonical_path AS "originalProjectPath", COALESCE(s.goal, s.task) AS goal,
+                      s.status, s.started_at AS "startedAtMs", s.updated_at_ms AS "updatedAtMs",
+                      s.completed_at AS "completedAtMs"
+               FROM sessions AS s
+               JOIN projects AS p ON p.id = s.project_id
+               ORDER BY s.started_at DESC
+               LIMIT ?""",
+            (limit,),
         ) as cursor:
             return [dict(row) for row in await cursor.fetchall()]
+
+    async def get_session_detail(self, session_id: str) -> dict[str, Any] | None:
+        async with self._db.execute(
+            """SELECT s.id, s.name, s.project_id AS "projectId", p.display_name AS "projectDisplayName",
+                      p.canonical_path AS "originalProjectPath", COALESCE(s.goal, s.task) AS goal,
+                      s.status, s.started_at AS "startedAtMs", s.updated_at_ms AS "updatedAtMs",
+                      s.completed_at AS "completedAtMs", s.project_path AS "workspacePath"
+               FROM sessions AS s
+               JOIN projects AS p ON p.id = s.project_id
+               WHERE s.id = ?""",
+            (session_id,),
+        ) as cursor:
+            row = await cursor.fetchone()
+        return dict(row) if row is not None else None
 
     async def get_legacy_session(self, session_id: str) -> dict[str, Any] | None:
         async with self._db.execute("SELECT * FROM sessions WHERE id = ?", (session_id,)) as cursor:

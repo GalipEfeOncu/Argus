@@ -17,6 +17,9 @@ type AcceptanceAction = components['schemas']['AcceptanceActionResponse'];
 type AcceptancePatch = components['schemas']['AcceptancePatchResponse'];
 type RuntimeHealth = operations['runtime_health_runtime_health_get']['responses'][200]['content']['application/json'];
 type SupportBundle = operations['support_bundle_runtime_support_bundle_get']['responses'][200]['content']['application/json'];
+export type ProjectSummary = components['schemas']['ProjectResponse'];
+export type SessionSummary = components['schemas']['SessionSummaryResponse'];
+export type SessionDetail = components['schemas']['SessionDetailResponse'];
 
 async function request<T>(method: RequestMethod, path: string, body?: unknown): Promise<T> {
   const connection = await ensureBackendConnection();
@@ -42,11 +45,15 @@ export const api = {
     supportBundle: (sessionIds: string[] = []) => request<SupportBundle>('GET', `/runtime/support-bundle${sessionIds.length === 0 ? '' : `?${sessionIds.map((id) => `session_id=${encodeURIComponent(id)}`).join('&')}`}`),
   },
 
+  projects: {
+    list: () => request<ProjectSummary[]>('GET', '/projects/'),
+  },
+
   // ── Sessions ──────────────────────────────────────────────
   sessions: {
     create: (config: SessionCreateRequest) => request<SessionCreateResponse>('POST', '/sessions/', config),
-    list: () => request<unknown[]>('GET', '/sessions'),
-    get: (id: string) => request<unknown>('GET', `/sessions/${id}`),
+    list: () => request<SessionSummary[]>('GET', '/sessions/'),
+    get: (id: string) => request<SessionDetail>('GET', `/sessions/${id}`),
     configuration: (id: string) => request<SessionConfigurationResponse>('GET', `/sessions/${id}/configuration`),
     delete: (id: string) => request<void>('DELETE', `/sessions/${id}`),
     acceptance: (id: string) => request<AcceptanceReview>('GET', `/sessions/${id}/acceptance`),

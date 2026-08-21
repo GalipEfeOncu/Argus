@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 
-type ActivePage = 'dashboard' | 'session-setup' | 'session' | 'settings' | 'history';
+type ActivePage = 'dashboard' | 'session-setup' | 'session' | 'settings';
 
 interface UIState {
   activePage: ActivePage;

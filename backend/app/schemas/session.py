@@ -189,6 +189,33 @@ class SessionResponse(CamelModel):
     completed_at: float | None = None
 
 
+ShellSessionStatus = Literal[
+    "setup", "created", "preparing", "running", "paused", "waiting_approval",
+    "waiting_decision", "completed", "completed_partial", "cancelled", "failed", "error",
+]
+
+
+class SessionSummaryResponse(CamelModel):
+    """Bounded, non-secret metadata used by the local navigation shell."""
+
+    id: Identifier
+    name: str = Field(min_length=1, max_length=256)
+    project_id: Identifier
+    project_display_name: str = Field(min_length=1, max_length=256)
+    original_project_path: str = Field(min_length=1, max_length=4096)
+    goal: Summary
+    status: ShellSessionStatus
+    started_at_ms: int = Field(ge=0)
+    updated_at_ms: int = Field(ge=0)
+    completed_at_ms: int | None = Field(default=None, ge=0)
+
+
+class SessionDetailResponse(SessionSummaryResponse):
+    """Shell metadata plus the managed path used by the active session."""
+
+    workspace_path: str = Field(min_length=1, max_length=4096)
+
+
 class SessionConfigurationResponse(CamelModel):
     configuration_version: int = Field(ge=1)
     available_agent_ids: list[Identifier]

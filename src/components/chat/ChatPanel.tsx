@@ -9,9 +9,10 @@ import './ChatPanel.css';
 interface ChatPanelProps {
   sessionId: string;
   sessionName: string;
+  projectName: string;
 }
 
-export const ChatPanel: React.FC<ChatPanelProps> = ({ sessionId, sessionName }) => {
+export const ChatPanel: React.FC<ChatPanelProps> = ({ sessionId, sessionName, projectName }) => {
   const { setActivePage, agentPanelVisible, toggleAgentPanel } = useUIStore();
 
   return (
@@ -34,7 +35,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ sessionId, sessionName }) 
           </button>
 
           <div className="chat-breadcrumb">
-            <span className="chat-breadcrumb-parent">argus-frontend</span>
+            <span className="chat-breadcrumb-parent">{projectName}</span>
             <span className="chat-breadcrumb-sep">/</span>
             <span className="chat-breadcrumb-current">{sessionName || 'Session'}</span>
           </div>
@@ -59,13 +60,6 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ sessionId, sessionName }) 
             <span>Agents</span>
           </button>
 
-          <button className="chat-menu-btn" title="Session Options">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="12" cy="5" r="1" />
-              <circle cx="12" cy="12" r="1" />
-              <circle cx="12" cy="19" r="1" />
-            </svg>
-          </button>
         </div>
       </div>
 

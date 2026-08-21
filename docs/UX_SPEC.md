@@ -10,6 +10,12 @@ Argus uses an evolvable three-panel desktop layout:
 
 The layout preserves the existing dark, high-density visual direction while prioritizing readable information hierarchy over decorative effects.
 
+The navigation shell lists only projects and sessions returned by the local
+runtime. It shows compact loading, empty, and retryable error states without
+inventing sample projects, account identity, subscription status, or actions
+that the runtime does not support. Selecting a project filters the durable
+session list; selecting a session opens its real project/session breadcrumb.
+
 ## Shared room
 
 Messages distinguish human, Coordinator, agent, system, and tool participants. Agent output shows a concise intent or decision summary plus the resulting content. Tool calls are collapsible, correlate to the initiating participant, and link to artifacts/diffs.

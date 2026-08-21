@@ -10,6 +10,8 @@ All notable user-visible changes to Argus are recorded here. The project follows
 
 - Starting or approving a session no longer launches the deterministic demo
   task or writes its fixed reference file in a real project workspace.
+- The navigation shell now loads durable local projects and sessions instead of
+  showing sample projects, a fake account, or controls with no available action.
 
 ## [1.0.0-alpha.2] - 2026-08-16
 

@@ -43,6 +43,45 @@ def test_session_creation_prepares_a_default_isolated_workspace(tmp_path: Path, 
     assert Path(workspace[1]).is_dir() and Path(workspace[1]) != project
 
 
+def test_session_shell_resources_return_original_project_metadata(tmp_path: Path, monkeypatch) -> None:
+    database_path = tmp_path / "shell.db"
+    monkeypatch.setattr(settings, "db_path", str(database_path))
+    project = tmp_path / "project"
+    project.mkdir()
+    with TestClient(app) as client:
+        registered = client.post("/projects/", json={"path": str(project), "displayName": "Argus UI"})
+        created = client.post("/sessions/", json={
+            "projectId": registered.json()["id"], "goal": "Polish the navigation", "roleConfigs": [],
+        })
+        listed = client.get("/sessions/")
+        detail = client.get(f"/sessions/{created.json()['id']}")
+
+    assert listed.status_code == 200
+    assert listed.json() == [{
+        "id": created.json()["id"],
+        "name": created.json()["name"],
+        "projectId": registered.json()["id"],
+        "projectDisplayName": "Argus UI",
+        "originalProjectPath": str(project.resolve()),
+        "goal": "Polish the navigation",
+        "status": "setup",
+        "startedAtMs": listed.json()[0]["startedAtMs"],
+        "updatedAtMs": listed.json()[0]["updatedAtMs"],
+        "completedAtMs": None,
+    }]
+    assert detail.status_code == 200
+    assert detail.json()["originalProjectPath"] == str(project.resolve())
+    assert detail.json()["projectDisplayName"] == "Argus UI"
+    assert Path(detail.json()["workspacePath"]) != project.resolve()
+
+
+def test_session_detail_returns_not_found_for_an_unknown_session(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setattr(settings, "db_path", str(tmp_path / "missing-session.db"))
+    with TestClient(app) as client:
+        response = client.get("/sessions/missing")
+    assert response.status_code == 404
+
+
 def test_direct_write_session_requires_acknowledgement(tmp_path: Path, monkeypatch) -> None:
     database_path = tmp_path / "direct.db"
     monkeypatch.setattr(settings, "db_path", str(database_path))

@@ -78,6 +78,22 @@
   margin-bottom: 14px;
 }
 
+.dashboard-section-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-sm);
+}
+
+.dashboard-clear-filter {
+  margin-bottom: 14px;
+  border: 0;
+  background: transparent;
+  color: var(--accent-text);
+  cursor: pointer;
+  font-size: 11px;
+}
+
 /* ── Empty State ─────────────────────────────────────────────── */
 
 .dashboard-empty {
@@ -169,6 +185,10 @@
   transform: translateY(-1px);
 }
 
+.session-card:focus-within {
+  border-color: var(--border-focus);
+}
+
 .session-card-top {
   display: flex;
   align-items: center;
@@ -205,28 +225,18 @@
   flex: 1;
 }
 
-.session-delete-btn {
+.session-open-button {
   display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 22px;
-  height: 22px;
-  opacity: 0;
-  color: var(--text-muted);
-  border: none;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  width: 100%;
+  padding: 0;
+  border: 0;
   background: transparent;
-  border-radius: 4px;
+  color: inherit;
+  text-align: left;
   cursor: pointer;
-  transition: opacity var(--transition-fast), color var(--transition-fast), background-color var(--transition-fast);
-}
-
-.group:hover .session-delete-btn {
-  opacity: 1;
-}
-
-.session-delete-btn:hover {
-  color: var(--status-error);
-  background-color: rgba(220, 38, 38, 0.1);
 }
 
 .session-name {
@@ -239,23 +249,24 @@
   text-overflow: ellipsis;
 }
 
+.session-goal,
+.session-project {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.session-project {
+  color: var(--text-muted);
+}
+
 .session-meta {
   font-size: 11px;
   color: var(--text-muted);
   display: flex;
   flex-direction: column;
   gap: 2px;
-}
-
-.session-open-hint {
-  font-size: 11px;
-  color: var(--accent-text);
-  font-weight: 600;
-  opacity: 0;
-  transition: opacity var(--transition-fast);
-  margin-top: 2px;
-}
-
-.group:hover .session-open-hint {
-  opacity: 1;
 }
