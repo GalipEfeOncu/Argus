@@ -10,6 +10,24 @@ Argus uses an evolvable three-panel desktop layout:
 
 The layout preserves the existing dark, high-density visual direction while prioritizing readable information hierarchy over decorative effects.
 
+## Offline local profile
+
+The navigation footer opens an optional profile stored only on the current
+device. Before configuration it says **Set up local profile** and never shows a
+fabricated person, subscription plan, or online status. After configuration it
+shows initials derived from the backend-confirmed display name. The profile is
+personalization, not an account or authorization boundary, and the rest of the
+application remains usable without it.
+
+The profile screen has explicit loading, unconfigured, ready, editing, saving,
+and unavailable states. Loading uses a stable local skeleton without blocking
+the navigation shell. Load failures provide a keyboard-accessible retry. Save
+failures retain the draft while the navigation footer continues to show the
+last server-confirmed value. Display-name validation is associated with the
+field and focused on error; saving exposes busy state and disables duplicate
+submission. The avatar uses initials and design tokens, so this flow requests no
+filesystem or native image permission.
+
 The navigation shell lists only projects and sessions returned by the local
 runtime. It shows compact loading, empty, and retryable error states without
 inventing sample projects, account identity, subscription status, or actions

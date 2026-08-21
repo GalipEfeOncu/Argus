@@ -68,7 +68,7 @@ All context selection decisions are recorded in assignment metadata. Provider pr
 
 ## 3. Persistence model
 
-SQLite is the source of truth for local orchestration metadata. Store timestamps as UTC epoch milliseconds and IDs as UUID strings.
+SQLite is the source of truth for local orchestration metadata. Store timestamps as UTC epoch milliseconds and IDs as UUID strings, except explicitly fixed singleton records such as the local profile.
 
 | Table | Required responsibility |
 | --- | --- |
@@ -88,6 +88,7 @@ SQLite is the source of truth for local orchestration metadata. Store timestamps
 | `artifacts` | Diffs, exports, file references, and checksums |
 | `provider_profiles` | Non-secret provider metadata and OS credential reference only |
 | `provider_operations` | Safe request fingerprint and terminal outcome state for provider work; never credentials or raw prompts |
+| `local_profile` | Optional singleton display name, nullable bio, and timestamps for this device only; never account, authentication, plan, or credential data |
 
 Events are never updated or deleted during normal operation. Read models may be rebuilt from them. Session deletion is a deliberate future retention policy, not an implicit cascade.
 

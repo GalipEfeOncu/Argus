@@ -19,6 +19,7 @@ REQUIRED_TABLES = {
     "skill_package_files",
     "assignment_proposals", "assignment_handoffs",
     "limit_reservations", "session_runtime_clocks", "loop_signals", "finding_follow_ups", "limit_resolution_requests",
+    "local_profile",
 }
 
 
@@ -46,7 +47,7 @@ async def test_fresh_database_has_every_phase_2_1_table_and_migration_metadata(t
         await database.close()
 
     assert REQUIRED_TABLES <= tables
-    assert versions == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19]
+    assert versions == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]
     assert "idx_events_session_sequence" in event_indexes
 
 
@@ -116,6 +117,32 @@ async def test_pre_migration_prototype_database_upgrades_without_losing_session_
             row = await cursor.fetchone()
 
     assert dict(row) == {"task": "old task", "goal": "old task", "created_at_ms": 1000}
+
+
+@pytest.mark.asyncio
+async def test_local_profile_migration_preserves_v19_data_without_inventing_a_profile(tmp_path, monkeypatch) -> None:
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "db_path", str(tmp_path / "profile-v20.db"))
+    database = await get_db()
+    try:
+        await apply_migrations(database, MIGRATIONS[:19])
+        await create_session(database)
+        await database.commit()
+        await apply_migrations(database)
+        async with database.execute("SELECT name FROM sessions WHERE id = 'session_1'") as cursor:
+            preserved = await cursor.fetchone()
+        async with database.execute("SELECT COUNT(*) AS total FROM local_profile") as cursor:
+            profile_count = (await cursor.fetchone())["total"]
+        with pytest.raises(aiosqlite.IntegrityError):
+            await database.execute(
+                "INSERT INTO local_profile VALUES ('other', 'Name', NULL, 1, 1)"
+            )
+    finally:
+        await database.close()
+
+    assert preserved["name"] == "Test session"
+    assert profile_count == 0
 
 
 @pytest.mark.asyncio

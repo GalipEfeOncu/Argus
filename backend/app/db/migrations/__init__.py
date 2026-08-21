@@ -35,6 +35,7 @@ from app.db.migrations import (
     v0017_provider_profiles,
     v0018_recovery,
     v0019_acceptance,
+    v0020_local_profile,
 )
 
 
@@ -77,6 +78,7 @@ MIGRATIONS: tuple[Migration, ...] = (
     Migration(17, "provider_profiles", v0017_provider_profiles.apply),
     Migration(18, "restart_recovery", v0018_recovery.apply),
     Migration(19, "diff_review_and_acceptance", v0019_acceptance.apply),
+    Migration(20, "offline_local_profile", v0020_local_profile.apply),
 )
 
 

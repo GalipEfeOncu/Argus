@@ -1,6 +1,7 @@
 import React from 'react';
 import { useUIStore } from '@/stores/uiStore';
 import { useWorkspaceStore } from '@/stores/workspaceStore';
+import { useLocalProfileStore } from '@/stores/localProfileStore';
 import { useWorkspaceCatalog } from '@/hooks/useWorkspaceCatalog';
 import './Sidebar.css';
 
@@ -25,6 +26,10 @@ const ChevronRightIcon: React.FC = () => (
   </svg>
 );
 
+function initials(displayName: string): string {
+  return displayName.trim().split(/\s+/u).slice(0, 2).map((part) => Array.from(part)[0] ?? '').join('').toLocaleUpperCase();
+}
+
 export const Sidebar: React.FC = () => {
   const { activePage, setActivePage, sidebarCollapsed, toggleSidebar } = useUIStore();
   const { refresh } = useWorkspaceCatalog();
@@ -33,6 +38,8 @@ export const Sidebar: React.FC = () => {
   const loading = useWorkspaceStore((state) => state.loading);
   const error = useWorkspaceStore((state) => state.error);
   const selectProject = useWorkspaceStore((state) => state.selectProject);
+  const localProfile = useLocalProfileStore((state) => state.profile);
+  const profileStatus = useLocalProfileStore((state) => state.status);
 
   const handleNewSession = () => {
     setActivePage('session-setup');
@@ -168,6 +175,22 @@ export const Sidebar: React.FC = () => {
             ))}
           </div>
         )}
+      </div>
+
+      <div className="sidebar-profile">
+        <button
+          type="button"
+          className={`sidebar-profile__button ${activePage === 'profile' ? 'sidebar-profile__button--active' : ''}`}
+          onClick={() => setActivePage('profile')}
+          aria-label={localProfile === null ? 'Set up local profile' : `Open profile for ${localProfile.displayName}`}
+          title={sidebarCollapsed ? (localProfile?.displayName ?? 'Set up local profile') : undefined}
+        >
+          <span className="sidebar-profile__avatar" aria-hidden="true">{localProfile === null ? '?' : initials(localProfile.displayName)}</span>
+          {!sidebarCollapsed && <span className="sidebar-profile__copy">
+            <strong>{localProfile?.displayName ?? (profileStatus === 'loading' ? 'Loading profile…' : 'Set up local profile')}</strong>
+            <small>{localProfile === null ? 'Stored on this device' : 'Local profile'}</small>
+          </span>}
+        </button>
       </div>
 
     </aside>

@@ -484,6 +484,7 @@ The REST API manages durable configuration; real-time execution uses WebSocket c
 | `/agent-definitions` | Built-in templates, overrides, and custom roles |
 | `/skills` | List, import, validate, enable, and assign local skills |
 | `/providers` | Provider metadata, credential references, validation, and model discovery |
+| `/profile` | Read or update the optional, non-secret profile stored on this device |
 | `/policies` | Permission profiles and session overrides |
 | `/session-presets` | Built-in and user-saved team, limit, gate, and approval presets |
 | `/artifacts` | Diffs, exports, and session files |
@@ -571,6 +572,26 @@ snapshots the stored package content, version, and hash into `session_agents`;
 it never re-reads the mutable source directory for an active session.
 
 REST schemas are generated from FastAPI OpenAPI. Clients must not hand-maintain duplicate request/response interfaces.
+
+### Offline local profile
+
+`GET /profile` always returns `{ "profile": null }` when this device has no
+configured profile, or a profile containing `displayName`, nullable `bio`,
+`createdAtMs`, and `updatedAtMs`. It does not infer identity from the operating
+system or create a placeholder record.
+
+`PATCH /profile` accepts a strict, non-empty partial body containing only
+`displayName` and/or `bio`. A new profile requires `displayName`; omission returns
+HTTP 422 with `detail.code` `display_name_required`. Display names are trimmed,
+contain 1–80 characters, and reject control characters. Bio is trimmed, limited
+to 280 characters, and may be cleared with `null`; blank bio text normalizes to
+`null`. Unknown account, authentication, token, plan, or other fields are
+rejected. Repeating a patch that does not change either value returns the
+existing record without advancing `updatedAtMs`.
+
+The profile is a local SQLite singleton. It is not an Argus account, grants no
+workspace or provider authority, and is not sent to a model provider by the
+profile endpoints.
 
 ### Provider profiles and native credentials
 

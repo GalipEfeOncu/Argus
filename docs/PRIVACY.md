@@ -7,6 +7,9 @@ approval history, diffs, usage summaries, and runtime diagnostics remain on the
 user's machine by default. Argus has no built-in advertising, analytics, or
 automatic support-bundle upload. Provider credentials are stored by the
 operating-system credential service; SQLite stores only non-secret references.
+An optional local profile stores only the display name and bio chosen for this
+Argus installation. It is not an online account and is not uploaded by the
+profile feature.
 
 ## What can leave the device
 
@@ -26,7 +29,8 @@ not upload it.
 
 Application metadata is stored under the current user's Argus data directory,
 currently `~/.argus/` on supported clients. Isolated workspaces remain until the
-user chooses cleanup. Uninstall behavior and whether local data is preserved are
+user chooses cleanup. The local profile remains in the same application data
+until it is edited or that local data is removed. Uninstall behavior and whether local data is preserved are
 verified and stated for each published installer. Migration backups are local,
 checksummed, never uploaded automatically, and can be deleted by the user after
 the upgraded version is verified.

@@ -3174,6 +3174,92 @@
         "title": "LimitWarningEvent",
         "type": "object"
       },
+      "LocalProfilePatch": {
+        "additionalProperties": false,
+        "properties": {
+          "bio": {
+            "anyOf": [
+              {
+                "maxLength": 280,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bio"
+          },
+          "displayName": {
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Displayname",
+            "type": "string"
+          }
+        },
+        "title": "LocalProfilePatch",
+        "type": "object"
+      },
+      "LocalProfileResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "bio": {
+            "anyOf": [
+              {
+                "maxLength": 280,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bio"
+          },
+          "createdAtMs": {
+            "minimum": 0.0,
+            "title": "Createdatms",
+            "type": "integer"
+          },
+          "displayName": {
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Displayname",
+            "type": "string"
+          },
+          "updatedAtMs": {
+            "minimum": 0.0,
+            "title": "Updatedatms",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "displayName",
+          "bio",
+          "createdAtMs",
+          "updatedAtMs"
+        ],
+        "title": "LocalProfileResponse",
+        "type": "object"
+      },
+      "LocalProfileStateResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "profile": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LocalProfileResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "profile"
+        ],
+        "title": "LocalProfileStateResponse",
+        "type": "object"
+      },
       "ManualModelRequest": {
         "additionalProperties": false,
         "properties": {
@@ -6639,6 +6725,66 @@
         "summary": "List Available Models",
         "tags": [
           "models"
+        ]
+      }
+    },
+    "/profile": {
+      "get": {
+        "operationId": "get_local_profile_profile_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LocalProfileStateResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Local Profile",
+        "tags": [
+          "profile"
+        ]
+      },
+      "patch": {
+        "operationId": "patch_local_profile_profile_patch",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LocalProfilePatch"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LocalProfileResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Patch Local Profile",
+        "tags": [
+          "profile"
         ]
       }
     },

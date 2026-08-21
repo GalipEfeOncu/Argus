@@ -6,7 +6,9 @@ import { Dashboard } from '@/components/pages/Dashboard';
 import { SessionSetup } from '@/components/pages/SessionSetup';
 import { SessionView } from '@/components/pages/SessionView';
 import { Settings } from '@/components/pages/Settings';
+import { Profile } from '@/components/pages/Profile';
 import { useTauri } from '@/hooks/useTauri';
+import { useLocalProfile } from '@/hooks/useLocalProfile';
 import './App.css';
 
 const PageRenderer: React.FC = () => {
@@ -17,12 +19,14 @@ const PageRenderer: React.FC = () => {
     case 'session-setup': return <SessionSetup />;
     case 'session':       return <SessionView />;
     case 'settings':      return <Settings />;
+    case 'profile':       return <Profile />;
     default:              return <Dashboard />;
   }
 };
 
 const App: React.FC = () => {
   const { status, errorMsg, startBackend } = useTauri();
+  useLocalProfile(status === 'running');
 
   const banner = (() => {
     switch (status) {

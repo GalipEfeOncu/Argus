@@ -114,6 +114,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/profile": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Local Profile */
+        get: operations["get_local_profile_profile_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Patch Local Profile */
+        patch: operations["patch_local_profile_profile_patch"];
+        trace?: never;
+    };
     "/projects/": {
         parameters: {
             query?: never;
@@ -1513,6 +1531,28 @@ export interface components {
              */
             version: 1;
         };
+        /** LocalProfilePatch */
+        LocalProfilePatch: {
+            /** Bio */
+            bio?: string | null;
+            /** Displayname */
+            displayName?: string;
+        };
+        /** LocalProfileResponse */
+        LocalProfileResponse: {
+            /** Bio */
+            bio: string | null;
+            /** Createdatms */
+            createdAtMs: number;
+            /** Displayname */
+            displayName: string;
+            /** Updatedatms */
+            updatedAtMs: number;
+        };
+        /** LocalProfileStateResponse */
+        LocalProfileStateResponse: {
+            profile: components["schemas"]["LocalProfileResponse"] | null;
+        };
         /** ManualModelRequest */
         ManualModelRequest: {
             /** Modelid */
@@ -2707,6 +2747,59 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
+                };
+            };
+        };
+    };
+    get_local_profile_profile_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LocalProfileStateResponse"];
+                };
+            };
+        };
+    };
+    patch_local_profile_profile_patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LocalProfilePatch"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LocalProfileResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

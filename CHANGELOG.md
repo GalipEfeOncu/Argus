@@ -6,6 +6,12 @@ All notable user-visible changes to Argus are recorded here. The project follows
 
 ## Unreleased
 
+### Added
+
+- An optional offline profile now lets the device owner set a local display name
+  and bio, with accessible edit, loading, retry, and save states and no online
+  account or browser-persisted identity.
+
 ### Fixed
 
 - Starting or approving a session no longer launches the deterministic demo

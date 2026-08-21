@@ -17,6 +17,9 @@ type AcceptanceAction = components['schemas']['AcceptanceActionResponse'];
 type AcceptancePatch = components['schemas']['AcceptancePatchResponse'];
 type RuntimeHealth = operations['runtime_health_runtime_health_get']['responses'][200]['content']['application/json'];
 type SupportBundle = operations['support_bundle_runtime_support_bundle_get']['responses'][200]['content']['application/json'];
+export type LocalProfile = components['schemas']['LocalProfileResponse'];
+export type LocalProfilePatch = components['schemas']['LocalProfilePatch'];
+type LocalProfileState = components['schemas']['LocalProfileStateResponse'];
 export type ProjectSummary = components['schemas']['ProjectResponse'];
 export type SessionSummary = components['schemas']['SessionSummaryResponse'];
 export type SessionDetail = components['schemas']['SessionDetailResponse'];
@@ -43,6 +46,11 @@ export const api = {
   runtime: {
     health: () => request<RuntimeHealth>('GET', '/runtime/health'),
     supportBundle: (sessionIds: string[] = []) => request<SupportBundle>('GET', `/runtime/support-bundle${sessionIds.length === 0 ? '' : `?${sessionIds.map((id) => `session_id=${encodeURIComponent(id)}`).join('&')}`}`),
+  },
+
+  profile: {
+    get: () => request<LocalProfileState>('GET', '/profile'),
+    patch: (profile: LocalProfilePatch) => request<LocalProfile>('PATCH', '/profile', profile),
   },
 
   projects: {
