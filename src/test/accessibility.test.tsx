@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import axe from 'axe-core';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -42,5 +42,14 @@ describe('application accessibility smoke', () => {
     expect(retry).toHaveFocus();
     fireEvent.click(retry);
     expect(startBackend).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps the shell visible while the optional session workspace loads', async () => {
+    useUIStore.setState({ activePage: 'session' });
+    render(<App />);
+
+    expect(within(screen.getByRole('main')).getByRole('status')).toHaveTextContent('Loading session workspace…');
+    expect(screen.getByRole('button', { name: 'Dashboard' })).toBeInTheDocument();
+    expect(await screen.findByText('No active session selected.', {}, { timeout: 5_000 })).toBeInTheDocument();
   });
 });

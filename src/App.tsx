@@ -4,12 +4,20 @@ import { Sidebar } from '@/components/layout/Sidebar';
 import { StatusBar } from '@/components/layout/StatusBar';
 import { Dashboard } from '@/components/pages/Dashboard';
 import { SessionSetup } from '@/components/pages/SessionSetup';
-import { SessionView } from '@/components/pages/SessionView';
 import { Settings } from '@/components/pages/Settings';
 import { Profile } from '@/components/pages/Profile';
 import { useTauri } from '@/hooks/useTauri';
 import { useLocalProfile } from '@/hooks/useLocalProfile';
 import './App.css';
+
+const SessionView = React.lazy(() => import('@/components/pages/SessionView')
+  .then((module) => ({ default: module.SessionView })));
+
+const SessionWorkspaceFallback: React.FC = () => (
+  <div className="workspace-loading" role="status" aria-live="polite">
+    Loading session workspace…
+  </div>
+);
 
 const PageRenderer: React.FC = () => {
   const { activePage } = useUIStore();
@@ -17,7 +25,7 @@ const PageRenderer: React.FC = () => {
   switch (activePage) {
     case 'dashboard':     return <Dashboard />;
     case 'session-setup': return <SessionSetup />;
-    case 'session':       return <SessionView />;
+    case 'session':       return <React.Suspense fallback={<SessionWorkspaceFallback />}><SessionView /></React.Suspense>;
     case 'settings':      return <Settings />;
     case 'profile':       return <Profile />;
     default:              return <Dashboard />;

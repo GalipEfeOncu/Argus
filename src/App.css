@@ -3,3 +3,14 @@
 }
 
 .workspace-main { min-width: 0; }
+
+.workspace-loading {
+  display: grid;
+  width: 100%;
+  min-height: 100%;
+  place-items: center;
+  padding: var(--spacing-lg);
+  color: var(--text-secondary);
+  background: var(--bg-main);
+  font-size: 12px;
+}
