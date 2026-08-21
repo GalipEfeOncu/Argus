@@ -52,11 +52,11 @@ export const Dashboard: React.FC = () => {
           {selectedProjectId !== null && <button type="button" className="dashboard-clear-filter" onClick={() => selectProject(null)}>Show all projects</button>}
         </div>
 
-        {loading ? (
+        {loading && sessions.length === 0 ? (
           <div className="dashboard-empty" role="status"><p className="dashboard-empty-title">Loading local sessions…</p></div>
-        ) : error !== null ? (
-          <div className="dashboard-empty" role="alert"><p className="dashboard-empty-title">Local workspace unavailable</p><p className="dashboard-empty-sub">{error}</p><button type="button" className="dashboard-empty-cta" onClick={() => void refresh()}>Retry</button></div>
-        ) : visibleSessions.length === 0 ? (
+        ) : <>
+          {error !== null && <div className="dashboard-catalog-alert" role="alert"><span>{error}</span><button type="button" onClick={() => void refresh()}>Retry</button></div>}
+          {visibleSessions.length === 0 ? (
           /* ── Empty State ─────────────────────────────────── */
           <div className="dashboard-empty">
             <div className="dashboard-empty-icon">
@@ -73,7 +73,7 @@ export const Dashboard: React.FC = () => {
               Start your first session
             </button>
           </div>
-        ) : (
+          ) : (
           /* ── Session Grid ─────────────────────────────────── */
           <div className="dashboard-grid">
             {visibleSessions.map((session) => (
@@ -105,7 +105,8 @@ export const Dashboard: React.FC = () => {
               </article>
             ))}
           </div>
-        )}
+          )}
+        </>}
       </div>
     </div>
   );

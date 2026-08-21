@@ -12,6 +12,7 @@ interface UIState {
   toggleSidebar: () => void;
   setSidebarCollapsed: (val: boolean) => void;
   toggleAgentPanel: () => void;
+  setAgentPanelVisible: (visible: boolean) => void;
   toggleWorkflow: () => void;
 }
 
@@ -25,5 +26,6 @@ export const useUIStore = create<UIState>()((set) => ({
   toggleSidebar: () => set((s) => ({ sidebarCollapsed: !s.sidebarCollapsed })),
   setSidebarCollapsed: (val) => set({ sidebarCollapsed: val }),
   toggleAgentPanel: () => set((s) => ({ agentPanelVisible: !s.agentPanelVisible })),
+  setAgentPanelVisible: (agentPanelVisible) => set({ agentPanelVisible }),
   toggleWorkflow: () => set((s) => ({ workflowVisible: !s.workflowVisible })),
 }));

@@ -11,6 +11,8 @@ const listAgentDefinitions = vi.fn();
 const listSkills = vi.fn();
 const setSkillEnabled = vi.fn();
 const refreshProviderCredential = vi.fn();
+const listProviders = vi.fn();
+const listProviderModels = vi.fn();
 const configuredModel = { providerId: 'prv_configured', modelId: 'model-1', displayName: 'Configured model' };
 const configuredModels = Object.fromEntries(['coordinator', 'planner', 'builder', 'reviewer', 'tester', 'ui_agent'].map((role) => [role, configuredModel]));
 
@@ -21,8 +23,8 @@ vi.mock('@/services/api', () => ({ api: {
   agentDefinitions: { list: () => listAgentDefinitions() },
   skills: { list: () => listSkills(), setEnabled: (...args: unknown[]) => setSkillEnabled(...args) },
   providers: {
-    list: () => Promise.resolve([{ id: 'prv_configured', displayName: 'Configured provider', credentialConfigured: false }]),
-    listModels: () => Promise.resolve({ models: [{ id: 'model-1', displayName: 'Configured model', supportsStructuredOutput: true }] }),
+    list: () => listProviders(),
+    listModels: () => listProviderModels(),
   },
 } }));
 
@@ -33,10 +35,14 @@ beforeEach(() => {
   listSkills.mockReset();
   setSkillEnabled.mockReset();
   refreshProviderCredential.mockReset();
+  listProviders.mockReset();
+  listProviderModels.mockReset();
   refreshProviderCredential.mockResolvedValue(undefined);
   createSessionRequest.mockResolvedValue({ id: 'ses_live', agentSnapshots: [] });
   listAgentDefinitions.mockResolvedValue([]);
   listSkills.mockResolvedValue([]);
+  listProviders.mockResolvedValue([{ id: 'prv_configured', displayName: 'Configured provider', credentialConfigured: false }]);
+  listProviderModels.mockResolvedValue({ models: [{ id: 'model-1', displayName: 'Configured model', supportsStructuredOutput: true }] });
   useSettingsStore.setState({ defaultRoleModels: configuredModels });
   useSessionStore.setState({ sessions: [], activeSessionId: null });
   useUIStore.setState({ activePage: 'dashboard' });
@@ -56,6 +62,20 @@ test('a providerless setup remains disabled and explains every missing selected 
   expect(screen.getByRole('button', { name: 'Start Coordinator session' })).toBeDisabled();
   expect(screen.getByRole('alert')).toHaveTextContent('Coordinator requires a configured model.');
   expect(createSessionRequest).not.toHaveBeenCalled();
+});
+
+test('provider catalogue failures disable start and expose a retry without leaking raw errors', async () => {
+  listProviders.mockRejectedValueOnce(new Error('secret provider response body'));
+  render(<SessionSetup />);
+
+  const alertText = await screen.findByText(/Configured provider models could not be loaded/);
+  expect(alertText.closest('[role="alert"]')).not.toBeNull();
+  expect(screen.queryByText('secret provider response body')).not.toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Start Coordinator session' })).toBeDisabled();
+
+  fireEvent.click(screen.getByRole('button', { name: 'Retry provider models' }));
+  await waitFor(() => expect(listProviders).toHaveBeenCalledTimes(2));
+  await waitFor(() => expect(screen.queryByRole('button', { name: 'Retry provider models' })).not.toBeInTheDocument());
 });
 
 test('all seven setup sections are keyboard-focusable and a selected preset creates a live isolated session', async () => {

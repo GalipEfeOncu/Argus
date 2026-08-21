@@ -13,9 +13,21 @@ export function useWorkspaceCatalog(): { refresh: () => Promise<void> } {
   const refresh = useCallback(async () => {
     if (pendingLoad !== null) return pendingLoad;
     beginLoad();
-    pendingLoad = Promise.all([api.projects.list(), api.sessions.list()])
-      .then(([projects, sessions]) => finishLoad(projects, sessions))
-      .catch(() => failLoad('Local projects and sessions could not be loaded.'))
+    pendingLoad = Promise.allSettled([api.projects.list(), api.sessions.list()])
+      .then(([projectsResult, sessionsResult]) => {
+        const projects = projectsResult.status === 'fulfilled' ? projectsResult.value : null;
+        const sessions = sessionsResult.status === 'fulfilled' ? sessionsResult.value : null;
+        if (projects === null && sessions === null) {
+          failLoad('Local projects and sessions could not be loaded.');
+          return;
+        }
+        const error = projects === null
+          ? 'Local projects could not be refreshed. Previously loaded projects remain available.'
+          : sessions === null
+            ? 'Local sessions could not be refreshed. Previously loaded sessions remain available.'
+            : null;
+        finishLoad(projects, sessions, error);
+      })
       .finally(() => { pendingLoad = null; });
     return pendingLoad;
   }, [beginLoad, failLoad, finishLoad]);

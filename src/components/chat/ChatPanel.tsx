@@ -24,9 +24,10 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ sessionId, sessionName, pr
         {/* Left: back + breadcrumb */}
         <div className="chat-header-left">
           <button
+            type="button"
             className="chat-back-btn"
             onClick={() => setActivePage('dashboard')}
-            title="Go to Dashboard"
+            aria-label="Go to dashboard"
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <line x1="19" y1="12" x2="5" y2="12" />
@@ -34,11 +35,11 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ sessionId, sessionName, pr
             </svg>
           </button>
 
-          <div className="chat-breadcrumb">
-            <span className="chat-breadcrumb-parent">{projectName}</span>
-            <span className="chat-breadcrumb-sep">/</span>
-            <span className="chat-breadcrumb-current">{sessionName || 'Session'}</span>
-          </div>
+          <nav className="chat-breadcrumb" aria-label="Session breadcrumb">
+            <button type="button" className="chat-breadcrumb-parent" onClick={() => setActivePage('dashboard')}>{projectName}</button>
+            <span className="chat-breadcrumb-sep" aria-hidden="true">/</span>
+            <span className="chat-breadcrumb-current" aria-current="page">{sessionName || 'Session'}</span>
+          </nav>
 
           <span className="chat-env-badge">LOCAL</span>
         </div>
@@ -47,9 +48,13 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ sessionId, sessionName, pr
         <div className="chat-header-right">
           <SessionControls sessionId={sessionId} />
           <button
+            id="agent-panel-toggle"
+            type="button"
             onClick={toggleAgentPanel}
             className={`chat-agents-toggle ${agentPanelVisible ? 'chat-agents-toggle--active' : ''}`}
-            title="Toggle Agents Panel"
+            aria-controls="agent-context-panel"
+            aria-expanded={agentPanelVisible}
+            aria-label={`${agentPanelVisible ? 'Hide' : 'Open'} session context`}
           >
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />

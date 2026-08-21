@@ -20,6 +20,9 @@ All notable user-visible changes to Argus are recorded here. The project follows
 
 ### Fixed
 
+- The workspace shell and session context now remain usable at narrow window
+  sizes, expose truthful runtime status and keyboard navigation, and provide
+  retryable provider, model, project, and session catalogue failure states.
 - Composer drafts now remain editable during session reconnects and are cleared
   only after the correlated room event confirms delivery. Users can also send
   Coordinator guidance while a separate approval remains pending.

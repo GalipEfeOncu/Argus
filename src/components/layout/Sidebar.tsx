@@ -47,6 +47,16 @@ export const Sidebar: React.FC = () => {
 
   const navItems = [
     {
+      id: 'dashboard',
+      label: 'Dashboard',
+      icon: (
+        <svg className="nav-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M3 11 12 3l9 8" /><path d="M5 10v10h14V10" /><path d="M9 20v-6h6v6" />
+        </svg>
+      ),
+      action: () => { selectProject(null); setActivePage('dashboard'); },
+    },
+    {
       id: 'settings',
       label: 'Settings',
       icon: (
@@ -65,22 +75,20 @@ export const Sidebar: React.FC = () => {
   };
 
   return (
-    <aside className={`sidebar flex flex-col transition-all duration-200 ${sidebarCollapsed ? 'sidebar-collapsed' : 'sidebar-expanded'}`}>
+    <aside aria-label="Workspace navigation" className={`sidebar flex flex-col transition-all duration-200 ${sidebarCollapsed ? 'sidebar-collapsed' : 'sidebar-expanded'}`}>
       
       {/* ── Logo Header ─────────────────────────────────── */}
       <div className="sidebar-header flex items-center justify-between px-3 py-3">
         {!sidebarCollapsed ? (
-          <div className="flex items-center gap-2.5 select-none">
+          <button type="button" className="sidebar-home flex items-center gap-2.5 select-none" onClick={() => { selectProject(null); setActivePage('dashboard'); }} aria-label="Go to dashboard">
             {/* Red icon box */}
             <div className="logo-icon-box">
               <AgusLogoIcon />
             </div>
             <span className="logo-wordmark">ARGUS</span>
-          </div>
+          </button>
         ) : (
-          <div className="logo-icon-box logo-icon-box--center">
-            <AgusLogoIcon />
-          </div>
+          <button type="button" className="sidebar-home logo-icon-box logo-icon-box--center" onClick={() => { selectProject(null); setActivePage('dashboard'); }} aria-label="Go to dashboard"><AgusLogoIcon /></button>
         )}
 
         <button 
@@ -108,7 +116,7 @@ export const Sidebar: React.FC = () => {
       </div>
 
       {/* ── Main Navigation ─────────────────────────────── */}
-      <nav className="py-1 flex flex-col gap-0.5 px-2">
+      <nav aria-label="Primary navigation" className="py-1 flex flex-col gap-0.5 px-2">
         {navItems.map((item) => (
           <button
             key={item.id}
@@ -119,6 +127,7 @@ export const Sidebar: React.FC = () => {
                 : 'nav-row--default'
             } ${sidebarCollapsed ? 'justify-center' : 'justify-start'}`}
             title={sidebarCollapsed ? item.label : undefined}
+            aria-current={activePage === item.id ? 'page' : undefined}
           >
             {item.icon}
             {!sidebarCollapsed && <span>{item.label}</span>}
@@ -134,14 +143,15 @@ export const Sidebar: React.FC = () => {
               <span className="projects-label">PROJECTS</span>
             </div>
             <div className="flex-1 overflow-y-auto px-2 flex flex-col gap-0.5 projects-scroll" aria-live="polite">
-              {loading && <p className="projects-state" role="status">Loading local projects…</p>}
+              {loading && projects.length === 0 && <p className="projects-state" role="status">Loading local projects…</p>}
               {!loading && error !== null && <div className="projects-state" role="alert"><span>{error}</span><button type="button" onClick={() => void refresh()}>Retry</button></div>}
               {!loading && error === null && projects.length === 0 && <p className="projects-state">No local projects registered.</p>}
-              {!loading && error === null && projects.map((project) => (
+              {projects.map((project) => (
                 <button
                   key={project.id}
                   onClick={() => openProject(project.id)}
                   aria-label={project.displayName}
+                  aria-current={activePage === 'dashboard' && project.id === selectedProjectId ? 'page' : undefined}
                   className={`project-row flex items-center px-3 py-1.5 rounded-md text-sm transition-colors text-left w-full ${
                     project.id === selectedProjectId
                       ? 'project-row--active' 
@@ -163,6 +173,7 @@ export const Sidebar: React.FC = () => {
                   key={project.id}
                   onClick={() => openProject(project.id)}
                   aria-label={project.displayName}
+                  aria-current={activePage === 'dashboard' && project.id === selectedProjectId ? 'page' : undefined}
                 className={`project-avatar-pill w-7 h-7 rounded flex items-center justify-center text-[10px] font-bold transition-colors ${
                   project.id === selectedProjectId
                     ? 'project-avatar-pill--active' 
@@ -183,6 +194,7 @@ export const Sidebar: React.FC = () => {
           className={`sidebar-profile__button ${activePage === 'profile' ? 'sidebar-profile__button--active' : ''}`}
           onClick={() => setActivePage('profile')}
           aria-label={localProfile === null ? 'Set up local profile' : `Open profile for ${localProfile.displayName}`}
+          aria-current={activePage === 'profile' ? 'page' : undefined}
           title={sidebarCollapsed ? (localProfile?.displayName ?? 'Set up local profile') : undefined}
         >
           <span className="sidebar-profile__avatar" aria-hidden="true">{localProfile === null ? '?' : initials(localProfile.displayName)}</span>

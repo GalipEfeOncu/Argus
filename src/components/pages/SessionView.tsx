@@ -16,7 +16,7 @@ export const SessionView: React.FC = () => {
 
   if (!session) {
     return (
-      <div className="flex items-center justify-center h-full w-full text-muted bg-[var(--bg-main)]">
+      <div className="session-view-empty" role="status">
         No active session selected.
       </div>
     );

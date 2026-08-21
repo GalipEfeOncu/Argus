@@ -9,7 +9,7 @@ interface WorkspaceStoreState {
   loaded: boolean;
   error: string | null;
   beginLoad: () => void;
-  finishLoad: (projects: ProjectSummary[], sessions: SessionSummary[]) => void;
+  finishLoad: (projects: ProjectSummary[] | null, sessions: SessionSummary[] | null, error?: string | null) => void;
   failLoad: (message: string) => void;
   invalidate: () => void;
   selectProject: (projectId: string | null) => void;
@@ -23,15 +23,15 @@ export const useWorkspaceStore = create<WorkspaceStoreState>()((set) => ({
   loaded: false,
   error: null,
   beginLoad: () => set({ loading: true, error: null }),
-  finishLoad: (projects, sessions) => set((state) => ({
-    projects,
-    sessions,
-    selectedProjectId: state.selectedProjectId !== null && projects.some((project) => project.id === state.selectedProjectId)
+  finishLoad: (projects, sessions, error = null) => set((state) => ({
+    projects: projects ?? state.projects,
+    sessions: sessions ?? state.sessions,
+    selectedProjectId: projects === null || (state.selectedProjectId !== null && projects.some((project) => project.id === state.selectedProjectId))
       ? state.selectedProjectId
       : null,
     loading: false,
     loaded: true,
-    error: null,
+    error,
   })),
   failLoad: (message) => set({ loading: false, loaded: true, error: message }),
   invalidate: () => set({ loaded: false }),

@@ -117,24 +117,35 @@ export const SessionSetup: React.FC = () => {
   const [skillError, setSkillError] = useState<string | null>(null);
   const [providerModels, setProviderModels] = useState<ModelRef[]>([]);
   const [modelsLoaded, setModelsLoaded] = useState(false);
+  const [providerCatalogState, setProviderCatalogState] = useState<'loading' | 'ready' | 'error'>('loading');
+  const [providerReload, setProviderReload] = useState(0);
+  const [definitionCatalogState, setDefinitionCatalogState] = useState<'loading' | 'ready' | 'error'>('loading');
+  const [definitionReload, setDefinitionReload] = useState(0);
 
   useEffect(() => {
     let active = true;
+    setProviderCatalogState('loading');
+    setModelsLoaded(false);
     const providerApi = api.providers;
     if (providerApi === undefined) return () => { active = false; };
     void providerApi.list().then(async (profiles) => {
       await Promise.all(profiles.filter((profile) => profile.credentialConfigured).map((profile) => tauriCommands.refreshProviderCredential(profile.id).catch(() => undefined)));
-      const listed = await Promise.all(profiles.map(async (profile) => ({ profile, response: await providerApi.listModels(profile.id) })));
+      const listed = await Promise.allSettled(profiles.map(async (profile) => ({ profile, response: await providerApi.listModels(profile.id) })));
       if (!active) return;
       const profileIds = new Set(profiles.map((profile) => profile.id));
-      setProviderModels([...listed.flatMap(({ profile, response }) => response.models.map((model) => ({ providerId: profile.id, modelId: model.id, displayName: `${profile.displayName} · ${model.displayName}${model.supportsStructuredOutput === false ? ' · structured output unavailable' : ''}` }))), ...manualProviderModels.filter((model) => profileIds.has(model.providerId))]);
+      const discovered = listed.flatMap((result) => result.status === 'fulfilled'
+        ? result.value.response.models.map((model) => ({ providerId: result.value.profile.id, modelId: model.id, displayName: `${result.value.profile.displayName} · ${model.displayName}${model.supportsStructuredOutput === false ? ' · structured output unavailable' : ''}` }))
+        : []);
+      setProviderModels([...discovered, ...manualProviderModels.filter((model) => profileIds.has(model.providerId))]);
       setModelsLoaded(true);
-    }).catch(() => { if (active) { setProviderModels([]); setModelsLoaded(true); } });
+      setProviderCatalogState(listed.some((result) => result.status === 'rejected') ? 'error' : 'ready');
+    }).catch(() => { if (active) { setProviderModels([]); setModelsLoaded(true); setProviderCatalogState('error'); } });
     return () => { active = false; };
-  }, [manualProviderModels]);
+  }, [manualProviderModels, providerReload]);
 
   useEffect(() => {
     let active = true;
+    setDefinitionCatalogState('loading');
     const listDefinitions = api.agentDefinitions?.list;
     if (listDefinitions === undefined) return () => { active = false; };
     void listDefinitions().then((definitions) => {
@@ -162,9 +173,10 @@ export const SessionSetup: React.FC = () => {
         ...definitions.filter((definition) => definition.role === 'coordinator' && definition.id !== 'builtin.coordinator.v1')
           .map((definition) => ({ id: definition.id, name: definition.name, permissionProfile: definition.permissionProfile })),
       ]);
-    }).catch(() => { /* The setup remains usable while the local catalogue starts. */ });
+      setDefinitionCatalogState('ready');
+    }).catch(() => { if (active) setDefinitionCatalogState('error'); });
     return () => { active = false; };
-  }, []);
+  }, [definitionReload]);
 
   useEffect(() => {
     let active = true;
@@ -185,7 +197,7 @@ export const SessionSetup: React.FC = () => {
     }
     return errors;
   }, [configuration, modelsLoaded, providerModels]);
-  const canStart = modelsLoaded && projectPath.trim().length > 0 && goal.trim().length > 0 && validation.length === 0;
+  const canStart = providerCatalogState === 'ready' && modelsLoaded && projectPath.trim().length > 0 && goal.trim().length > 0 && validation.length === 0;
   const update = (change: (current: SessionConfiguration) => SessionConfiguration) => setConfiguration((current) => markCustom(change(current)));
 
   const handleSelectFolder = async () => {
@@ -342,6 +354,10 @@ export const SessionSetup: React.FC = () => {
           <section className="setup-card" aria-labelledby="setup-coordinator">
             <h2 id="setup-coordinator" className="setup-card-label">2 — Coordinator</h2>
             <p className="setup-static">Coordinator is mandatory and receives messages without an @mention.</p>
+            {definitionCatalogState === 'loading' && <p className="setup-muted" role="status">Loading agent definitions…</p>}
+            {definitionCatalogState === 'error' && <div className="setup-catalog-error" role="alert"><span>Agent definitions could not be loaded. Built-in definitions remain available.</span><button type="button" className="setup-secondary-btn" onClick={() => setDefinitionReload((value) => value + 1)}>Retry definitions</button></div>}
+            {providerCatalogState === 'loading' && <p className="setup-muted" role="status">Loading configured provider models…</p>}
+            {providerCatalogState === 'error' && <div className="setup-catalog-error" role="alert"><span>Configured provider models could not be loaded. Session start is disabled until the local catalogue is available.</span><button type="button" className="setup-secondary-btn" onClick={() => setProviderReload((value) => value + 1)}>Retry provider models</button></div>}
             <label className="setup-label" htmlFor="coordinator-definition">Definition version</label><select id="coordinator-definition" className="setup-select" value={configuration.coordinatorDefinitionId} onChange={(event) => { const definition = coordinatorDefinitions.find((item) => item.id === event.target.value); update((current) => ({ ...current, coordinatorDefinitionId: event.target.value, coordinatorPermissionProfile: definition?.permissionProfile ?? current.coordinatorPermissionProfile })); }}>{coordinatorDefinitions.map((definition) => <option key={definition.id} value={definition.id}>{definition.name}</option>)}</select>
             <label className="setup-label" htmlFor="coordinator-model">Model</label><select id="coordinator-model" className="setup-select" value={configuration.coordinatorModel ? `${configuration.coordinatorModel.providerId}:${configuration.coordinatorModel.modelId}` : 'missing'} onChange={(event) => { const selected = providerModels.find((model) => `${model.providerId}:${model.modelId}` === event.target.value); update((current) => ({ ...current, coordinatorModel: event.target.value === 'missing' ? null : selected ?? defaultRoleModels.coordinator ?? current.coordinatorModel })); }}><option value="missing">No model configured</option>{configuration.coordinatorModel && !providerModels.some((model) => model.providerId === configuration.coordinatorModel?.providerId && model.modelId === configuration.coordinatorModel.modelId) && <option value={`${configuration.coordinatorModel.providerId}:${configuration.coordinatorModel.modelId}`}>{configuration.coordinatorModel.displayName}</option>}{providerModels.map((model) => <option key={`${model.providerId}:${model.modelId}`} value={`${model.providerId}:${model.modelId}`}>{model.displayName}</option>)}</select>
             <label className="setup-label" htmlFor="coordinator-prompt">Prompt override <span className="setup-muted">(optional)</span></label><textarea id="coordinator-prompt" className="setup-textarea setup-textarea--compact" value={configuration.coordinatorPromptOverride} onChange={(event) => update((current) => ({ ...current, coordinatorPromptOverride: event.target.value }))} placeholder="Keep routing and handoffs concise…" />
@@ -379,7 +395,7 @@ export const SessionSetup: React.FC = () => {
             <h2 id="setup-review" className="setup-card-label">7 — Review</h2>
             <ul className="review-summary">{authoritySummary(configuration).map((item) => <li key={item}>{item}</li>)}</ul>
             {validation.length > 0 && <div className="setup-validation" role="alert"><strong>Resolve before starting</strong><ul>{validation.map((error) => <li key={error}>{error}</li>)}</ul></div>}
-            {!modelsLoaded && <p className="setup-muted">Loading configured provider models…</p>}
+            {!modelsLoaded && providerCatalogState !== 'error' && <p className="setup-muted">Loading configured provider models…</p>}
             {!projectPath && <p className="setup-muted">Select a workspace to start.</p>}{!goal.trim() && <p className="setup-muted">Describe the goal to start.</p>}
             {startError !== null && <p className="setup-validation" role="alert">{startError}</p>}
             <button className="setup-init-btn" type="button" onClick={() => void handleStart()} disabled={!canStart || isStarting}>{isStarting ? 'Creating isolated session…' : 'Start Coordinator session'}</button>

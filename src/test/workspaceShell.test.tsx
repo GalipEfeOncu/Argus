@@ -7,6 +7,8 @@ import { SessionView } from '@/components/pages/SessionView';
 import { useSessionStore } from '@/stores/sessionStore';
 import { useUIStore } from '@/stores/uiStore';
 import { useWorkspaceStore } from '@/stores/workspaceStore';
+import { useSessionRoomStore } from '@/stores/sessionRoomStore';
+import { createSessionProjection } from '@/services/sessionProjection';
 import type { ProjectSummary, SessionSummary } from '@/services/api';
 
 const { listProjects, listSessions } = vi.hoisted(() => ({ listProjects: vi.fn(), listSessions: vi.fn() }));
@@ -19,6 +21,7 @@ vi.mock('@/components/chat/MessageList', () => ({ MessageList: () => <div>Timeli
 vi.mock('@/components/chat/MessageInput', () => ({ MessageInput: () => <div>Composer</div> }));
 vi.mock('@/components/chat/ApprovalBar', () => ({ ApprovalBar: () => null }));
 vi.mock('@/components/chat/SessionControls', () => ({ SessionControls: () => <div>Controls</div> }));
+vi.mock('@/components/workflow/RuntimeContext', () => ({ RuntimeContext: () => <div>Canonical runtime context</div> }));
 
 const project: ProjectSummary = {
   id: 'prj_argus', canonicalPath: '/work/argus', displayName: 'Argus', createdAtMs: 1, updatedAtMs: 1,
@@ -33,9 +36,10 @@ const session: SessionSummary = {
 beforeEach(() => {
   listProjects.mockReset();
   listSessions.mockReset();
-  useUIStore.setState({ activePage: 'dashboard', sidebarCollapsed: false });
+  useUIStore.setState({ activePage: 'dashboard', sidebarCollapsed: false, agentPanelVisible: false });
   useSessionStore.setState({ sessions: [], activeSessionId: null });
   useWorkspaceStore.setState({ projects: [], sessions: [], selectedProjectId: null, loading: false, loaded: true, error: null });
+  useSessionRoomStore.setState({ projections: {} });
 });
 
 afterEach(cleanup);
@@ -49,7 +53,21 @@ test('sidebar renders only durable projects and selects a real project', () => {
   expect(screen.queryByText('PRO PLAN')).not.toBeInTheDocument();
   expect(screen.queryByRole('button', { name: 'Search' })).not.toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: 'Argus' }));
+  expect(screen.getByRole('button', { name: 'Argus' })).toHaveAttribute('aria-current', 'page');
   expect(useWorkspaceStore.getState().selectedProjectId).toBe(project.id);
+  expect(useUIStore.getState().activePage).toBe('dashboard');
+});
+
+test('sidebar and dashboard navigation expose semantic current-page state to keyboard users', () => {
+  useWorkspaceStore.setState({ projects: [project], sessions: [session] });
+  render(<Sidebar />);
+  const dashboard = screen.getByRole('button', { name: 'Dashboard' });
+  expect(dashboard).toHaveAttribute('aria-current', 'page');
+  fireEvent.click(screen.getByRole('button', { name: 'Settings' }));
+  expect(screen.getByRole('button', { name: 'Settings' })).toHaveAttribute('aria-current', 'page');
+  const home = screen.getByRole('button', { name: 'Go to dashboard' });
+  home.focus();
+  fireEvent.click(home);
   expect(useUIStore.getState().activePage).toBe('dashboard');
 });
 
@@ -64,6 +82,18 @@ test('shell hydrates its catalog from the typed local API', async () => {
   expect(listProjects).toHaveBeenCalledOnce();
   expect(listSessions).toHaveBeenCalledOnce();
   expect(useWorkspaceStore.getState().projects).toEqual([project]);
+});
+
+test('workspace refresh preserves successful project data when session loading fails', async () => {
+  listProjects.mockResolvedValue([project]);
+  listSessions.mockRejectedValue(new Error('private runtime detail'));
+  useWorkspaceStore.setState({ loaded: false });
+  render(<Dashboard />);
+
+  expect(await screen.findByRole('alert')).toHaveTextContent('Local sessions could not be refreshed');
+  expect(useWorkspaceStore.getState().projects).toEqual([project]);
+  expect(screen.queryByText('private runtime detail')).not.toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument();
 });
 
 test('sidebar exposes loading, empty, and retryable error states', () => {
@@ -85,7 +115,7 @@ test('dashboard exposes loading, empty, and retryable error states', () => {
   expect(screen.getByRole('status')).toHaveTextContent('Loading local sessions');
 
   act(() => useWorkspaceStore.setState({ loading: false, error: 'Local projects and sessions could not be loaded.' }));
-  expect(screen.getByRole('alert')).toHaveTextContent('Local workspace unavailable');
+  expect(screen.getByRole('alert')).toHaveTextContent('Local projects and sessions could not be loaded');
   expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument();
 
   act(() => useWorkspaceStore.setState({ error: null, sessions: [] }));
@@ -111,6 +141,8 @@ test('shared-room breadcrumb uses the real project and has no no-op session menu
   expect(screen.getByText('Argus')).toBeInTheDocument();
   expect(screen.getByText('Navigation polish')).toBeInTheDocument();
   expect(screen.queryByTitle('Session Options')).not.toBeInTheDocument();
+  expect(screen.getByText('Navigation polish')).toHaveAttribute('aria-current', 'page');
+  expect(screen.getByRole('navigation', { name: 'Session breadcrumb' })).toBeInTheDocument();
 });
 
 test('a durable dashboard selection opens the real session and project breadcrumb', () => {
@@ -120,4 +152,25 @@ test('a durable dashboard selection opens the real session and project breadcrum
   expect(screen.getByText('Argus')).toBeInTheDocument();
   expect(screen.getByText('Navigation polish')).toBeInTheDocument();
   expect(screen.getByText('Timeline')).toBeInTheDocument();
+});
+
+test('session context reports canonical status and restores toggle focus on close and Escape', async () => {
+  useSessionStore.setState({ activeSessionId: session.id });
+  useWorkspaceStore.setState({ projects: [project], sessions: [session] });
+  useSessionRoomStore.setState({ projections: { [session.id]: { ...createSessionProjection(session.id), connection: 'connected', status: 'running' } } });
+  render(<SessionView />);
+
+  const toggle = screen.getByRole('button', { name: 'Open session context' });
+  fireEvent.click(toggle);
+  expect(await screen.findByRole('complementary', { name: 'Session context' })).toBeInTheDocument();
+  expect(screen.getByRole('status')).toHaveTextContent('connected · running');
+  const close = screen.getByRole('button', { name: 'Close session context' });
+  expect(close).toHaveFocus();
+  fireEvent.click(close);
+  await waitFor(() => expect(toggle).toHaveFocus());
+
+  fireEvent.click(toggle);
+  fireEvent.keyDown(document, { key: 'Escape' });
+  await waitFor(() => expect(screen.queryByRole('complementary', { name: 'Session context' })).not.toBeInTheDocument());
+  await waitFor(() => expect(toggle).toHaveFocus());
 });

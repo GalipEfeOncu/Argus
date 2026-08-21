@@ -55,6 +55,16 @@
   user-select: none;
 }
 
+.sidebar-home {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.sidebar-home.logo-icon-box { background-color: var(--logo-red); color: var(--text-primary); }
+
 /* ── Toggle Button ────────────────────────────────────────── */
 
 .sidebar-toggle-btn {
@@ -75,6 +85,28 @@
 .sidebar-toggle-btn:hover {
   color: var(--text-primary);
   background-color: rgba(255, 255, 255, 0.06);
+}
+
+.sidebar-home:focus-visible,
+.sidebar-toggle-btn:focus-visible,
+.btn-new-session:focus-visible,
+.nav-row:focus-visible,
+.project-row:focus-visible,
+.project-avatar-pill:focus-visible,
+.projects-state button:focus-visible {
+  outline: 2px solid var(--border-focus);
+  outline-offset: 2px;
+}
+
+@media (max-width: 720px) {
+  .sidebar-expanded {
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: min(var(--sidebar-width), 82vw);
+    box-shadow: var(--shadow-lg);
+  }
+
+  .sidebar-collapsed { width: 52px; flex: 0 0 52px; }
 }
 
 /* ── New Session Button ───────────────────────────────────── */
