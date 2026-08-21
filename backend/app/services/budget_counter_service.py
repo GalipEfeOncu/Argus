@@ -196,6 +196,7 @@ class BudgetCounterService:
     async def record_coordinator_usage(
         self, session_id: str, *, input_tokens: int, output_tokens: int, normalized_cost: float | None,
         duration_ms: int, cost_uncertainty: Literal["exact", "estimated", "unavailable"],
+        scope_id: str | None = None,
     ) -> None:
         """Record provider usage that belongs to the mandatory Coordinator."""
 
@@ -207,7 +208,7 @@ class BudgetCounterService:
                 await self._adjust(session_id, "tokens", "session", session_id, input_tokens + output_tokens)
                 if normalized_cost is not None:
                     await self._adjust(session_id, "cost", "session", session_id, normalized_cost)
-                payload = {"scopeId": session_id, "inputTokens": input_tokens, "outputTokens": output_tokens,
+                payload = {"scopeId": scope_id or session_id, "inputTokens": input_tokens, "outputTokens": output_tokens,
                            "normalizedCost": normalized_cost, "durationMs": duration_ms, "costUncertainty": cost_uncertainty}
                 await self._events._append_in_transaction(
                     event_id=f"usage_{uuid.uuid4().hex}", session_id=session_id, event_type="usage.updated", actor_id="system",

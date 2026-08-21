@@ -46,7 +46,7 @@ class LangChainProvider(Provider):
         fallback_text: list[str] = []
         try:
             model, structured_fallback = self._prepared_model(request)
-            async for chunk in model.astream(list(request.messages)):
+            async for chunk in model.astream(_provider_messages(request)):
                 if request.request_id in self._cancelled_request_ids:
                     yield Cancelled()
                     return
@@ -101,12 +101,15 @@ class LangChainProvider(Provider):
             events.append(TextDelta(text))
         for call in getattr(chunk, "tool_calls", ()) or ():
             if not isinstance(call, Mapping):
+                events.append(TerminalError("provider_tool_call_invalid", "The provider returned an incomplete tool call."))
                 continue
             name = call.get("name")
             call_id = call.get("id")
             arguments = call.get("args", {})
             if isinstance(name, str) and isinstance(call_id, str) and isinstance(arguments, Mapping):
                 events.append(ToolCall(call_id, name, dict(arguments)))
+            else:
+                events.append(TerminalError("provider_tool_call_invalid", "The provider returned an incomplete tool call."))
         additional = getattr(chunk, "additional_kwargs", {}) or {}
         parsed = additional.get("parsed") if isinstance(additional, Mapping) else None
         if parsed is not None:
@@ -268,3 +271,27 @@ def _is_json_value(value: object) -> bool:
 
 class ProviderRequestUnsupported(Exception):
     """An optional SDK cannot bind requested tools or a response schema."""
+
+
+def _provider_messages(request: ProviderRequest) -> list[dict[str, object]]:
+    """Translate the typed neutral transcript to LangChain's cross-provider shape."""
+
+    messages: list[dict[str, object]] = []
+    for message in request.messages:
+        if message["role"] == "assistant":
+            messages.append({
+                "role": "assistant", "content": message["content"],
+                "tool_calls": [
+                    {"id": call["id"], "name": call["name"], "args": dict(call["arguments"]), "type": "tool_call"}
+                    for call in message["tool_calls"]
+                ],
+            })
+        elif message["role"] == "tool":
+            messages.append({
+                "role": "tool", "content": message["content"],
+                "tool_call_id": message["tool_call_id"],
+                "name": message["name"],
+            })
+        else:
+            messages.append({"role": message["role"], "content": message["content"]})
+    return messages

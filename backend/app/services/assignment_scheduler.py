@@ -179,7 +179,9 @@ class AssignmentScheduler:
             )
             return handoff_id
 
-    async def dispatch_ready(self, session_id: str) -> tuple[ScheduledAssignment, ...]:
+    async def dispatch_ready(
+        self, session_id: str, *, assignment_ids: tuple[str, ...] | None = None,
+    ) -> tuple[ScheduledAssignment, ...]:
         """Start eligible work, allowing bounded parallel readers and one writer."""
 
         async with transaction(self._db):
@@ -202,8 +204,16 @@ class AssignmentScheduler:
                 (session_id,),
             ) as cursor:
                 writer_running = await cursor.fetchone() is not None
+            filter_clause = ""
+            arguments: tuple[object, ...] = (session_id,)
+            if assignment_ids is not None:
+                if not assignment_ids:
+                    return ()
+                filter_clause = " AND id IN (%s)" % ",".join("?" for _ in assignment_ids)
+                arguments = (session_id, *assignment_ids)
             async with self._db.execute(
-                "SELECT * FROM assignments WHERE session_id = ? AND state = 'created' ORDER BY created_at_ms, rowid", (session_id,)
+                f"SELECT * FROM assignments WHERE session_id = ? AND state = 'created'{filter_clause} ORDER BY created_at_ms, rowid",
+                arguments,
             ) as cursor:
                 pending = await cursor.fetchall()
             started: list[ScheduledAssignment] = []
@@ -305,7 +315,9 @@ class AssignmentScheduler:
             (_safe_json(value), attempt_id),
         )
 
-    async def checkpoint(self, attempt_id: str, checkpoint: dict[str, Any]) -> None:
+    async def checkpoint(
+        self, attempt_id: str, checkpoint: dict[str, Any], *, count_iteration: bool = True,
+    ) -> None:
         # A checkpoint is the worker boundary after one model iteration. Count
         # it outside the checkpoint-write transaction so a durable hard-limit
         # event is never rolled back with the rejected write.
@@ -316,16 +328,17 @@ class AssignmentScheduler:
             active = await cursor.fetchone()
         if active is None:
             raise SchedulerRejected("attempt_not_running", "Checkpoint requires a running attempt.")
-        from app.services.budget_counter_service import BudgetCounterService, BudgetExceeded
-        try:
-            await BudgetCounterService(self._db).record_model_iteration(str(active["session_id"]), str(active["id"]))
-        except BudgetExceeded as error:
-            async with transaction(self._db):
-                from app.services.limit_resolution_service import LimitResolutionService
-                await LimitResolutionService(self._db).request_latest_in_transaction(
-                    str(active["session_id"]), counter=error.counter, scope_id=error.scope_id, assignment_id=str(active["id"]),
-                )
-            raise SchedulerRejected("model_iteration_limit_reached", "The assignment model-iteration limit was reached.") from error
+        if count_iteration:
+            from app.services.budget_counter_service import BudgetCounterService, BudgetExceeded
+            try:
+                await BudgetCounterService(self._db).record_model_iteration(str(active["session_id"]), str(active["id"]))
+            except BudgetExceeded as error:
+                async with transaction(self._db):
+                    from app.services.limit_resolution_service import LimitResolutionService
+                    await LimitResolutionService(self._db).request_latest_in_transaction(
+                        str(active["session_id"]), counter=error.counter, scope_id=error.scope_id, assignment_id=str(active["id"]),
+                    )
+                raise SchedulerRejected("model_iteration_limit_reached", "The assignment model-iteration limit was reached.") from error
         async with transaction(self._db):
             async with self._db.execute("SELECT assignment.* FROM assignment_attempts attempt JOIN assignments assignment ON assignment.id = attempt.assignment_id WHERE attempt.id = ?", (attempt_id,)) as cursor:
                 assignment = await cursor.fetchone()

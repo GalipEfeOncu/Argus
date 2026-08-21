@@ -238,13 +238,26 @@ A valid `final` action emits a visible Coordinator message and reaches
 `completed` only after deterministic gate validation. `ask_user` and `wait`
 emit a visible message and pause; after a human room message, `session.resume`
 starts one new bounded Coordinator turn. `stop` emits its visible summary and
-fails safely. Assignment proposals still pass through the scheduler. Because
-the specialist executor is not connected in the current production slice, no
-attempt is left running: unavailable or policy-rejected work emits recoverable
-canonical errors and the session fails honestly. Provider/configuration errors
-are redacted and fail the session. Pause and cancel fence late model output;
-restart recovery marks an interrupted provider operation unknown and never
-replays it automatically.
+fails safely. Assignment proposals still pass through the scheduler. Accepted
+read-only proposals run only when `requestedTools`, the immutable specialist
+allowlist, and `workspace.read` authority agree. The production worker exposes
+only `read_file`, `list_dir`, and `search_files`; every call emits committed
+`tool.requested` → `tool.started` → `tool.completed` events and is bounded by
+the configured model-iteration, tool-call, token, wall-clock, pause, and cancel
+limits. Tool call IDs and names are preserved across the assistant/tool-result
+provider turn, while raw arguments and file results are never persisted in the
+timeline or audit tables. Mutating specialist work remains fail-closed and does
+not touch the workspace. A bounded, redacted specialist result returns to a new
+Coordinator turn for gate/final validation. Provider/configuration errors are
+redacted and fail the session. Pause and cancel fence late model output; restart
+recovery marks interrupted provider operations unknown and never replays them
+automatically.
+
+The current production lifecycle executes one specialist proposal per
+Coordinator turn. A multi-proposal action fails before any assignment is
+persisted; the Coordinator can submit another bounded assignment on its next
+turn. This avoids implying parallel worker execution before that lifecycle is
+available.
 
 Pause, resume, cancel, approvals, and human messages remain canonical commands. Rejected commands are emitted as
 correlated `error.created` events rather than an out-of-band WebSocket payload,

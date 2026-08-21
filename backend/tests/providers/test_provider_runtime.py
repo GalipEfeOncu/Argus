@@ -179,6 +179,23 @@ async def test_production_adapter_normalizes_a_lazy_chat_model_stream() -> None:
     assert fake_model.response_schema == {"type": "object", "properties": {"action": {"type": "string"}}}
 
 
+@pytest.mark.asyncio
+async def test_production_adapter_fails_closed_on_incomplete_tool_call() -> None:
+    class FakeModel:
+        async def astream(self, _: list[object]):
+            yield SimpleNamespace(
+                content="", tool_calls=[{"name": "read_file", "args": {"path": "README.md"}}],
+                additional_kwargs={}, usage_metadata={}, response_metadata={"finish_reason": "tool_call"},
+            )
+
+    provider = create_provider(
+        "google", model_id="test", api_key="runtime-only",
+        module_loader=lambda _: SimpleNamespace(ChatGoogleGenerativeAI=lambda **_: FakeModel()),
+    )
+    events = [event async for event in provider.stream(request())]
+    assert events[0] == TerminalError("provider_tool_call_invalid", "The provider returned an incomplete tool call.")
+
+
 def test_minimal_sidecar_import_avoids_optional_provider_and_langgraph_modules() -> None:
     backend_root = Path(__file__).resolve().parents[2]
     result = subprocess.run(
@@ -323,6 +340,8 @@ async def test_all_provider_kinds_share_the_same_synthetic_stream_conformance() 
 
     for kind, (module_name, constructor) in constructors.items():
         class Model:
+            received: list[dict[str, object]] = []
+
             def bind_tools(self, _: list[object]) -> "Model":
                 return self
 
@@ -330,12 +349,24 @@ async def test_all_provider_kinds_share_the_same_synthetic_stream_conformance() 
                 assert include_raw is True
                 return self
 
-            async def astream(self, _: list[object]):
+            async def astream(self, messages: list[dict[str, object]]):
+                self.received = messages
                 yield SimpleNamespace(content="ok", tool_calls=[{"id": "tool", "name": "read_file", "args": {"path": "README.md"}}], additional_kwargs={"parsed": {"action": "wait"}}, usage_metadata={"input_tokens": 1, "output_tokens": 1, "total_tokens": 2}, response_metadata={"finish_reason": "stop"})
 
-        provider = create_provider(kind, model_id="synthetic", api_key="runtime-only", module_loader=lambda name, c=constructor: SimpleNamespace(**{c: lambda **_: Model()}))
-        events = [event async for event in provider.stream(ProviderRequest(request_id=f"{kind}-request", model_id="synthetic", messages=({"role": "user", "content": "x"},), tools=({"name": "read_file"},), response_schema={"type": "object"}))]
+        model = Model()
+        provider = create_provider(kind, model_id="synthetic", api_key="runtime-only", module_loader=lambda name, c=constructor: SimpleNamespace(**{c: lambda **_: model}))
+        events = [event async for event in provider.stream(ProviderRequest(
+            request_id=f"{kind}-request", model_id="synthetic",
+            messages=(
+                {"role": "user", "content": "x"},
+                {"role": "assistant", "content": "", "tool_calls": [{"id": "call-7", "name": "read_file", "arguments": {"path": "README.md"}}]},
+                {"role": "tool", "content": "bounded result", "tool_call_id": "call-7", "name": "read_file"},
+            ),
+            tools=({"name": "read_file"},), response_schema={"type": "object"},
+        ))]
         assert events == [TextDelta("ok"), ToolCall("tool", "read_file", {"path": "README.md"}), StructuredOutput({"action": "wait"}), Usage(input_tokens=1, output_tokens=1, total_tokens=2), Finished()]
+        assert model.received[-2]["tool_calls"] == [{"id": "call-7", "name": "read_file", "args": {"path": "README.md"}, "type": "tool_call"}]
+        assert model.received[-1] == {"role": "tool", "content": "bounded result", "tool_call_id": "call-7", "name": "read_file"}
 
 
 @pytest.mark.asyncio

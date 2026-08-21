@@ -85,3 +85,15 @@ def test_system_prompt_is_redacted_and_included_in_the_total_context_ceiling() -
     assert len(result.system_prompt) + len(result.user_prompt) <= 30
     assert "sk-" not in result.system_prompt
     assert "system_prompt" in result.metadata.truncated_sections
+
+
+def test_context_redacts_pem_and_generic_secret_assignments() -> None:
+    result = AssignmentContextBuilder().build(
+        agent=AgentSnapshot("agent-1", "reviewer", "Review safely."),
+        goal="API_KEY=should-not-persist\n-----BEGIN PRIVATE KEY-----\ncanary\n-----END PRIVATE KEY-----",
+        assignment=AssignmentContext("assignment-1", "Report findings."),
+    )
+
+    assert "should-not-persist" not in result.user_prompt
+    assert "PRIVATE KEY" not in result.user_prompt
+    assert "canary" not in result.user_prompt

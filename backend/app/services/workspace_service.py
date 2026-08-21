@@ -535,6 +535,65 @@ class ScopedToolService:
             raise WorkspaceError("workspace file exceeds the bounded read limit")
         return content
 
+    def list_directory(self, path: str = ".", *, max_entries: int = 200) -> list[str]:
+        target = resolve_workspace_path(self._workspace.root_path, path, must_exist=True)
+        if target.is_symlink() or not target.is_dir():
+            raise WorkspaceScopeError("workspace directory target is invalid")
+        entries: list[str] = []
+        for child in sorted(target.iterdir(), key=lambda item: item.name):
+            if child.is_symlink():
+                raise WorkspaceScopeError("symbolic links are not allowed in workspace paths")
+            entries.append(child.name + ("/" if child.is_dir() else ""))
+            if len(entries) >= max_entries:
+                break
+        return entries
+
+    def search_text(
+        self, query: str, path: str = ".", *, max_results: int = 100,
+        max_files: int = 2_000, max_bytes: int = 10_000_000,
+    ) -> list[str]:
+        if not query or len(query) > 500:
+            raise WorkspaceError("search query must be between 1 and 500 characters")
+        target = resolve_workspace_path(self._workspace.root_path, path, must_exist=True)
+        if target.is_symlink():
+            raise WorkspaceScopeError("symbolic links are not allowed in workspace paths")
+        candidates: Iterable[Path]
+        if target.is_file():
+            candidates = (target,)
+        else:
+            def bounded_files() -> Iterable[Path]:
+                for current, directories, files in os.walk(target, followlinks=False):
+                    current_path = Path(current)
+                    for name in directories:
+                        if (current_path / name).is_symlink():
+                            raise WorkspaceScopeError("symbolic links are not allowed in workspace paths")
+                    directories[:] = sorted(directories)
+                    for name in sorted(files):
+                        yield current_path / name
+            candidates = bounded_files()
+        results: list[str] = []
+        scanned_files = scanned_bytes = 0
+        for candidate in candidates:
+            if candidate.is_symlink():
+                raise WorkspaceScopeError("symbolic links are not allowed in workspace paths")
+            if not candidate.is_file():
+                continue
+            scanned_files += 1
+            scanned_bytes += candidate.stat().st_size
+            if scanned_files > max_files or scanned_bytes > max_bytes:
+                break
+            relative = candidate.relative_to(self._workspace.root_path).as_posix()
+            try:
+                content = self.read_text(relative, max_characters=200_000)
+            except (UnicodeDecodeError, WorkspaceError):
+                continue
+            for line_number, line in enumerate(content.splitlines(), 1):
+                if query in line:
+                    results.append(f"{relative}:{line_number}:{line[:500]}")
+                    if len(results) >= max_results:
+                        return results
+        return results
+
     def write_text(self, path: str, content: str) -> None:
         try:
             file_fd = _open_workspace_file(self._workspace.root_path, path, write=True)

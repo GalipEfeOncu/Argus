@@ -245,6 +245,21 @@ class SessionConfigurationService:
             approval["approvalPolicy"], approval["workspacePolicy"], json.loads(row["acknowledgements_json"]), row["policy_hash"], agent_snapshots,
         )
 
+    async def raw_agent_snapshot(self, session_id: str, session_agent_id: str) -> dict[str, Any]:
+        """Return one immutable stored snapshot, not a mutable definition projection."""
+
+        async with self._db.execute(
+            "SELECT snapshot_json FROM session_agents WHERE session_id = ? AND id = ?",
+            (session_id, session_agent_id),
+        ) as cursor:
+            row = await cursor.fetchone()
+        if row is None:
+            raise ConfigurationError("session_agent_not_found", "The immutable session agent was not found.")
+        value = json.loads(row["snapshot_json"])
+        if not isinstance(value, dict):
+            raise ConfigurationError("session_agent_invalid", "The immutable session agent snapshot is invalid.")
+        return value
+
     async def _insert_snapshot(
         self, *, session_id: str, version: int, available_agent_ids: list[str], required_role_rules: list[dict[str, Any]],
         execution_limits: dict[str, Any], approval_policy: dict[str, Any], workspace_policy: dict[str, Any], acknowledgements: list[str],

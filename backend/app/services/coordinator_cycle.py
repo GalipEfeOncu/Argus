@@ -271,6 +271,7 @@ class CoordinatorCycle:
                             session_id, input_tokens=event.input_tokens or 0, output_tokens=event.output_tokens or 0,
                             normalized_cost=event.cost_usd, duration_ms=0,
                             cost_uncertainty="exact" if event.cost_usd is not None and event.exact else ("estimated" if event.cost_usd is not None else "unavailable"),
+                            scope_id=request.request_id,
                         )
                     except BudgetExceeded as error:
                         from app.services.limit_resolution_service import LimitResolutionService

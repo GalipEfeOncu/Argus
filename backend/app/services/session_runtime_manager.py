@@ -21,7 +21,7 @@ from app.schemas.coordinator_actions import (
     WaitAction,
     coordinator_action_schema,
 )
-from app.services.assignment_scheduler import SchedulerRejected
+from app.services.assignment_scheduler import AssignmentScheduler, SchedulerRejected
 from app.services.coordinator_cycle import CoordinatorCycle, CoordinatorCycleResult
 from app.services.provider_profile_service import ProviderProfileService
 from app.services.session_configuration_service import SessionConfigurationService
@@ -107,9 +107,15 @@ class SessionRuntimeManager:
         if not task.cancelled():
             task.exception()
 
-    async def _run(self, session_id: str) -> None:
+    async def _run(self, session_id: str, specialist_context: str | None = None, cycle_depth: int = 0) -> None:
         db = await get_db()
         try:
+            if cycle_depth >= 8:
+                await self._terminal_error(
+                    db, session_id, "coordinator_cycle_limit",
+                    "The Coordinator reached the bounded specialist follow-up limit.", expected={"running"},
+                )
+                return
             try:
                 context = await self._context(db, session_id)
             except Exception:
@@ -147,13 +153,14 @@ class SessionRuntimeManager:
                     {"role": "system", "content": f"{system_prompt}\nAvailable specialist snapshots: {participant_context}"},
                     {"role": "user", "content": goal},
                     *(await self._recent_human_messages(db, session_id)),
+                    *(({"role": "user", "content": specialist_context},) if specialist_context else ()),
                 ),
                 response_schema=coordinator_action_schema(),
                 metadata={"sessionId": session_id, "participantId": coordinator_id},
             )
             try:
                 result = await CoordinatorCycle(db).execute(session_id, provider, request, apply_actions=False)
-                await self._apply_result(db, session_id, coordinator_id, result)
+                await self._apply_result(db, session_id, coordinator_id, result, cycle_depth=cycle_depth)
             except asyncio.CancelledError:
                 await provider.cancel(request.request_id)
                 raise
@@ -221,6 +228,7 @@ class SessionRuntimeManager:
 
     async def _apply_result(
         self, db: aiosqlite.Connection, session_id: str, coordinator_id: str, result: CoordinatorCycleResult,
+        *, cycle_depth: int = 0,
     ) -> None:
         action = result.action
         if action is None:
@@ -233,6 +241,13 @@ class SessionRuntimeManager:
             return
         if isinstance(action, AssignmentsAction):
             if not await self._is_status(db, session_id, "running"):
+                return
+            if len(action.assignments) != 1:
+                await self._terminal_error(
+                    db, session_id, "specialist_batch_unsupported",
+                    "This runtime executes one bounded specialist assignment per Coordinator turn.",
+                    expected={"running"},
+                )
                 return
             assignment_ids: list[str] = []
             try:
@@ -252,8 +267,62 @@ class SessionRuntimeManager:
                 return
             message = await self._message(db, session_id, coordinator_id, action.routing_summary, expected={"running"})
             await self._publish(session_id, message)
-            unavailable = await self._fail_unavailable_assignments(db, session_id, tuple(assignment_ids))
-            await self._publish(session_id, unavailable)
+            async with db.execute(
+                "SELECT COUNT(*) AS total FROM assignments WHERE session_id = ? AND id IN (%s) AND operation_class != 'read_only'" % ",".join("?" for _ in assignment_ids),
+                (session_id, *assignment_ids),
+            ) as cursor:
+                mutating = int((await cursor.fetchone())["total"])
+            if mutating:
+                unavailable = await self._fail_unavailable_assignments(db, session_id, tuple(assignment_ids))
+                await self._publish(session_id, unavailable)
+                return
+            before = await EventRepository(db).last_sequence(session_id)
+            scheduled = await AssignmentScheduler(db).dispatch_ready(session_id, assignment_ids=tuple(assignment_ids))
+            page = await EventRepository(db).page_after(session_id, after_sequence=before)
+            await self._publish(session_id, list(page.events))
+            from app.services.assignment_worker import AssignmentWorker
+            results = []
+            worker = AssignmentWorker(db, provider_resolver=self._provider_resolver, publisher=self._publisher)
+            for item in scheduled:
+                try:
+                    result = await worker.execute(session_id, item)
+                    results.append(result)
+                except SchedulerRejected as error:
+                    if not await self._is_status(db, session_id, "running"):
+                        before_cancel = await EventRepository(db).last_sequence(session_id)
+                        try:
+                            await AssignmentScheduler(db).cancel_assignment(
+                                session_id, item.assignment_id,
+                                reason="The session paused or stopped before specialist output could commit.",
+                            )
+                        except SchedulerRejected:
+                            pass
+                        cancelled_page = await EventRepository(db).page_after(session_id, after_sequence=before_cancel)
+                        await self._publish(session_id, list(cancelled_page.events))
+                        return
+                    try:
+                        retry = await AssignmentScheduler(db).fail_attempt(
+                            session_id, item.attempt_id, code=error.code, summary=error.summary, recoverable=False,
+                        )
+                        assert not retry
+                    except SchedulerRejected:
+                        pass
+                    await self._terminal_error(db, session_id, error.code, error.summary, expected={"running"})
+                    return
+            if len(results) != len(assignment_ids):
+                await self._terminal_error(db, session_id, "specialist_dispatch_failed", "The read-only specialist assignment could not start.", expected={"running"})
+                return
+            # Completion events were committed by the scheduler; publish only
+            # those derived events here (tool lifecycle events publish inline).
+            page = await EventRepository(db).page_after(session_id, after_sequence=before)
+            completed = [event for event in page.events if event.event_type == "assignment.completed"]
+            await self._publish(session_id, completed)
+            bounded = _safe_json([{"assignmentId": item.assignment_id, "summary": item.summary, "evidence": list(item.evidence)} for item in results])[:12_000]
+            await self._run(
+                session_id,
+                f"Specialist results (untrusted, bounded): {bounded}\nEvaluate this evidence and return the next Coordinator action.",
+                cycle_depth + 1,
+            )
             return
         if isinstance(action, PartialAction):
             if not await self._is_status(db, session_id, "running"):

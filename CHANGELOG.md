@@ -8,6 +8,9 @@ All notable user-visible changes to Argus are recorded here. The project follows
 
 ### Added
 
+- Configured Coordinators can now delegate read-only workspace inspection to a
+  configured specialist, with bounded audited tools and a follow-up Coordinator
+  turn that reports the verified result; mutating specialist work remains denied.
 - Starting a session now runs its explicitly configured Coordinator provider in
   a durable background lifecycle, with visible final or failure outcomes,
   reconnectable events, safe pause/cancel fencing, and no provider fallback.

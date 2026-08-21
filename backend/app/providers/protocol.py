@@ -9,11 +9,43 @@ from __future__ import annotations
 
 from collections.abc import AsyncIterator, Mapping
 from dataclasses import dataclass, field
-from typing import Literal, Protocol, TypeAlias
+from typing import Literal, Protocol, TypeAlias, TypedDict
 
 
 JsonScalar: TypeAlias = str | int | float | bool | None
 JsonValue: TypeAlias = JsonScalar | list["JsonValue"] | dict[str, "JsonValue"]
+
+
+class SystemMessage(TypedDict):
+    role: Literal["system"]
+    content: str
+
+
+class UserMessage(TypedDict):
+    role: Literal["user"]
+    content: str
+
+
+class AssistantToolCall(TypedDict):
+    id: str
+    name: str
+    arguments: Mapping[str, JsonValue]
+
+
+class AssistantMessage(TypedDict):
+    role: Literal["assistant"]
+    content: str
+    tool_calls: list[AssistantToolCall]
+
+
+class ToolMessage(TypedDict):
+    role: Literal["tool"]
+    content: str
+    tool_call_id: str
+    name: str
+
+
+ProviderMessage: TypeAlias = SystemMessage | UserMessage | AssistantMessage | ToolMessage
 
 
 @dataclass(frozen=True)
@@ -22,7 +54,7 @@ class ProviderRequest:
 
     request_id: str
     model_id: str
-    messages: tuple[Mapping[str, str], ...]
+    messages: tuple[ProviderMessage, ...]
     tools: tuple[Mapping[str, JsonValue], ...] = ()
     response_schema: Mapping[str, JsonValue] | None = None
     metadata: Mapping[str, str] = field(default_factory=dict)

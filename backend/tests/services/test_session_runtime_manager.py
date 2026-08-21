@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import asyncio
 import json
+from pathlib import Path
+import time
 
 import pytest
 from fastapi.testclient import TestClient
@@ -9,10 +11,11 @@ from fastapi.testclient import TestClient
 from app.config import settings
 from app.db.database import get_db, transaction
 from app.db.repositories import EventRepository, SessionRepository, _now_ms
-from app.providers.protocol import ProviderRequest, StructuredOutput
+from app.providers.protocol import ProviderRequest, StructuredOutput, ToolCall
 from app.providers.scripted import ScriptedProvider, SlowStream
 from app.providers.adapters import ProviderDependencyUnavailable
 from app.schemas.provider import ProviderProfileCreate
+from app.schemas.project import WorkspaceMode
 from app.schemas.session import RequiredRoleRule, SessionAgentInput, SessionConfigurationInput
 from app.schemas.session_commands import parse_session_command
 from app.services.command_processor import CommandProcessor
@@ -20,11 +23,13 @@ from app.services.provider_profile_service import ProviderProfileService
 from app.services.session_configuration_service import SessionConfigurationService
 from app.services.session_runtime_manager import SessionRuntimeManager
 from app.services.session_runtime_manager import session_runtime_manager
+from app.services.workspace_service import ProjectWorkspaceService, ScopedToolService
 from app.main import app
 
 
 async def _session(
     database, session_id: str = "runtime-session", *, required_builder_gate: bool = False,
+    zero_limit: str | None = None,
 ) -> tuple[str, str]:
     profile = await ProviderProfileService(database).create(ProviderProfileCreate(
         providerKind="openai", displayName="Configured provider",
@@ -44,16 +49,18 @@ async def _session(
                 }),
                 SessionAgentInput.model_validate({
                     "id": "builder", "role": "builder", "capabilities": ["workspace.read", "workspace.write"],
+                    "toolAllowlist": ["read_file", "list_dir", "search_files"],
                     "modelBinding": {"providerProfileId": profile.id, "modelId": "configured-model"},
                 }),
             ],
             coordinator_id="coordinator",
-            configuration=SessionConfigurationInput(
-                availableAgentIds=["builder"],
-                requiredRoleRules=[RequiredRoleRule(
+            configuration=SessionConfigurationInput.model_validate({
+                "availableAgentIds": ["builder"],
+                "requiredRoleRules": [RequiredRoleRule(
                     id="builder-gate", role="builder", applicability="always", successEvidence="verified_change",
-                )] if required_builder_gate else [],
-            ),
+                ).model_dump(by_alias=True)] if required_builder_gate else [],
+                **({"executionLimits": {zero_limit: 0}} if zero_limit else {}),
+            }),
             workspace_mode="snapshot", acknowledged_direct_write=False,
         )
     coordinator_id = next(agent["id"] for agent in snapshot.agent_snapshots if agent["role"] == "coordinator")
@@ -356,7 +363,9 @@ async def test_assignment_without_specialist_executor_fails_honestly_without_a_r
         for _ in range(100):
             async with database.execute("SELECT state FROM assignments LIMIT 1") as cursor:
                 assignment = await cursor.fetchone()
-            if assignment is not None and assignment["state"] == "failed":
+            async with database.execute("SELECT status FROM sessions WHERE id = 'runtime-session'") as cursor:
+                current_status = (await cursor.fetchone())["status"]
+            if current_status == "failed":
                 break
             await asyncio.sleep(0.005)
         async with database.execute("SELECT COUNT(*) AS total FROM assignment_attempts") as cursor:
@@ -370,14 +379,16 @@ async def test_assignment_without_specialist_executor_fails_honestly_without_a_r
 
     if operation_class == "read_only":
         assert assignment is not None and assignment["state"] == "failed"
+        assert attempts == 1
     else:
         assert assignment is None
-    assert attempts == 0 and status == "failed"
+        assert attempts == 0
+    assert status == "failed"
     assert any(event.event_type == "error.created" and event.payload["recoverable"] for event in events)
 
 
 @pytest.mark.asyncio
-async def test_later_rejected_proposal_does_not_leave_an_earlier_assignment_created(temporary_sqlite_db) -> None:
+async def test_multi_proposal_turn_fails_before_any_assignment_is_created(temporary_sqlite_db) -> None:
     database = await get_db()
     builder_id = ""
 
@@ -409,7 +420,7 @@ async def test_later_rejected_proposal_does_not_leave_an_earlier_assignment_crea
         await manager.shutdown()
         await database.close()
 
-    assert states == ["failed"]
+    assert states == []
     assert attempts == 0
 
 
@@ -550,3 +561,212 @@ def test_websocket_fans_out_start_before_runtime_events_and_duplicate_does_not_r
         session_runtime_manager._provider_resolver = previous_resolver
 
     assert len(requests) == 1
+
+
+@pytest.mark.asyncio
+async def test_read_only_specialist_tool_result_returns_to_coordinator_and_completes(
+    temporary_sqlite_db, tmp_path: Path,
+) -> None:
+    database = await get_db()
+    await _session(database)
+    builder_id = (await SessionConfigurationService(database).current("runtime-session")).available_agent_ids[0]
+    source = tmp_path / "source"
+    source.mkdir()
+    (source / "README.md").write_text("Argus specialist evidence\n", encoding="utf-8")
+    workspaces = ProjectWorkspaceService(database, managed_root=Path(settings.db_path).resolve().parent / "workspaces")
+    project = await workspaces.register_project(str(source))
+    await workspaces.prepare_workspace(session_id="runtime-session", project_id=str(project["id"]), mode=WorkspaceMode.snapshot)
+    coordinator = ScriptedProvider(((StructuredOutput({
+        "type": "assignments", "routingSummary": "Inspect the bounded workspace.",
+        "assignments": [{
+            "proposalId": "read-proposal", "assigneeAgentId": builder_id,
+            "objective": "Read the project overview.", "acceptanceCriteria": ["Report README evidence."],
+            "operationClass": "read_only", "requestedBudget": {},
+            "requestedCapabilities": ["workspace.read"], "requestedTools": ["read_file"],
+            "reasonSummary": "The configured specialist can inspect the file.",
+        }],
+    }),),))
+    specialist = ScriptedProvider((
+        (ToolCall("read-call-1", "read_file", {"path": "README.md"}),),
+        (StructuredOutput({"summary": "README confirms Argus specialist evidence.", "evidence": []}),),
+    ))
+    follow_up = ScriptedProvider(((StructuredOutput({
+        "type": "final", "finalSummary": "The configured specialist verified the README.",
+        "evidenceReferences": ["read-proposal"],
+    }),),))
+    providers = iter((coordinator, specialist, follow_up))
+
+    async def resolver(_profile_id: str, _model_id: str):
+        return next(providers)
+
+    manager = SessionRuntimeManager(provider_resolver=resolver, publisher=lambda _session, _events: asyncio.sleep(0))
+    try:
+        await _start(database)
+        await manager.start("runtime-session")
+        await _wait_for_status(database, "completed")
+        events = await EventRepository(database).list_for_session("runtime-session")
+        async with database.execute("SELECT exit_state, request_summary, result_summary FROM tool_executions") as cursor:
+            tool = await cursor.fetchone()
+    finally:
+        await manager.shutdown()
+        await database.close()
+
+    assert [event.event_type for event in events if event.event_type.startswith("tool.")] == [
+        "tool.requested", "tool.started", "tool.completed",
+    ]
+    assert tool["exit_state"] == "succeeded"
+    assert "README.md" not in tool["request_summary"] and "Argus specialist evidence" not in tool["result_summary"]
+    transcript = specialist.requests[1].messages
+    assert transcript[-2]["role"] == "assistant" and transcript[-2]["tool_calls"][0]["id"] == "read-call-1"
+    assert transcript[-1] == {"role": "tool", "content": "Argus specialist evidence\n", "tool_call_id": "read-call-1", "name": "read_file"}
+    assert events[-2].payload["content"] == "The configured specialist verified the README."
+    assert (source / "README.md").read_text(encoding="utf-8") == "Argus specialist evidence\n"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(("command", "target"), [("session.pause", "paused"), ("session.cancel", "cancelled")])
+async def test_pause_and_cancel_fence_late_specialist_output(
+    temporary_sqlite_db, command: str, target: str,
+) -> None:
+    database = await get_db()
+    await _session(database)
+    builder_id = (await SessionConfigurationService(database).current("runtime-session")).available_agent_ids[0]
+    coordinator = ScriptedProvider(((StructuredOutput({
+        "type": "assignments", "routingSummary": "Inspect safely.",
+        "assignments": [{
+            "proposalId": "slow-read", "assigneeAgentId": builder_id, "objective": "Inspect.",
+            "acceptanceCriteria": ["Report."], "operationClass": "read_only", "requestedBudget": {},
+            "requestedCapabilities": ["workspace.read"], "requestedTools": [], "reasonSummary": "Eligible.",
+        }],
+    }),),))
+    specialist = ScriptedProvider(((SlowStream(0.08), StructuredOutput({"summary": "Late specialist output.", "evidence": []})),))
+    providers = iter((coordinator, specialist))
+
+    async def resolver(_profile_id: str, _model_id: str):
+        return next(providers)
+
+    manager = SessionRuntimeManager(provider_resolver=resolver, publisher=lambda _session, _events: asyncio.sleep(0))
+    try:
+        await _start(database)
+        await manager.start("runtime-session")
+        for _ in range(100):
+            async with database.execute("SELECT state FROM assignments LIMIT 1") as cursor:
+                row = await cursor.fetchone()
+            if row is not None and row["state"] == "running":
+                break
+            await asyncio.sleep(0.005)
+        await CommandProcessor(database).process("runtime-session", parse_session_command({
+            "commandId": f"specialist-{target}", "type": command, "payload": {},
+        }))
+        await manager.wait("runtime-session")
+        events = await EventRepository(database).list_for_session("runtime-session")
+        async with database.execute("SELECT status FROM sessions WHERE id = 'runtime-session'") as cursor:
+            status = (await cursor.fetchone())["status"]
+    finally:
+        await manager.shutdown()
+        await database.close()
+
+    assert status == target
+    assert not any(event.event_type == "assignment.completed" for event in events)
+    assert not any(event.event_type == "message.created" and event.payload.get("content") == "Late specialist output." for event in events)
+
+
+@pytest.mark.asyncio
+async def test_pause_during_read_tool_records_cancelled_tool_and_fences_result(
+    temporary_sqlite_db, tmp_path: Path, monkeypatch,
+) -> None:
+    database = await get_db()
+    await _session(database)
+    builder_id = (await SessionConfigurationService(database).current("runtime-session")).available_agent_ids[0]
+    source = tmp_path / "slow-source"
+    source.mkdir()
+    (source / "README.md").write_text("late secret content\n", encoding="utf-8")
+    workspaces = ProjectWorkspaceService(database, managed_root=Path(settings.db_path).resolve().parent / "workspaces")
+    project = await workspaces.register_project(str(source))
+    await workspaces.prepare_workspace(session_id="runtime-session", project_id=str(project["id"]), mode=WorkspaceMode.snapshot)
+    original_read = ScopedToolService.read_text
+
+    def slow_read(self, path: str, *, max_characters=None):
+        time.sleep(0.08)
+        return original_read(self, path, max_characters=max_characters)
+
+    monkeypatch.setattr(ScopedToolService, "read_text", slow_read)
+    coordinator = ScriptedProvider(((StructuredOutput({
+        "type": "assignments", "routingSummary": "Inspect safely.",
+        "assignments": [{
+            "proposalId": "slow-tool", "assigneeAgentId": builder_id, "objective": "Read.",
+            "acceptanceCriteria": ["Report."], "operationClass": "read_only", "requestedBudget": {},
+            "requestedCapabilities": ["workspace.read"], "requestedTools": ["read_file"], "reasonSummary": "Eligible.",
+        }],
+    }),),))
+    specialist = ScriptedProvider(((ToolCall("slow-call", "read_file", {"path": "README.md"}),),))
+    providers = iter((coordinator, specialist))
+
+    async def resolver(_profile_id: str, _model_id: str):
+        return next(providers)
+
+    manager = SessionRuntimeManager(provider_resolver=resolver, publisher=lambda _session, _events: asyncio.sleep(0))
+    try:
+        await _start(database)
+        await manager.start("runtime-session")
+        for _ in range(100):
+            events = await EventRepository(database).list_for_session("runtime-session")
+            if any(event.event_type == "tool.started" for event in events):
+                break
+            await asyncio.sleep(0.005)
+        await CommandProcessor(database).process("runtime-session", parse_session_command({
+            "commandId": "pause-tool", "type": "session.pause", "payload": {},
+        }))
+        await manager.wait("runtime-session")
+        events = await EventRepository(database).list_for_session("runtime-session")
+        async with database.execute("SELECT exit_state, result_summary FROM tool_executions") as cursor:
+            tool = await cursor.fetchone()
+    finally:
+        await manager.shutdown()
+        await database.close()
+
+    assert tool["exit_state"] == "cancelled"
+    assert "late secret content" not in json.dumps([event.payload for event in events])
+    assert not any(event.event_type == "assignment.completed" for event in events)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(("limit_name", "expected_resolutions"), [
+    ("maxModelIterationsPerAssignment", 1), ("maxToolCallsPerAssignment", 2),
+])
+async def test_zero_specialist_limits_prevent_provider_turn_or_tool_start(
+    temporary_sqlite_db, limit_name: str, expected_resolutions: int,
+) -> None:
+    database = await get_db()
+    await _session(database, zero_limit=limit_name)
+    builder_id = (await SessionConfigurationService(database).current("runtime-session")).available_agent_ids[0]
+    coordinator = ScriptedProvider(((StructuredOutput({
+        "type": "assignments", "routingSummary": "Inspect safely.",
+        "assignments": [{
+            "proposalId": f"zero-{limit_name}", "assigneeAgentId": builder_id, "objective": "Read.",
+            "acceptanceCriteria": ["Report."], "operationClass": "read_only", "requestedBudget": {},
+            "requestedCapabilities": ["workspace.read"], "requestedTools": ["read_file"], "reasonSummary": "Eligible.",
+        }],
+    }),),))
+    specialist = ScriptedProvider(((ToolCall("must-not-start", "read_file", {"path": "README.md"}),),))
+    providers = iter((coordinator, specialist))
+    resolutions = 0
+
+    async def resolver(_profile_id: str, _model_id: str):
+        nonlocal resolutions
+        resolutions += 1
+        return next(providers)
+
+    manager = SessionRuntimeManager(provider_resolver=resolver, publisher=lambda _session, _events: asyncio.sleep(0))
+    try:
+        await _start(database)
+        await manager.start("runtime-session")
+        await _wait_for_status(database, "failed")
+        async with database.execute("SELECT COUNT(*) AS total FROM tool_executions") as cursor:
+            tool_count = int((await cursor.fetchone())["total"])
+    finally:
+        await manager.shutdown()
+        await database.close()
+
+    assert resolutions == expected_resolutions
+    assert tool_count == 0

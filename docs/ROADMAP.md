@@ -645,11 +645,12 @@ Current status (2026-07-26):
   a test fixture for isolated workspace, approval, artifact, and evidence
   contracts. Production `session.start` no longer launches that fixed task;
   runtime work requires an explicitly configured provider profile and model.
-- Current incremental runtime behavior invokes that configured Coordinator in a
-  single background turn, persists final/error/pause outcomes without requiring
-  a connected WebSocket, and fences cancellation/restart. Specialist execution
-  is still unavailable in this slice, so assignment proposals terminate visibly
-  without leaving a running attempt; this is not a new phase-completion claim.
+- Current incremental runtime behavior invokes configured Coordinator and
+  read-only specialist providers without requiring a connected WebSocket. A
+  read-only assignment can use the three scoped filesystem inspection tools and
+  return bounded evidence to a Coordinator follow-up turn. Mutating specialist
+  execution still fails before workspace access. This updates current behavior
+  only and is not a new phase-completion claim.
 - ✅ Pause, resume, cancel, human correction, and reconnect are covered on the
   live transport. Cancellation and participant interruption serialize with an
   in-flight workspace mutation, so accepted cancellation fences later output.

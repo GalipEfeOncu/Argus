@@ -207,9 +207,17 @@ connection for it, resolves only the immutable configured provider/model, and
 publishes every derived event after commit. The turn continues without a live
 WebSocket. Pause or cancel fences late provider output, shutdown drains then
 cancels within a bound, and restart recovery records an interrupted Coordinator
-operation as unknown instead of replaying remote work. Specialist execution is
-not yet attached to this lifecycle; scheduler proposals fail visibly and leave
-no running attempt rather than implying work is happening.
+operation as unknown instead of replaying remote work. Accepted read-only
+assignments now dispatch a bounded provider-backed specialist worker. Its tools
+are the intersection of the proposal, immutable session-agent allowlist, and
+`workspace.read` authority, and all filesystem reads pass through the scoped
+workspace service. Tool arguments/results remain provider-turn context only;
+durable records contain bounded summaries. The structured specialist result is
+fed into a bounded Coordinator follow-up turn for deterministic gate and final
+validation. Mutating specialist execution remains deliberately unavailable and
+fails before any workspace action.
+The current manager accepts one specialist proposal per Coordinator turn;
+parallel proposal execution remains planned rather than an in-process claim.
 
 Different projects may run sessions concurrently. Only one mutating session can hold a project writer lock in the MVP. Within a session, read-only work may overlap while only one participant holds the writer lease.
 

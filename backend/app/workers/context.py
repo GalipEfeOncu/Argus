@@ -16,6 +16,11 @@ _SENSITIVE_VALUE = re.compile(
     r"AKIA[0-9A-Z]{16}|eyJ[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]+\.)",
     re.I,
 )
+_SENSITIVE_BLOCK = re.compile(
+    r"-----BEGIN [^-\r\n]*PRIVATE KEY-----.*?-----END [^-\r\n]*PRIVATE KEY-----|"
+    r"(?:api[_-]?key|access[_-]?token|client[_-]?secret|password)\s*[:=]\s*[^\s,;]+",
+    re.I | re.S,
+)
 _LOGGER = logging.getLogger(__name__)
 
 
@@ -244,4 +249,4 @@ def log_context_selection(metadata: ContextSelectionMetadata) -> None:
 
 
 def _redact(text: str) -> str:
-    return _SENSITIVE_VALUE.sub("[REDACTED]", text.strip())
+    return _SENSITIVE_VALUE.sub("[REDACTED]", _SENSITIVE_BLOCK.sub("[REDACTED]", text.strip()))

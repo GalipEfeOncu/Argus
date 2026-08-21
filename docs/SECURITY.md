@@ -75,6 +75,16 @@ The backend, not an agent prompt, enforces agent-pool membership, required-role
 eligibility, workspace bounds, command policy, approval state, budgets,
 timeouts, and cancellation. Prompts must not be treated as a security boundary.
 
+The production specialist loop currently executes read-only assignments only.
+It intersects the proposal's requested tools with the immutable participant
+allowlist and requires `workspace.read`; the only executable names are
+`read_file`, `list_dir`, and `search_files`. Absolute paths, parent traversal,
+workspace escape, symbolic links, malformed or duplicate tool-call IDs, and
+unknown tools fail closed before filesystem access. Raw tool arguments and file
+contents may be returned to the configured provider for that bounded turn, but
+are not written to events, tool audit rows, logs, or support exports. Mutating
+proposals never enter this executor.
+
 ## Local skill packages
 
 Local skill package files are untrusted model context, not executable policy.
