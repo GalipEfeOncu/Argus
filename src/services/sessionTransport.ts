@@ -73,9 +73,10 @@ export class SessionStreamClient {
   }
 
   send(command: ArgusSessionCommand): boolean {
+    if (!this.transport.send(command)) return false;
     this.projection = queueCommand(this.projection, command);
     this.publish({ isStreamingUpdate: false });
-    return this.transport.send(command);
+    return true;
   }
 
   retry(commandId: string): boolean {
@@ -88,6 +89,13 @@ export class SessionStreamClient {
       onEvent: (value) => this.receive(value),
       onConnectionState: (connection) => {
         this.projection = setConnectionState(this.projection, connection);
+        if (connection === 'connected') {
+          for (const pending of Object.values(this.projection.pendingCommands)) {
+            if (this.transport.send(pending.command)) {
+              this.projection = queueCommand(this.projection, pending.command);
+            }
+          }
+        }
         this.publish({ isStreamingUpdate: false });
       },
       onReconnectRequested: () => this.resync(),

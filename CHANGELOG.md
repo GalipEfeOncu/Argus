@@ -14,6 +14,9 @@ All notable user-visible changes to Argus are recorded here. The project follows
 
 ### Fixed
 
+- Composer drafts now remain editable during session reconnects and are cleared
+  only after the correlated room event confirms delivery. Users can also send
+  Coordinator guidance while a separate approval remains pending.
 - Session setup now requires explicit models from configured provider profiles,
   the runtime rejects placeholder or unknown provider bindings before creating
   a workspace, and the live WebSocket bundle no longer includes simulator paths.

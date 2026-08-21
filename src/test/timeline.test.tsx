@@ -8,6 +8,7 @@ import { createSessionProjection, reduceSessionEvent, type SessionProjection } f
 import { createTimelineEntries } from '@/services/timelineModel';
 import { useSessionRoomStore } from '@/stores/sessionRoomStore';
 import { useSessionStore } from '@/stores/sessionStore';
+import { useAgentStore } from '@/stores/agentStore';
 
 const sendMessage = vi.fn();
 const sendInterrupt = vi.fn();
@@ -38,8 +39,13 @@ function snapshot(): ArgusSessionEvent {
   return event(0, 'session.snapshot', { status: 'running', lastSequence: 0 });
 }
 
+function connectedProjection(events: ArgusSessionEvent[] = [snapshot()]): SessionProjection {
+  return { ...projection(events), connection: 'connected' };
+}
+
 beforeEach(() => {
   sendMessage.mockReset();
+  sendMessage.mockReturnValue({ status: 'pending', commandId: 'cmd_message' });
   sendInterrupt.mockReset();
   useSessionStore.setState({ activeSessionId: sessionId });
   useSessionRoomStore.setState({ projections: {}, streamingRenderCommits: 0 });
@@ -51,6 +57,7 @@ afterEach(() => {
 });
 
 test('composer sends with keyboard, visibly defaults to Coordinator, and parses explicit mentions', () => {
+  useSessionRoomStore.setState({ projections: { [sessionId]: connectedProjection() } });
   render(<MessageInput sessionId={sessionId} />);
   const input = screen.getByLabelText('Message for shared room');
   expect(screen.getByText('Targets: Coordinator')).toBeInTheDocument();
@@ -59,6 +66,90 @@ test('composer sends with keyboard, visibly defaults to Coordinator, and parses 
   fireEvent.keyDown(input, { key: 'Enter' });
   expect(sendMessage).toHaveBeenCalledWith('@builder inspect this', ['builder']);
   expect(extractMentions('@Builder @builder @tester')).toEqual(['builder', 'tester']);
+});
+
+test('waiting for approval keeps Coordinator messaging available without resolving the approval', () => {
+  const waiting = connectedProjection([
+    snapshot(),
+    event(1, 'session.status_changed', { status: 'waiting_approval' }),
+    event(2, 'approval.requested', { approvalId: 'approval_1', capability: 'workspace.write', scopeSummary: 'Session workspace only.' }),
+  ]);
+  useSessionRoomStore.setState({ projections: { [sessionId]: waiting } });
+  useAgentStore.setState({ isInterrupted: true, interruptReason: 'Waiting for approval' });
+  render(<MessageInput sessionId={sessionId} />);
+
+  const input = screen.getByLabelText('Message for shared room');
+  fireEvent.change(input, { target: { value: 'Coordinator, use the narrower approach.' } });
+  expect(input).toBeEnabled();
+  expect(screen.getByText(/not approve or reject/)).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Execute Task' }));
+  expect(sendMessage).toHaveBeenCalledWith('Coordinator, use the narrower approach.', []);
+});
+
+test.each(['reconnecting', 'resyncing'] as const)('%s and unavailable dispatch preserve an editable draft', (connection) => {
+  useSessionRoomStore.setState({ projections: { [sessionId]: { ...connectedProjection(), connection } } });
+  render(<MessageInput sessionId={sessionId} />);
+  const input = screen.getByLabelText('Message for shared room');
+  fireEvent.change(input, { target: { value: 'Keep this draft' } });
+
+  expect(input).toBeEnabled();
+  expect(screen.getByRole('button', { name: 'Execute Task' })).toBeDisabled();
+  expect(screen.getByText(/Keep editing/)).toBeInTheDocument();
+
+  act(() => useSessionRoomStore.setState({ projections: { [sessionId]: connectedProjection() } }));
+  sendMessage.mockReturnValueOnce({ status: 'unavailable' });
+  fireEvent.click(screen.getByRole('button', { name: 'Execute Task' }));
+  expect(input).toHaveValue('Keep this draft');
+  expect(screen.getByRole('alert')).toHaveTextContent('not sent');
+});
+
+test('canonical message confirmation clears an unchanged submitted draft', () => {
+  useSessionRoomStore.setState({ projections: { [sessionId]: connectedProjection() } });
+  render(<MessageInput sessionId={sessionId} />);
+  const input = screen.getByLabelText('Message for shared room');
+  fireEvent.change(input, { target: { value: 'Confirmed draft' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Execute Task' }));
+
+  const confirmed = {
+    ...event(1, 'message.created', { messageId: 'msg_confirmed', authorId: 'human', authorKind: 'human', content: 'Confirmed draft' }, 'human'),
+    correlationId: 'cmd_message',
+  } as ArgusSessionEvent;
+  act(() => useSessionRoomStore.setState({ projections: { [sessionId]: connectedProjection([snapshot(), confirmed]) } }));
+  expect(input).toHaveValue('');
+  expect(screen.queryByText(/Message pending/)).not.toBeInTheDocument();
+});
+
+test('canonical message confirmation clears only the submitted draft and a correlated error preserves it', () => {
+  useSessionRoomStore.setState({ projections: { [sessionId]: connectedProjection() } });
+  const { unmount } = render(<MessageInput sessionId={sessionId} />);
+  const input = screen.getByLabelText('Message for shared room');
+  fireEvent.change(input, { target: { value: 'First draft' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Execute Task' }));
+  expect(input).toHaveValue('First draft');
+  expect(screen.getByText(/Message pending/)).toBeInTheDocument();
+
+  fireEvent.change(input, { target: { value: 'Next draft' } });
+  const confirmed = {
+    ...event(1, 'message.created', { messageId: 'msg_human', authorId: 'human', authorKind: 'human', content: 'First draft' }, 'human'),
+    correlationId: 'cmd_message',
+  } as ArgusSessionEvent;
+  act(() => useSessionRoomStore.setState({ projections: { [sessionId]: connectedProjection([snapshot(), confirmed]) } }));
+  expect(input).toHaveValue('Next draft');
+
+  unmount();
+  sendMessage.mockReturnValueOnce({ status: 'pending', commandId: 'cmd_rejected' });
+  useSessionRoomStore.setState({ projections: { [sessionId]: connectedProjection() } });
+  render(<MessageInput sessionId={sessionId} />);
+  const rejectedInput = screen.getByLabelText('Message for shared room');
+  fireEvent.change(rejectedInput, { target: { value: 'Retry this message' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Execute Task' }));
+  const rejected = {
+    ...event(1, 'error.created', { errorId: 'err_message', code: 'command_rejected', summary: 'Message could not be accepted.', recoverable: true }),
+    correlationId: 'cmd_rejected',
+  } as ArgusSessionEvent;
+  act(() => useSessionRoomStore.setState({ projections: { [sessionId]: connectedProjection([snapshot(), rejected]) } }));
+  expect(rejectedInput).toHaveValue('Retry this message');
+  expect(screen.getByRole('alert')).toHaveTextContent('Message could not be accepted.');
 });
 
 test('Escape requests an interruption while a message is streaming', () => {

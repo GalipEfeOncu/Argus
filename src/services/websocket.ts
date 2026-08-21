@@ -15,7 +15,6 @@ export class WebSocketSessionTransport implements SessionTransport {
   private socket: WebSocket | null = null;
   private intentionalClose = false;
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
-  private readonly pendingWireCommands: ArgusSessionCommand[] = [];
   private connectionGeneration = 0;
 
   connect(sessionId: string, afterSequence: number, handlers: TransportHandlers): void {
@@ -48,7 +47,6 @@ export class WebSocketSessionTransport implements SessionTransport {
     this.socket = socket;
     socket.onopen = () => {
       handlers.onConnectionState('connected');
-      this.flushPendingCommands(socket);
     };
     socket.onmessage = (message) => {
       try {
@@ -81,22 +79,15 @@ export class WebSocketSessionTransport implements SessionTransport {
   }
 
   send(command: ArgusSessionCommand): boolean {
-    if (this.socket === null || this.socket.readyState === WebSocket.CLOSING || this.socket.readyState === WebSocket.CLOSED) return false;
-    if (this.socket.readyState !== WebSocket.OPEN) {
-      this.pendingWireCommands.push(command);
-      return true;
-    }
+    if (this.socket === null || this.socket.readyState !== WebSocket.OPEN) return false;
     this.socket.send(JSON.stringify(command));
     return true;
   }
-
-  private flushPendingCommands(socket: WebSocket): void {
-    while (this.pendingWireCommands.length > 0 && socket.readyState === WebSocket.OPEN) {
-      const command = this.pendingWireCommands.shift();
-      if (command !== undefined) socket.send(JSON.stringify(command));
-    }
-  }
 }
+
+export type MessageDispatchResult =
+  | { status: 'pending'; commandId: string }
+  | { status: 'unavailable' };
 
 class WebSocketManager {
   private client: SessionStreamClient | null = null;
@@ -126,8 +117,10 @@ class WebSocketManager {
     client.connect();
   }
 
-  sendMessage(content: string, mentionIds: string[] = []): void {
-    this.send({ commandId: crypto.randomUUID(), type: 'message.send', payload: { content, ...(mentionIds.length === 0 ? {} : { mentionIds }) } });
+  sendMessage(content: string, mentionIds: string[] = []): MessageDispatchResult {
+    const commandId = crypto.randomUUID();
+    const accepted = this.send({ commandId, type: 'message.send', payload: { content, ...(mentionIds.length === 0 ? {} : { mentionIds }) } });
+    return accepted ? { status: 'pending', commandId } : { status: 'unavailable' };
   }
 
   sendApproval(approved: boolean, approvalId: string): void {
@@ -191,8 +184,8 @@ class WebSocketManager {
     this.connectionConsumers = 0;
   }
 
-  private send(command: ArgusSessionCommand): void {
-    this.client?.send(command);
+  private send(command: ArgusSessionCommand): boolean {
+    return this.client?.send(command) ?? false;
   }
 
   private activeStreamingParticipantId(): string | null {

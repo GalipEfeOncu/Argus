@@ -132,6 +132,33 @@ test('pending commands retry with the same idempotency key and resolve only from
   expect(client.getProjection().status).toBe('paused');
 });
 
+test('a transport refusal does not create a phantom pending command', () => {
+  const transport = new InMemorySessionTransport();
+  const client = new SessionStreamClient(transport, sessionId);
+  const command = { commandId: 'cmd_offline', type: 'message.send' as const, payload: { content: 'Keep this draft' } };
+
+  expect(client.send(command)).toBe(false);
+  expect(client.getProjection().pendingCommands[command.commandId]).toBeUndefined();
+});
+
+test('an unresolved accepted command is resent exactly once with the same id after reconnect', () => {
+  const transport = new InMemorySessionTransport();
+  const client = new SessionStreamClient(transport, sessionId);
+  client.connect();
+  transport.emit(snapshot());
+  const command = { commandId: 'cmd_reconnect', type: 'message.send' as const, payload: { content: 'Durable guidance' } };
+
+  expect(client.send(command)).toBe(true);
+  transport.dropConnection();
+
+  expect(transport.sentCommands.map((entry) => entry.commandId)).toEqual(['cmd_reconnect', 'cmd_reconnect']);
+  expect(client.getProjection().pendingCommands[command.commandId]?.attempts).toBe(2);
+  transport.emit(event(1, 'message.created', {
+    messageId: 'msg_reconnect', authorId: 'human', authorKind: 'human', content: 'Durable guidance',
+  }, { correlationId: command.commandId }));
+  expect(client.getProjection().pendingCommands[command.commandId]).toBeUndefined();
+});
+
 test('a canonical rejected-command error clears its pending command without forcing a resync', () => {
   const transport = new InMemorySessionTransport();
   const client = new SessionStreamClient(transport, sessionId);

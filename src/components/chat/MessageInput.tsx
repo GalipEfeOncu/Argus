@@ -1,6 +1,5 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useWebSocket } from '@/hooks/useWebSocket';
-import { useAgentStore } from '@/stores/agentStore';
 import { useSessionRoomStore } from '@/stores/sessionRoomStore';
 import './MessageInput.css';
 
@@ -10,17 +9,40 @@ interface MessageInputProps {
 
 export const MessageInput: React.FC<MessageInputProps> = ({ sessionId }) => {
   const [content, setContent] = useState('');
+  const [submission, setSubmission] = useState<{ commandId: string; draft: string } | null>(null);
+  const [dispatchError, setDispatchError] = useState<string | null>(null);
   const { sendMessage, sendInterrupt } = useWebSocket(sessionId);
-  const { isInterrupted } = useAgentStore();
   const projection = useSessionRoomStore((state) => state.projections[sessionId]);
   const isStreaming = Object.values(projection?.messages ?? {}).some((message) => message.streaming);
+  const connection = projection?.connection ?? 'idle';
+  const waitingForApproval = projection?.status === 'waiting_approval';
+  const dispatchAvailable = connection === 'connected';
   const mentions = extractMentions(content);
   const targetLabel = mentions.length === 0 ? 'Coordinator' : mentions.join(', ');
 
+  useEffect(() => {
+    if (submission === null || projection === undefined) return;
+    const result = projection.events.find((event) => event.correlationId === submission.commandId);
+    if (result?.type === 'message.created') {
+      setContent((current) => current === submission.draft ? '' : current);
+      setSubmission(null);
+      setDispatchError(null);
+    } else if (result?.type === 'error.created') {
+      setSubmission(null);
+      setDispatchError(result.payload.summary);
+    }
+  }, [projection, submission]);
+
   const handleSend = () => {
-    if (!content.trim() || isInterrupted) return;
-    sendMessage(content.trim(), mentions);
-    setContent('');
+    if (!content.trim() || !dispatchAvailable || submission !== null) return;
+    const draft = content;
+    const result = sendMessage(content.trim(), mentions);
+    if (result.status === 'unavailable') {
+      setDispatchError('The message was not sent. Keep editing and try again after the connection recovers.');
+      return;
+    }
+    setDispatchError(null);
+    setSubmission({ commandId: result.commandId, draft });
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -34,8 +56,6 @@ export const MessageInput: React.FC<MessageInputProps> = ({ sessionId }) => {
     }
   };
 
-  const isDisabled = isInterrupted;
-
   return (
     <div className="input-section">
 
@@ -46,11 +66,10 @@ export const MessageInput: React.FC<MessageInputProps> = ({ sessionId }) => {
           className="input-textarea"
           rows={3}
           aria-label="Message for shared room"
-          placeholder={isInterrupted ? 'Waiting for approval…' : 'Describe your task; @name explicitly targets a participant'}
+          placeholder="Describe your task; @name explicitly targets a participant"
           value={content}
           onChange={(e) => setContent(e.target.value)}
           onKeyDown={handleKeyDown}
-          disabled={isDisabled}
         />
 
         {/* ── Bottom Row ──────────────────────────────────── */}
@@ -60,7 +79,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({ sessionId }) => {
           <button
             className="btn-execute"
             onClick={handleSend}
-            disabled={!content.trim() || isInterrupted}
+            disabled={!content.trim() || !dispatchAvailable || submission !== null}
             type="button"
           >
             <span>Execute Task</span>
@@ -73,6 +92,11 @@ export const MessageInput: React.FC<MessageInputProps> = ({ sessionId }) => {
       </div>
 
       <p className="composer-target">Targets: {targetLabel}{isStreaming ? ' · Escape interrupts active streaming' : ''}</p>
+      {waitingForApproval && <p className="composer-state">Approval is still pending. You can message Coordinator; sending a message does not approve or reject the request.</p>}
+      {connection === 'reconnecting' && <p className="composer-state" role="status">Reconnecting… Keep editing; sending resumes after the connection recovers.</p>}
+      {connection === 'resyncing' && <p className="composer-state" role="status">Restoring ordered session state… Keep editing; sending resumes when it is ready.</p>}
+      {submission !== null && <p className="composer-state" role="status">Message pending — waiting for its canonical room event.</p>}
+      {dispatchError !== null && <p className="composer-state composer-state--error" role="alert">{dispatchError}</p>}
 
     </div>
   );
