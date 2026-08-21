@@ -8,6 +8,7 @@ from app.db.repositories import EventRepository, SessionRepository
 from app.schemas.session_commands import parse_session_command
 from app.services.command_processor import CommandProcessor, CommandRejected, event_wire_value
 from app.config import settings
+from app.services.session_runtime_manager import session_runtime_manager
 
 router = APIRouter()
 
@@ -111,6 +112,10 @@ async def canonical_session_websocket(
                 # The transaction completed inside process before any send, so a
                 # disconnect leaves a reconnectable original correlated result.
                 await connection_hub.publish(session_id, [event_wire_value(event) for event in outcome.events])
+                if command.type in {"session.start", "session.resume"} and not outcome.duplicate:
+                    # Runtime work starts only after the command outcome is
+                    # committed and offered to connected consumers.
+                    await session_runtime_manager.start(session_id)
             except WebSocketDisconnect:
                 return
             except CommandRejected as error:

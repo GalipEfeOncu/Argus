@@ -222,12 +222,31 @@ Decision choices are `reassign`, `change_approach`, `deliver_partial`, or
 ### Session execution
 
 `session.start` changes the durable session state and emits canonical command
-events; it does not schedule a fixed demo task or write a reference file. Model
-work requires every selected participant, including the Coordinator, to carry a
-model binding whose provider profile exists in the local provider catalogue.
+events before starting an idempotent background Coordinator turn; it does not
+schedule a fixed demo task or write a reference file. The background turn owns
+its own database connection and continues to persist ordered events when no
+WebSocket consumer is connected. Model work requires every selected participant,
+including the Coordinator, to carry a model binding whose provider profile exists in the local provider catalogue.
 Missing, built-in placeholder, or unknown provider bindings are rejected before
-an isolated workspace is provisioned. Pause, resume, cancel, approvals, and
-human messages remain canonical commands. Rejected commands are emitted as
+an isolated workspace is provisioned. After provider readiness succeeds, the
+runtime emits `running` and invokes the immutable Coordinator binding with the
+stored goal, bounded recent human messages, available participant metadata, and
+the strict Coordinator action schema. It never falls back to a scripted or
+built-in provider.
+
+A valid `final` action emits a visible Coordinator message and reaches
+`completed` only after deterministic gate validation. `ask_user` and `wait`
+emit a visible message and pause; after a human room message, `session.resume`
+starts one new bounded Coordinator turn. `stop` emits its visible summary and
+fails safely. Assignment proposals still pass through the scheduler. Because
+the specialist executor is not connected in the current production slice, no
+attempt is left running: unavailable or policy-rejected work emits recoverable
+canonical errors and the session fails honestly. Provider/configuration errors
+are redacted and fail the session. Pause and cancel fence late model output;
+restart recovery marks an interrupted provider operation unknown and never
+replays it automatically.
+
+Pause, resume, cancel, approvals, and human messages remain canonical commands. Rejected commands are emitted as
 correlated `error.created` events rather than an out-of-band WebSocket payload,
 allowing clients to clear pending state.
 
@@ -402,8 +421,8 @@ any scheduler work.
 | Action | Required visible fields | Runtime effect |
 | --- | --- | --- |
 | `assignments` | concise `routingSummary`, one or more proposals with ID, optional parent, objective, criteria, operation class, requested budget/capabilities/tools, and reason | Proposes dynamic specialist work; every assignee, capability, and tool is validated against the current available pool and immutable agent allowlist. |
-| `wait` | concise `routingSummary` | Leaves the session waiting for relevant work or evidence. |
-| `ask_user` | concise `routingSummary` and `question` | Requests a visible human decision. |
+| `wait` | concise `routingSummary` | Emits the summary and pauses until an explicit resume. |
+| `ask_user` | concise `routingSummary` and `question` | Emits the question and pauses for a human room message plus explicit resume. |
 | `final` | concise `finalSummary` and non-empty `evidenceReferences` | May finish only after deterministic required-gate validation. |
 | `partial` | concise `finalSummary`, unmet requirements, optional evidence references | Describes a bounded partial outcome; it does not claim success. |
 | `stop` | concise `finalSummary` and reason | Ends this Coordinator cycle using the configured decision policy. |

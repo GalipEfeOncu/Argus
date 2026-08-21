@@ -51,6 +51,7 @@ class CoordinatorCycleResult:
     resolution: str | None
     error_code: str | None = None
     error_summary: str | None = None
+    assignment_ids: tuple[str, ...] = ()
 
     @property
     def visible_summary(self) -> str | None:
@@ -111,7 +112,9 @@ class CoordinatorCycle:
 
         return session_id in cls._active_turns and session_id in cls._decision_providers
 
-    async def validate(self, session_id: str, action_value: Any) -> CoordinatorAction:
+    async def validate(
+        self, session_id: str, action_value: Any, *, route_unmet_gates: bool = True,
+    ) -> CoordinatorAction:
         try:
             action = parse_coordinator_action(action_value)
         except ValidationError as error:
@@ -120,10 +123,12 @@ class CoordinatorCycle:
         if isinstance(action, AssignmentsAction):
             self._validate_assignments(snapshot, action)
         if isinstance(action, FinalAction):
-            await self._validate_final(session_id, snapshot)
+            await self._validate_final(session_id, snapshot, route_unmet_gates=route_unmet_gates)
         return action
 
-    async def persist_assignments(self, session_id: str, action: AssignmentsAction | Any) -> tuple[str, ...]:
+    async def persist_assignments(
+        self, session_id: str, action: AssignmentsAction | Any, *, require_running: bool = False,
+    ) -> tuple[str, ...]:
         """Turn an already validated Coordinator action into durable scheduler work.
 
         Keeping this explicit makes provider execution unable to create an
@@ -137,11 +142,15 @@ class CoordinatorCycle:
             raise CoordinatorActionRejected("not_assignment_action", "Only assignment actions can be scheduled.")
         scheduler = AssignmentScheduler(self._db)
         return tuple([
-            await scheduler.accept_coordinator_proposal(session_id, proposal, parent_id=proposal.parent_id)
+            await scheduler.accept_coordinator_proposal(
+                session_id, proposal, parent_id=proposal.parent_id, require_running=require_running,
+            )
             for proposal in validated.assignments
         ])
 
-    async def resolve_actions(self, session_id: str, actions: list[Any]) -> CoordinatorCycleResult:
+    async def resolve_actions(
+        self, session_id: str, actions: list[Any], *, apply_actions: bool = True,
+    ) -> CoordinatorCycleResult:
         """Validate a response and at most one deterministic correction response."""
 
         if session_id in self._superseded_sessions:
@@ -152,7 +161,7 @@ class CoordinatorCycle:
                 self._superseded_sessions.discard(session_id)
                 return CoordinatorCycleResult(None, attempt > 0, True, None, "user_superseded", "A newer user instruction superseded this Coordinator response.")
             try:
-                action = await self.validate(session_id, raw_action)
+                action = await self.validate(session_id, raw_action, route_unmet_gates=apply_actions)
             except CoordinatorActionRejected as error:
                 if attempt == 0:
                     if len(actions) == 1:
@@ -164,7 +173,9 @@ class CoordinatorCycle:
         resolution = (await SessionConfigurationService(self._db).current(session_id)).approval_policy["limitResolution"]
         return CoordinatorCycleResult(None, True, True, resolution, "missing_coordinator_action", "Coordinator did not provide a correction response.")
 
-    async def execute(self, session_id: str, provider: Provider, request: ProviderRequest) -> CoordinatorCycleResult:
+    async def execute(
+        self, session_id: str, provider: Provider, request: ProviderRequest, *, apply_actions: bool = True,
+    ) -> CoordinatorCycleResult:
         """Consume structured provider output, retrying exactly once after an invalid action."""
 
         if session_id in self._active_streams:
@@ -179,7 +190,7 @@ class CoordinatorCycle:
             for attempt in range(2):
                 if session_id in self._superseded_sessions:
                     await provider.cancel(request.request_id)
-                    return await self.resolve_actions(session_id, action_values)
+                    return await self.resolve_actions(session_id, action_values, apply_actions=apply_actions)
                 correction_note = () if attempt == 0 else ({
                     "role": "system",
                     "content": "Your prior action was invalid. Return only one valid Coordinator action without permissions, configuration, or gate claims.",
@@ -192,12 +203,14 @@ class CoordinatorCycle:
                 self._active_streams[session_id] = (provider, attempt_request.request_id)
                 value = await self._one_structured_output(session_id, provider, attempt_request)
                 if value is _SUPERSEDED:
-                    return await self.resolve_actions(session_id, action_values)
+                    return await self.resolve_actions(session_id, action_values, apply_actions=apply_actions)
                 action_values.append(value)
-                result = await self.resolve_actions(session_id, action_values)
+                result = await self.resolve_actions(session_id, action_values, apply_actions=apply_actions)
                 if result.action is not None or result.stopped:
                     if isinstance(result.action, AssignmentsAction):
-                        await self.persist_assignments(session_id, result.action)
+                        if not apply_actions:
+                            return result
+                        assignment_ids = await self.persist_assignments(session_id, result.action)
                         await AssignmentScheduler(self._db).dispatch_ready(session_id)
                         # A reached limit can be produced by dispatch itself.
                         # Reuse this live Coordinator provider once, but the
@@ -205,14 +218,15 @@ class CoordinatorCycle:
                         # tool-free decision schema and never asks for a retry.
                         from app.services.limit_resolution_service import LimitResolutionService
                         await LimitResolutionService(self._db).execute_coordinator_decision(session_id, provider, request)
-                    elif isinstance(result.action, PartialAction):
+                        result = replace(result, assignment_ids=assignment_ids)
+                    elif isinstance(result.action, PartialAction) and apply_actions:
                         if await self.request_partial_acceptance(session_id, result.action) is None:
                             return CoordinatorCycleResult(
                                 None, result.correction_requested, True, None, "partial_outcome_not_runnable",
                                 "The session stopped or paused before the partial outcome could be presented.",
                             )
                     return result
-            return await self.resolve_actions(session_id, action_values)
+            return await self.resolve_actions(session_id, action_values, apply_actions=apply_actions)
         finally:
             # All synchronous runtime limit producers commit their request in
             # the active turn. Consume it here, after their transaction ended.
@@ -298,14 +312,17 @@ class CoordinatorCycle:
             if missing:
                 raise CoordinatorActionRejected("missing_capability", "Coordinator requested a capability the selected agent does not declare.")
 
-    async def _validate_final(self, session_id: str, snapshot: ConfigurationSnapshot) -> None:
+    async def _validate_final(
+        self, session_id: str, snapshot: ConfigurationSnapshot, *, route_unmet_gates: bool,
+    ) -> None:
         from app.services.gate_engine import GateEngine
 
         gates = GateEngine(self._db)
         if any(state.status == "pending" for state in await gates.states(session_id)):
-            await gates.route_unsatisfied(session_id)
-            await gates.append_states(session_id)
-            await AssignmentScheduler(self._db).dispatch_ready(session_id)
+            if route_unmet_gates:
+                await gates.route_unsatisfied(session_id)
+                await gates.append_states(session_id)
+                await AssignmentScheduler(self._db).dispatch_ready(session_id)
             raise CoordinatorActionRejected(
                 "required_gate_unmet",
                 "Coordinator cannot deliver a final result while required evidence is missing; eligible gate work was queued.",

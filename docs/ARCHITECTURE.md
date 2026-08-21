@@ -200,6 +200,17 @@ created → preparing → running ⇄ paused
 
 Each session has an append-only event log. The client receives a snapshot then events in increasing `sequence` order. On reconnect it requests events after its last confirmed sequence. Commands carry idempotency keys.
 
+The current provider-backed Coordinator lifecycle starts only after the durable
+`session.start` result has been fanned out. A process-owned manager gives each
+session at most one background Coordinator turn, opens an independent database
+connection for it, resolves only the immutable configured provider/model, and
+publishes every derived event after commit. The turn continues without a live
+WebSocket. Pause or cancel fences late provider output, shutdown drains then
+cancels within a bound, and restart recovery records an interrupted Coordinator
+operation as unknown instead of replaying remote work. Specialist execution is
+not yet attached to this lifecycle; scheduler proposals fail visibly and leave
+no running attempt rather than implying work is happening.
+
 Different projects may run sessions concurrently. Only one mutating session can hold a project writer lock in the MVP. Within a session, read-only work may overlap while only one participant holds the writer lease.
 
 ## Participants, roles, and skills

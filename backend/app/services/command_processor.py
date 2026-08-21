@@ -159,6 +159,9 @@ class CommandProcessor:
             # SQLite transaction boundary.
             from app.services.coordinator_cycle import CoordinatorCycle
             await CoordinatorCycle.supersede_active(session_id)
+        elif command.type == "session.cancel":
+            from app.services.coordinator_cycle import CoordinatorCycle
+            await CoordinatorCycle.supersede_active(session_id)
         if replan_decision_id is not None:
             from app.services.limit_resolution_service import LimitResolutionService
             await LimitResolutionService(self._db).replan_after_resolution(session_id, replan_decision_id)

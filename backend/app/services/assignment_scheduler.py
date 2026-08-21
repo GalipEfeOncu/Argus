@@ -52,6 +52,7 @@ class AssignmentScheduler:
 
     async def accept_coordinator_proposal(
         self, session_id: str, proposal: CoordinatorAssignment, *, parent_id: str | None = None,
+        require_running: bool = False,
     ) -> str:
         """Validate and durably accept one Coordinator proposal exactly once."""
 
@@ -59,6 +60,11 @@ class AssignmentScheduler:
         rejection: SchedulerRejected | None = None
         assignment_id: str | None = None
         async with transaction(self._db):
+            if require_running:
+                async with self._db.execute("SELECT status FROM sessions WHERE id = ?", (session_id,)) as cursor:
+                    session = await cursor.fetchone()
+                if session is None or session["status"] != "running":
+                    raise SchedulerRejected("session_not_running", "The session stopped or paused before the assignment could be accepted.")
             existing = await self._proposal_assignment(session_id, proposal.proposal_id)
             if existing is not None:
                 if existing["validation_state"] != "accepted":

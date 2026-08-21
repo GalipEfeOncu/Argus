@@ -16,6 +16,7 @@ from app.services.workspace_service import ProjectWorkspaceService
 from app.services.agent_definition_service import AgentDefinitionService
 from app.services.recovery_service import RecoveryService
 from app.services.observability_service import observability
+from app.services.session_runtime_manager import session_runtime_manager
 from app.version import APP_VERSION
 
 
@@ -29,7 +30,8 @@ async def lifespan(app: FastAPI):
         await AgentDefinitionService(db).ensure_builtin_templates()
         await ProjectWorkspaceService(db, managed_root=Path(settings.db_path).expanduser().resolve().parent / "workspaces").recover_after_restart()
         report = await RecoveryService(db).recover_after_restart()
-        observability.record("INFO", "runtime.recovery_checked", {"sessions": report.sessions, "orphanedAttempts": report.orphaned_attempts})
+        recovered_coordinators = await session_runtime_manager.recover_after_restart()
+        observability.record("INFO", "runtime.recovery_checked", {"sessions": report.sessions, "orphanedAttempts": report.orphaned_attempts, "interruptedCoordinators": recovered_coordinators})
         print(f"[Argus] Recovery checked {report.sessions} sessions; orphaned attempts={report.orphaned_attempts}")
     finally:
         await db.close()
@@ -37,6 +39,7 @@ async def lifespan(app: FastAPI):
     try:
         yield
     finally:
+        await session_runtime_manager.shutdown()
         print("[Argus] Shutting down")
 
 

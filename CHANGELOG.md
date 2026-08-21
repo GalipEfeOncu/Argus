@@ -8,6 +8,9 @@ All notable user-visible changes to Argus are recorded here. The project follows
 
 ### Added
 
+- Starting a session now runs its explicitly configured Coordinator provider in
+  a durable background lifecycle, with visible final or failure outcomes,
+  reconnectable events, safe pause/cancel fencing, and no provider fallback.
 - An optional offline profile now lets the device owner set a local display name
   and bio, with accessible edit, loading, retry, and save states and no online
   account or browser-persisted identity.
