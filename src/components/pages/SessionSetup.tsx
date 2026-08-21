@@ -8,14 +8,14 @@ import { useTauri } from '@/hooks/useTauri';
 import { api } from '@/services/api';
 import { tauriCommands } from '@/services/tauri';
 import {
-  applyPreset, authoritySummary, createConfiguration, limitDefinitions, markCustom,
-  roleEvidence, validateConfiguration,
+  createReadOnlyAlphaConfiguration, enforceReadOnlyAlphaConfiguration, limitDefinitions,
+  markCustom, readOnlyAlphaAuthoritySummary, READ_ONLY_ALPHA_TOOLS, validateConfiguration,
 } from '@/services/sessionConfiguration';
-import type { AgentInstance, ApprovalBehavior, ApprovalPolicy, ExecutionLimits, RequiredRoleRule, SessionConfiguration, SessionPreset, WorkspaceMode } from '@/types/session';
+import type { AgentInstance, ExecutionLimits, SessionConfiguration } from '@/types/session';
 import type { AgentInfo, AgentRole, ModelRef } from '@/types/agent';
 import './SessionSetup.css';
 
-const capabilityOptions = ['workspace.read', 'workspace.write', 'test.run'];
+const readOnlyLimitDefinitions = limitDefinitions.filter(({ key }) => !['maxRevisionsPerFinding', 'maxParallelReadOnlyAssignments'].includes(key));
 
 function visibleAgentNames(configuration: SessionConfiguration): string {
   return configuration.availableAgents.filter((agent) => configuration.availableAgentIds.includes(agent.id)).map((agent) => agent.label).join(', ') || 'No specialists';
@@ -26,39 +26,32 @@ function toSessionCreateRequest(
   goal: string,
   configuration: SessionConfiguration,
 ): Parameters<typeof api.sessions.create>[0] {
-  const acknowledgements: string[] = [];
-  if (configuration.workspaceMode === 'direct_write' && configuration.directWriteAcknowledged) {
-    acknowledgements.push('direct_write_limited_rollback');
-  }
-  if (configuration.preauthorizationAcknowledged) {
-    if (configuration.approvalPolicy.permissionProfile === 'autonomous') acknowledgements.push('autonomous_permissions');
-    if (configuration.approvalPolicy.permissionProfile === 'expert_unrestricted') acknowledgements.push('expert_unrestricted_permissions');
-  }
+  const runtimeConfiguration = enforceReadOnlyAlphaConfiguration(configuration);
   return {
     projectPath,
     goal,
     coordinatorAgentId: 'coordinator',
     agents: [
       {
-        id: 'coordinator', role: 'coordinator', agentDefinitionId: configuration.coordinatorDefinitionId,
-        modelBinding: configuration.coordinatorModel === null ? undefined : {
-          providerProfileId: configuration.coordinatorModel.providerId, modelId: configuration.coordinatorModel.modelId,
+        id: 'coordinator', role: 'coordinator', agentDefinitionId: runtimeConfiguration.coordinatorDefinitionId,
+        modelBinding: runtimeConfiguration.coordinatorModel === null ? undefined : {
+          providerProfileId: runtimeConfiguration.coordinatorModel.providerId, modelId: runtimeConfiguration.coordinatorModel.modelId,
         },
-        permissionProfile: configuration.coordinatorPermissionProfile,
-        skillIds: configuration.enabledSkills,
-        ...(configuration.coordinatorPromptOverride.trim() ? { systemPrompt: configuration.coordinatorPromptOverride } : {}),
-        outputLanguage: configuration.outputLanguage,
+        permissionProfile: runtimeConfiguration.coordinatorPermissionProfile,
+        skillIds: runtimeConfiguration.enabledSkills,
+        ...(runtimeConfiguration.coordinatorPromptOverride.trim() ? { systemPrompt: runtimeConfiguration.coordinatorPromptOverride } : {}),
+        outputLanguage: runtimeConfiguration.outputLanguage,
       },
-      ...configuration.availableAgents.map((agent) => ({
+      ...runtimeConfiguration.availableAgents.map((agent) => ({
         id: agent.id, role: agent.role, agentDefinitionId: agent.agentDefinitionId, capabilities: agent.capabilities,
         ...(agent.modelRef === null ? {} : { modelBinding: { providerProfileId: agent.modelRef.providerId, modelId: agent.modelRef.modelId } }),
         permissionProfile: agent.permissionProfile,
-        outputLanguage: configuration.outputLanguage,
+        outputLanguage: runtimeConfiguration.outputLanguage,
       })),
     ],
     configuration: {
-      availableAgentIds: configuration.availableAgentIds,
-      requiredRoleRules: configuration.requiredRoleRules.map((rule) => ({
+      availableAgentIds: runtimeConfiguration.availableAgentIds,
+      requiredRoleRules: runtimeConfiguration.requiredRoleRules.map((rule) => ({
         id: rule.id,
         role: rule.role,
         applicability: rule.applicability,
@@ -67,13 +60,13 @@ function toSessionCreateRequest(
         requiredCapabilities: [],
         ...(rule.capability === undefined ? {} : { capability: rule.capability }),
       })),
-      executionLimits: configuration.executionLimits,
-      approvalPolicy: configuration.approvalPolicy,
-      workspacePolicy: { mode: configuration.workspaceMode },
-      acknowledgements,
+      executionLimits: runtimeConfiguration.executionLimits,
+      approvalPolicy: runtimeConfiguration.approvalPolicy,
+      workspacePolicy: { mode: runtimeConfiguration.workspaceMode },
+      acknowledgements: [],
     },
-    workspaceMode: configuration.workspaceMode,
-    acknowledgeDirectWrite: configuration.directWriteAcknowledged,
+    workspaceMode: runtimeConfiguration.workspaceMode,
+    acknowledgeDirectWrite: false,
   };
 }
 
@@ -105,16 +98,12 @@ export const SessionSetup: React.FC = () => {
   const { openDirectoryDialog } = useTauri();
   const [projectPath, setProjectPath] = useState('');
   const [goal, setGoal] = useState('');
-  const [configuration, setConfiguration] = useState(() => createConfiguration(defaultRoleModels));
+  const [configuration, setConfiguration] = useState(() => createReadOnlyAlphaConfiguration(defaultRoleModels));
   const [startError, setStartError] = useState<string | null>(null);
   const [isStarting, setIsStarting] = useState(false);
   const [coordinatorDefinitions, setCoordinatorDefinitions] = useState<Array<{ id: string; name: string; permissionProfile: SessionConfiguration['coordinatorPermissionProfile'] }>>([
     { id: 'builtin.coordinator.v1', name: 'Coordinator', permissionProfile: 'balanced' },
   ]);
-  const [localSkills, setLocalSkills] = useState<Array<{
-    id: string; manifest: { name: string; version: string }; enabled: boolean; trustState: string; requestedTools: string[]; requestedPermissions: string[];
-  }>>([]);
-  const [skillError, setSkillError] = useState<string | null>(null);
   const [providerModels, setProviderModels] = useState<ModelRef[]>([]);
   const [modelsLoaded, setModelsLoaded] = useState(false);
   const [providerCatalogState, setProviderCatalogState] = useState<'loading' | 'ready' | 'error'>('loading');
@@ -164,7 +153,7 @@ export const SessionSetup: React.FC = () => {
           permissionProfile: definition.permissionProfile,
           outputLanguage: definition.outputLanguage,
         }));
-      setConfiguration((current) => ({
+      setConfiguration((current) => enforceReadOnlyAlphaConfiguration({
         ...current,
         availableAgents: [...current.availableAgents.filter((agent) => !agent.id.startsWith('definition-')), ...customAgents],
       }));
@@ -178,23 +167,15 @@ export const SessionSetup: React.FC = () => {
     return () => { active = false; };
   }, [definitionReload]);
 
-  useEffect(() => {
-    let active = true;
-    const listSkills = api.skills?.list;
-    if (listSkills === undefined) return () => { active = false; };
-    void listSkills().then((skills) => { if (active) setLocalSkills(skills); }).catch(() => {
-      if (active) setSkillError('Local skill packages could not be loaded.');
-    });
-    return () => { active = false; };
-  }, []);
-
   const validation = useMemo(() => {
-    const errors = validateConfiguration(configuration);
+    const runtimeConfiguration = enforceReadOnlyAlphaConfiguration(configuration);
+    const errors = validateConfiguration(runtimeConfiguration);
     const availableModels = new Set(providerModels.map((model) => `${model.providerId}:${model.modelId}`));
-    const selectedModels = [configuration.coordinatorModel, ...configuration.availableAgents.filter((agent) => configuration.availableAgentIds.includes(agent.id)).map((agent) => agent.modelRef)];
+    const selectedModels = [runtimeConfiguration.coordinatorModel, ...runtimeConfiguration.availableAgents.filter((agent) => runtimeConfiguration.availableAgentIds.includes(agent.id)).map((agent) => agent.modelRef)];
     if (modelsLoaded && selectedModels.some((model) => model !== null && !availableModels.has(`${model.providerId}:${model.modelId}`))) {
       errors.push('Every selected model must belong to a configured provider profile and its available model list.');
     }
+    if (runtimeConfiguration.availableAgentIds.length === 0) errors.push('A configured read-only specialist model is required.');
     return errors;
   }, [configuration, modelsLoaded, providerModels]);
   const canStart = providerCatalogState === 'ready' && modelsLoaded && projectPath.trim().length > 0 && goal.trim().length > 0 && validation.length === 0;
@@ -205,114 +186,41 @@ export const SessionSetup: React.FC = () => {
       const path = await openDirectoryDialog();
       if (path) {
         setProjectPath(path);
-        setConfiguration((current) => ({ ...current, preauthorizationScope: path, preauthorizationAcknowledged: false }));
       }
     } catch {
       // The native bridge exposes its error state separately; keep the form usable.
     }
   };
 
-  const handleImportSkill = async () => {
-    const importSkill = api.skills?.import;
-    if (importSkill === undefined) return;
-    setSkillError(null);
-    try {
-      const sourcePath = await openDirectoryDialog();
-      if (!sourcePath) return;
-      const imported = await importSkill(sourcePath);
-      setLocalSkills((current) => [imported, ...current.filter((skill) => skill.id !== imported.id)]);
-    } catch {
-      setSkillError('This folder is not a valid local skill package. Check its manifest and files.');
-    }
-  };
-
-  const setSkillEnabled = async (skillId: string, enabled: boolean) => {
-    const setEnabled = api.skills?.setEnabled;
-    if (setEnabled === undefined) return;
-    setSkillError(null);
-    try {
-      const updated = await setEnabled(skillId, enabled);
-      setLocalSkills((current) => current.map((skill) => skill.id === skillId ? updated : skill));
-      if (!enabled) update((current) => ({ ...current, enabledSkills: current.enabledSkills.filter((id) => id !== skillId) }));
-    } catch {
-      setSkillError('The local runtime could not update this skill package.');
-    }
-  };
-
-  const selectPreset = (preset: SessionPreset) => {
-    if (preset === 'custom') return setConfiguration((current) => markCustom(current));
-    setConfiguration((current) => applyPreset(current, preset));
-  };
-
   const toggleAgent = (agent: AgentInstance) => update((current) => {
     const selected = current.availableAgentIds.includes(agent.id);
-    const required = current.requiredRoleRules.some((rule) => rule.role === agent.role);
-    if (selected && required) return current;
     return {
       ...current,
       availableAgentIds: selected ? current.availableAgentIds.filter((id) => id !== agent.id) : [...current.availableAgentIds, agent.id],
     };
   });
 
-  const toggleRequiredRole = (agent: AgentInstance) => update((current) => {
-    const matching = current.requiredRoleRules.find((rule) => rule.role === agent.role);
-    if (matching) return { ...current, requiredRoleRules: current.requiredRoleRules.filter((rule) => rule.id !== matching.id) };
-    const newRule: RequiredRoleRule = {
-      id: `gate-${agent.role}`, role: agent.role, applicability: agent.role === 'reviewer' || agent.role === 'tester' ? 'when_changes' : 'always',
-      successEvidence: agent.evidenceKinds[0] ?? roleEvidence(agent.role), minimumCompletions: 1,
-    };
-    return {
-      ...current,
-      availableAgentIds: current.availableAgentIds.includes(agent.id) ? current.availableAgentIds : [...current.availableAgentIds, agent.id],
-      requiredRoleRules: [...current.requiredRoleRules, newRule],
-    };
-  });
-
-  const updateRule = (role: AgentInstance['role'], change: (rule: RequiredRoleRule) => RequiredRoleRule) => update((current) => ({
-    ...current, requiredRoleRules: current.requiredRoleRules.map((rule) => rule.role === role ? change(rule) : rule),
-  }));
-
   const setLimit = (key: keyof ExecutionLimits, raw: string) => update((current) => ({
     ...current,
     executionLimits: { ...current.executionLimits, [key]: raw === '' ? null : Number(raw) },
   }));
 
-  const setApprovalBehavior = (behavior: ApprovalBehavior) => update((current) => ({
-    ...current,
-    approvalPolicy: { ...current.approvalPolicy, behavior, preauthorizedCapabilities: behavior === 'preauthorize_session' ? current.approvalPolicy.preauthorizedCapabilities : [] },
-    preauthorizationScope: behavior === 'preauthorize_session' ? current.preauthorizationScope || projectPath : '',
-    preauthorizationAcknowledged: behavior === 'preauthorize_session' ? current.preauthorizationAcknowledged : false,
-  }));
-
-  const toggleCapability = (capability: string) => update((current) => {
-    const selected = current.approvalPolicy.preauthorizedCapabilities.includes(capability);
-    return {
-      ...current,
-      approvalPolicy: {
-        ...current.approvalPolicy,
-        preauthorizedCapabilities: selected
-          ? current.approvalPolicy.preauthorizedCapabilities.filter((item) => item !== capability)
-          : [...current.approvalPolicy.preauthorizedCapabilities, capability],
-      },
-      preauthorizationAcknowledged: false,
-    };
-  });
-
   const handleStart = async () => {
     if (!canStart) return;
     setStartError(null);
     setIsStarting(true);
-    const roleConfigs = [{ instanceId: 'coordinator', role: 'coordinator' as const, enabled: true, modelRef: configuration.coordinatorModel!, customSystemPrompt: configuration.coordinatorPromptOverride || undefined },
-      ...configuration.availableAgents.filter((agent) => configuration.availableAgentIds.includes(agent.id)).map((agent) => ({ instanceId: agent.id, role: agent.role, enabled: true, modelRef: agent.modelRef!, }))];
+    const runtimeConfiguration = enforceReadOnlyAlphaConfiguration(configuration);
+    const roleConfigs = [{ instanceId: 'coordinator', role: 'coordinator' as const, enabled: true, modelRef: runtimeConfiguration.coordinatorModel!, customSystemPrompt: runtimeConfiguration.coordinatorPromptOverride || undefined },
+      ...runtimeConfiguration.availableAgents.filter((agent) => runtimeConfiguration.availableAgentIds.includes(agent.id)).map((agent) => ({ instanceId: agent.id, role: agent.role, enabled: true, modelRef: agent.modelRef!, }))];
     try {
       const configuredProfileIds = new Set(providerModels.map((model) => model.providerId));
-      const profileIds = new Set([configuration.coordinatorModel, ...configuration.availableAgents.map((agent) => agent.modelRef)].flatMap((model) => model !== null && configuredProfileIds.has(model.providerId) ? [model.providerId] : []));
+      const profileIds = new Set([runtimeConfiguration.coordinatorModel, ...runtimeConfiguration.availableAgents.filter((agent) => runtimeConfiguration.availableAgentIds.includes(agent.id)).map((agent) => agent.modelRef)].flatMap((model) => model !== null && configuredProfileIds.has(model.providerId) ? [model.providerId] : []));
       await Promise.all([...profileIds].map((profileId) => tauriCommands.refreshProviderCredential(profileId)));
-      const created = await api.sessions.create(toSessionCreateRequest(projectPath, goal.trim(), configuration));
+      const created = await api.sessions.create(toSessionCreateRequest(projectPath, goal.trim(), runtimeConfiguration));
       // The local store only retains render metadata.  The canonical snapshot
       // and every timeline entry arrive through the live transport.
-      initAgents(liveAgentInfos(configuration, created.agentSnapshots));
-      createSession({ projectPath, task: goal.trim(), roleConfigs, configuration }, created.id);
+      initAgents(liveAgentInfos(runtimeConfiguration, created.agentSnapshots));
+      createSession({ projectPath, task: goal.trim(), roleConfigs, configuration: runtimeConfiguration }, created.id);
       invalidateWorkspaceCatalog();
       setActivePage('session');
     } catch {
@@ -326,28 +234,20 @@ export const SessionSetup: React.FC = () => {
     <div className="session-setup">
       <div className="setup-inner">
         <header className="setup-header">
-          <button className="setup-back-btn" onClick={() => setActivePage('dashboard')} aria-label="Back to dashboard">←</button>
-          <div><h1 className="setup-title">New Session</h1><p className="setup-subtitle">Configure a visible, bounded Coordinator session.</p></div>
+          <button type="button" className="setup-back-btn" onClick={() => setActivePage('dashboard')} aria-label="Back to dashboard">←</button>
+          <div><h1 className="setup-title">New Read-only Session</h1><p className="setup-subtitle">Configure a bounded workspace inspection with a visible Coordinator.</p></div>
         </header>
 
-        <nav className="preset-bar" aria-label="Session presets">
-          {(['quick', 'balanced', 'thorough', 'custom'] as SessionPreset[]).map((preset) => (
-            <button key={preset} type="button" className={`preset-button ${configuration.preset === preset ? 'preset-button--active' : ''}`} onClick={() => selectPreset(preset)} aria-pressed={configuration.preset === preset}>
-              {preset[0].toUpperCase() + preset.slice(1)}
-            </button>
-          ))}
-          <span className="preset-note">Resolved values remain visible below.</span>
-        </nav>
+        <div className="setup-runtime-scope" role="note"><strong>Read-only Alpha runtime</strong><span>Coordinator may dispatch at most one specialist per turn. Specialists can only inspect with {READ_ONLY_ALPHA_TOOLS.join(', ')} when their immutable definition allows the requested tool. No files are changed and no tests or shell commands run.</span></div>
 
         <div className="setup-grid">
           <section className="setup-card" aria-labelledby="setup-goal">
-            <h2 id="setup-goal" className="setup-card-label">1 — Goal and workspace</h2>
+            <h2 id="setup-goal" className="setup-card-label">1 — Inspection goal and workspace</h2>
             <label className="setup-label" htmlFor="project-path">Project workspace</label>
             <div className="setup-path-row"><input id="project-path" className="argus-input" value={projectPath} readOnly placeholder="Select a directory…" /><button type="button" className="setup-secondary-btn" onClick={handleSelectFolder}>Browse</button></div>
             <label className="setup-label" htmlFor="session-goal">Goal</label>
-            <textarea id="session-goal" className="setup-textarea" value={goal} onChange={(event) => setGoal(event.target.value)} placeholder="What should the team build or verify?" />
-            <fieldset className="setup-fieldset"><legend>Workspace isolation</legend>{(['worktree', 'snapshot', 'direct_write'] as WorkspaceMode[]).map((mode) => <label key={mode} className="choice-row"><input type="radio" name="workspace-mode" checked={configuration.workspaceMode === mode} onChange={() => update((current) => ({ ...current, workspaceMode: mode, directWriteAcknowledged: mode === 'direct_write' ? false : current.directWriteAcknowledged }))} />{mode.replace('_', ' ')}</label>)}</fieldset>
-            {configuration.workspaceMode === 'direct_write' && <div className="setup-warning"><strong>Direct write has limited rollback.</strong> Changes target the original project instead of an isolated worktree or snapshot.<label className="choice-row"><input type="checkbox" checked={configuration.directWriteAcknowledged} onChange={() => update((current) => ({ ...current, directWriteAcknowledged: !current.directWriteAcknowledged }))} />I understand that rollback is limited.</label></div>}
+            <textarea id="session-goal" className="setup-textarea" value={goal} onChange={(event) => setGoal(event.target.value)} placeholder="What should Coordinator inspect or analyze?" />
+            <p className="setup-static"><strong>Workspace access:</strong> isolated, read-only inspection. Direct-write and mutation modes are not available in this Alpha.</p>
             <label className="setup-label" htmlFor="output-language">Output language</label><select id="output-language" className="setup-select" value={configuration.outputLanguage} onChange={(event) => update((current) => ({ ...current, outputLanguage: event.target.value as SessionConfiguration['outputLanguage'] }))}><option value="en">English</option><option value="tr">Türkçe</option></select>
           </section>
 
@@ -361,44 +261,29 @@ export const SessionSetup: React.FC = () => {
             <label className="setup-label" htmlFor="coordinator-definition">Definition version</label><select id="coordinator-definition" className="setup-select" value={configuration.coordinatorDefinitionId} onChange={(event) => { const definition = coordinatorDefinitions.find((item) => item.id === event.target.value); update((current) => ({ ...current, coordinatorDefinitionId: event.target.value, coordinatorPermissionProfile: definition?.permissionProfile ?? current.coordinatorPermissionProfile })); }}>{coordinatorDefinitions.map((definition) => <option key={definition.id} value={definition.id}>{definition.name}</option>)}</select>
             <label className="setup-label" htmlFor="coordinator-model">Model</label><select id="coordinator-model" className="setup-select" value={configuration.coordinatorModel ? `${configuration.coordinatorModel.providerId}:${configuration.coordinatorModel.modelId}` : 'missing'} onChange={(event) => { const selected = providerModels.find((model) => `${model.providerId}:${model.modelId}` === event.target.value); update((current) => ({ ...current, coordinatorModel: event.target.value === 'missing' ? null : selected ?? defaultRoleModels.coordinator ?? current.coordinatorModel })); }}><option value="missing">No model configured</option>{configuration.coordinatorModel && !providerModels.some((model) => model.providerId === configuration.coordinatorModel?.providerId && model.modelId === configuration.coordinatorModel.modelId) && <option value={`${configuration.coordinatorModel.providerId}:${configuration.coordinatorModel.modelId}`}>{configuration.coordinatorModel.displayName}</option>}{providerModels.map((model) => <option key={`${model.providerId}:${model.modelId}`} value={`${model.providerId}:${model.modelId}`}>{model.displayName}</option>)}</select>
             <label className="setup-label" htmlFor="coordinator-prompt">Prompt override <span className="setup-muted">(optional)</span></label><textarea id="coordinator-prompt" className="setup-textarea setup-textarea--compact" value={configuration.coordinatorPromptOverride} onChange={(event) => update((current) => ({ ...current, coordinatorPromptOverride: event.target.value }))} placeholder="Keep routing and handoffs concise…" />
-            <fieldset className="setup-fieldset"><legend>Local skills — trust and capability review</legend><p className="setup-static">Packages stay disabled after import. Their declared tools and permissions cannot expand this session’s policy.</p><button type="button" className="setup-secondary-btn" onClick={() => void handleImportSkill()}>Import local skill folder</button>{localSkills.length === 0 ? <p className="setup-muted">No local skill packages imported.</p> : localSkills.map((skill) => <div className="skill-review" key={skill.id}><strong>{skill.manifest.name} {skill.manifest.version}</strong><span className="setup-muted">{skill.trustState === 'enabled' ? 'Enabled after review' : 'Review required — disabled'}</span><span className="agent-capabilities">Tools: {skill.requestedTools.join(', ') || 'none'} · Permissions: {skill.requestedPermissions.join(', ') || 'none'}</span><label className="choice-row"><input type="checkbox" checked={skill.enabled} onChange={(event) => void setSkillEnabled(skill.id, event.target.checked)} />Enable after review</label><label className="choice-row"><input type="checkbox" disabled={!skill.enabled} checked={configuration.enabledSkills.includes(skill.id)} onChange={() => update((current) => ({ ...current, enabledSkills: current.enabledSkills.includes(skill.id) ? current.enabledSkills.filter((id) => id !== skill.id) : [...current.enabledSkills, skill.id] }))} />Use for this Coordinator session</label></div>)}{skillError !== null && <p className="setup-validation" role="alert">{skillError}</p>}</fieldset>
+            <p className="setup-muted">Coordinator receives no workspace tools. It routes one bounded read-only specialist assignment, then receives the specialist’s redacted result.</p>
           </section>
 
           <section className="setup-card" aria-labelledby="setup-team">
-            <h2 id="setup-team" className="setup-card-label">3 — Available team</h2><p className="setup-static">These are agent instances the Coordinator may select; roles are not a fixed pipeline.</p>
-            <div className="agent-config-list">{configuration.availableAgents.map((agent) => { const selected = configuration.availableAgentIds.includes(agent.id); const required = configuration.requiredRoleRules.some((rule) => rule.role === agent.role); const modelValue = agent.modelRef === null ? 'missing' : `${agent.modelRef.providerId}:${agent.modelRef.modelId}`; return <div className="agent-config-row" key={agent.id}><label><input type="checkbox" checked={selected} disabled={required} onChange={() => toggleAgent(agent)} /> <strong>{agent.label}</strong></label><label className="setup-label" htmlFor={`agent-model-${agent.id}`}>Model<select id={`agent-model-${agent.id}`} className="setup-select" value={modelValue} disabled={!selected} onChange={(event) => { const model = providerModels.find((item) => `${item.providerId}:${item.modelId}` === event.target.value) ?? null; update((current) => ({ ...current, availableAgents: current.availableAgents.map((item) => item.id === agent.id ? { ...item, modelRef: model } : item) })); }}><option value="missing">No model configured</option>{agent.modelRef !== null && !providerModels.some((model) => model.providerId === agent.modelRef?.providerId && model.modelId === agent.modelRef.modelId) && <option value={modelValue}>{agent.modelRef.displayName}</option>}{providerModels.map((model) => <option key={`${model.providerId}:${model.modelId}`} value={`${model.providerId}:${model.modelId}`}>{model.displayName}</option>)}</select></label><span className="agent-capabilities">{agent.capabilities.join(' · ')}</span>{agent.agentDefinitionId.startsWith('builtin.') ? null : <span className="setup-muted">Custom definition</span>}{required && <span className="required-lock">Required gate</span>}</div>; })}</div>
+            <h2 id="setup-team" className="setup-card-label">3 — Read-only specialist pool</h2><p className="setup-static">Coordinator may choose one selected specialist per turn. Role names do not grant build, write, test, or shell authority in this runtime.</p>
+            <div className="agent-config-list">{configuration.availableAgents.filter((agent) => agent.capabilities.includes('workspace.read')).map((agent) => { const selected = configuration.availableAgentIds.includes(agent.id); const modelValue = agent.modelRef === null ? 'missing' : `${agent.modelRef.providerId}:${agent.modelRef.modelId}`; return <div className="agent-config-row" key={agent.id}><label><input type="checkbox" checked={selected} onChange={() => toggleAgent(agent)} /> <strong>{agent.label}</strong> — inspection only</label><label className="setup-label" htmlFor={`agent-model-${agent.id}`}>Model<select id={`agent-model-${agent.id}`} className="setup-select" value={modelValue} disabled={!selected} onChange={(event) => { const model = providerModels.find((item) => `${item.providerId}:${item.modelId}` === event.target.value) ?? null; update((current) => ({ ...current, availableAgents: current.availableAgents.map((item) => item.id === agent.id ? { ...item, modelRef: model } : item) })); }}><option value="missing">No model configured</option>{agent.modelRef !== null && !providerModels.some((model) => model.providerId === agent.modelRef?.providerId && model.modelId === agent.modelRef.modelId) && <option value={modelValue}>{agent.modelRef.displayName}</option>}{providerModels.map((model) => <option key={`${model.providerId}:${model.modelId}`} value={`${model.providerId}:${model.modelId}`}>{model.displayName}</option>)}</select></label><span className="agent-capabilities">workspace.read · allowed tools are intersected with {READ_ONLY_ALPHA_TOOLS.join(', ')}</span>{agent.agentDefinitionId.startsWith('builtin.') ? null : <span className="setup-muted">Custom definition</span>}</div>; })}</div>
             <p className="setup-muted">Selected: {visibleAgentNames(configuration)}</p>
           </section>
 
-          <section className="setup-card" aria-labelledby="setup-gates">
-            <h2 id="setup-gates" className="setup-card-label">4 — Required roles</h2><p className="setup-static">A required role needs validated completion evidence before a successful result.</p>
-            {configuration.availableAgents.map((agent) => { const required = configuration.requiredRoleRules.find((rule) => rule.role === agent.role); return <div key={agent.id} className="gate-row"><label className="choice-row"><input type="checkbox" checked={Boolean(required)} onChange={() => toggleRequiredRole(agent)} />Require {agent.label}</label>{required && <div className="gate-options"><label>Applies<select className="setup-select" value={required.applicability} onChange={(event) => updateRule(agent.role, (rule) => ({ ...rule, applicability: event.target.value as RequiredRoleRule['applicability'], capability: event.target.value === 'when_capability_used' ? 'workspace.write' : undefined }))}><option value="always">Always</option><option value="when_changes">When changes</option><option value="when_capability_used">When capability used</option></select></label>{required.applicability === 'when_capability_used' && <label>Capability<input className="argus-input" value={required.capability ?? ''} onChange={(event) => updateRule(agent.role, (rule) => ({ ...rule, capability: event.target.value }))} /></label>}<label>Evidence<input className="argus-input" value={required.successEvidence} onChange={(event) => updateRule(agent.role, (rule) => ({ ...rule, successEvidence: event.target.value }))} /></label></div>}</div>; })}
-          </section>
-
           <section className="setup-card setup-card--wide" aria-labelledby="setup-limits">
-            <h2 id="setup-limits" className="setup-card-label">5 — Limits</h2><p className="setup-static">Blank is unlimited user ceiling. 0 disables the named work; runtime safety guards still apply.</p>
-            <div className="limits-grid">{limitDefinitions.map(({ key, label, unit, zeroMeaning }) => <label key={key} className="limit-field">{label}<input className="argus-input" type="number" min="0" step={key === 'maxSessionCost' ? '0.01' : '1'} value={configuration.executionLimits[key] ?? ''} onChange={(event) => setLimit(key, event.target.value)} /><span>{unit} · {zeroMeaning}</span></label>)}</div>
+            <h2 id="setup-limits" className="setup-card-label">4 — Read-only execution limits</h2><p className="setup-static">Blank is unlimited user ceiling. The worker still caps each read-only assignment to its production safety maximums; parallel work is fixed to one.</p>
+            <div className="limits-grid">{readOnlyLimitDefinitions.map(({ key, label, unit, zeroMeaning }) => <label key={key} className="limit-field">{label}<input className="argus-input" type="number" min="0" step={key === 'maxSessionCost' ? '0.01' : '1'} value={configuration.executionLimits[key] ?? ''} onChange={(event) => setLimit(key, event.target.value)} /><span>{unit} · {zeroMeaning}</span></label>)}</div>
             <label className="limit-field">Soft warning ratio<input className="argus-input" type="number" min="0.01" max="1" step="0.01" value={configuration.executionLimits.softWarningRatio} onChange={(event) => update((current) => ({ ...current, executionLimits: { ...current.executionLimits, softWarningRatio: Number(event.target.value) } }))} /><span>fraction of each hard limit</span></label>
           </section>
 
-          <section className="setup-card" aria-labelledby="setup-approvals">
-            <h2 id="setup-approvals" className="setup-card-label">6 — Approvals</h2>
-            <label className="setup-label" htmlFor="permission-profile">Permission profile</label><select id="permission-profile" className="setup-select" value={configuration.approvalPolicy.permissionProfile} onChange={(event) => update((current) => ({ ...current, approvalPolicy: { ...current.approvalPolicy, permissionProfile: event.target.value as ApprovalPolicy['permissionProfile'] }, preauthorizationAcknowledged: false }))}><option value="strict">Strict</option><option value="balanced">Balanced</option><option value="autonomous">Autonomous</option><option value="expert_unrestricted">Expert unrestricted</option></select>
-            <fieldset className="setup-fieldset"><legend>Approval behavior</legend>{(['ask_each_time', 'ask_by_policy', 'preauthorize_session', 'deny_interactive'] as ApprovalBehavior[]).map((behavior) => <label key={behavior} className="choice-row"><input type="radio" name="approval-behavior" checked={configuration.approvalPolicy.behavior === behavior} onChange={() => setApprovalBehavior(behavior)} />{behavior === 'preauthorize_session' ? 'No-interruption mode (pre-authorize session)' : behavior.replaceAll('_', ' ')}</label>)}</fieldset>
-            <fieldset className="setup-fieldset"><legend>Capability overrides</legend>{capabilityOptions.map((capability) => <label key={capability}>Override {capability}<select className="setup-select" value={configuration.approvalPolicy.capabilityOverrides[capability] ?? 'profile'} onChange={(event) => update((current) => { const capabilityOverrides = { ...current.approvalPolicy.capabilityOverrides }; if (event.target.value === 'profile') delete capabilityOverrides[capability]; else capabilityOverrides[capability] = event.target.value as 'allow' | 'ask' | 'deny'; return { ...current, approvalPolicy: { ...current.approvalPolicy, capabilityOverrides } }; })}><option value="profile">Use profile</option><option value="ask">Always ask</option><option value="deny">Deny</option></select></label>)}</fieldset>
-            {configuration.approvalPolicy.behavior === 'preauthorize_session' && <fieldset className="setup-fieldset"><legend>Pre-authorized capabilities</legend><p className="setup-static">Exact workspace scope: the entire isolated session workspace created for <strong>{projectPath || 'the selected project'}</strong></p>{capabilityOptions.map((capability) => <label key={capability} className="choice-row"><input type="checkbox" checked={configuration.approvalPolicy.preauthorizedCapabilities.includes(capability)} onChange={() => toggleCapability(capability)} />{capability}</label>)}{configuration.approvalPolicy.permissionProfile === 'autonomous' && <label className="choice-row"><input type="checkbox" checked={configuration.preauthorizationAcknowledged} onChange={() => update((current) => ({ ...current, preauthorizationAcknowledged: !current.preauthorizationAcknowledged, preauthorizationScope: current.preauthorizationScope || projectPath }))} />I explicitly acknowledge these capabilities for this workspace.</label>}</fieldset>}
-            {configuration.approvalPolicy.permissionProfile === 'expert_unrestricted' && <label className="choice-row"><input type="checkbox" checked={configuration.preauthorizationAcknowledged} onChange={() => update((current) => ({ ...current, preauthorizationAcknowledged: !current.preauthorizationAcknowledged, preauthorizationScope: current.preauthorizationScope || projectPath }))} />I explicitly acknowledge Expert unrestricted authority for this workspace.</label>}
-            <label className="setup-label" htmlFor="limit-resolution">At a hard limit</label><select id="limit-resolution" className="setup-select" value={configuration.approvalPolicy.limitResolution} onChange={(event) => update((current) => ({ ...current, approvalPolicy: { ...current.approvalPolicy, limitResolution: event.target.value as ApprovalPolicy['limitResolution'] } }))}><option value="ask_user">Ask user</option><option value="coordinator_decides">Coordinator decides</option><option value="stop">Stop</option></select>
-          </section>
-
           <section className="setup-card" aria-labelledby="setup-review">
-            <h2 id="setup-review" className="setup-card-label">7 — Review</h2>
-            <ul className="review-summary">{authoritySummary(configuration).map((item) => <li key={item}>{item}</li>)}</ul>
+            <h2 id="setup-review" className="setup-card-label">5 — Review read-only authority</h2>
+            <ul className="review-summary">{readOnlyAlphaAuthoritySummary(enforceReadOnlyAlphaConfiguration(configuration)).map((item) => <li key={item}>{item}</li>)}</ul>
             {validation.length > 0 && <div className="setup-validation" role="alert"><strong>Resolve before starting</strong><ul>{validation.map((error) => <li key={error}>{error}</li>)}</ul></div>}
             {!modelsLoaded && providerCatalogState !== 'error' && <p className="setup-muted">Loading configured provider models…</p>}
             {!projectPath && <p className="setup-muted">Select a workspace to start.</p>}{!goal.trim() && <p className="setup-muted">Describe the goal to start.</p>}
             {startError !== null && <p className="setup-validation" role="alert">{startError}</p>}
-            <button className="setup-init-btn" type="button" onClick={() => void handleStart()} disabled={!canStart || isStarting}>{isStarting ? 'Creating isolated session…' : 'Start Coordinator session'}</button>
+            <button className="setup-init-btn" type="button" onClick={() => void handleStart()} disabled={!canStart || isStarting}>{isStarting ? 'Creating read-only session…' : 'Start read-only Coordinator session'}</button>
           </section>
         </div>
       </div>

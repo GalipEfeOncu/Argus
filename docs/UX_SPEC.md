@@ -48,7 +48,8 @@ from the event log.
 
 ## Session setup
 
-Session creation uses progressive disclosure and provides these sections:
+The target session-configuration contract uses progressive disclosure and
+provides these sections:
 
 1. **Goal and workspace:** project, goal, workspace isolation, output language.
 2. **Coordinator:** selected versioned definition, model, prompt override, and
@@ -68,6 +69,18 @@ Session creation uses progressive disclosure and provides these sections:
 Coordinator cannot be disabled. Selecting a required role automatically prompts
 the user to add an eligible agent to the available team. Invalid or internally
 contradictory configurations cannot start.
+
+The current production Alpha setup deliberately exposes a narrower five-part
+inspection flow: inspection goal and workspace, Coordinator, read-only
+specialist pool, applicable execution limits, and authority review. It fixes
+workspace mode to an isolated worktree, allows at most one specialist assignment
+per Coordinator turn, and limits workspace tools to the intersection of the
+immutable definition allowlist and `read_file`, `list_dir`, and `search_files`.
+The UI does not expose presets, skills, required gates, mutation, direct-write,
+test or shell authority, capability overrides, or session pre-authorization
+until those production worker paths exist. The broader configuration contract
+remains reserved for later runtime capabilities; the current setup normalizes
+every submitted snapshot to the narrower Alpha authority.
 
 Role editing creates a new definition version rather than mutating a running
 session. The runtime snapshots the selected definition's capabilities, tool

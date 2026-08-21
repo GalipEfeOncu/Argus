@@ -20,6 +20,10 @@ All notable user-visible changes to Argus are recorded here. The project follows
 
 ### Fixed
 
+- Session setup and runtime copy now match the production read-only worker:
+  Coordinator can route one specialist inspection per turn, unsupported write,
+  test, gate, direct-write, and pre-authorization controls are no longer offered,
+  and submitted authority is narrowed before session creation.
 - Packaged desktop sidecars now include the provider adapters exposed by the
   application and verify them offline during the frozen build, instead of
   failing only after a configured provider session starts.

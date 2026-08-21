@@ -1,10 +1,8 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { useSessionRoomStore } from '@/stores/sessionRoomStore';
 import { useSessionStore } from '@/stores/sessionStore';
 import { useWebSocket } from '@/hooks/useWebSocket';
 import type { ProjectedParticipant } from '@/services/sessionProjection';
-import type { SessionConfigurationPatch } from '@/types/generated/session-commands';
-import { roleEvidence } from '@/services/sessionConfiguration';
 import './RuntimeContext.css';
 import { AcceptanceReview } from './AcceptanceReview';
 import { RuntimeDiagnostics } from './RuntimeDiagnostics';
@@ -37,11 +35,7 @@ function lifecycleLabel(status: string | null, error: { summary: string; recover
 export const RuntimeContext: React.FC<RuntimeContextProps> = ({ sessionId }) => {
   const projection = useSessionRoomStore((state) => state.projections[sessionId]);
   const configuration = useSessionStore((state) => state.sessions.find((session) => session.id === sessionId)?.configuration);
-  const { sendInterrupt, sendApproval, controlSession, updateConfiguration, resolveDecision } = useWebSocket(sessionId);
-  const [nextLimitResolution, setNextLimitResolution] = useState<'ask_user' | 'coordinator_decides' | 'stop'>('ask_user');
-  const [draftAgentIds, setDraftAgentIds] = useState<string[] | null>(null);
-  const [draftRequiredRules, setDraftRequiredRules] = useState<SessionConfigurationPatch['requiredRoleRules']>(null);
-  const [draftApprovalBehavior, setDraftApprovalBehavior] = useState<NonNullable<SessionConfigurationPatch['approvalBehavior']> | null>(null);
+  const { sendInterrupt, sendApproval, controlSession, resolveDecision } = useWebSocket(sessionId);
   if (projection === undefined) return <section className="runtime-context" aria-label="Session runtime context">Loading runtime context…</section>;
 
   const grouped = Object.values(projection.participants).reduce<Record<ParticipantGroup, ProjectedParticipant[]>>(
@@ -56,7 +50,6 @@ export const RuntimeContext: React.FC<RuntimeContextProps> = ({ sessionId }) => 
   const terminal = ['completed', 'completed_partial', 'cancelled'].includes(projection.status ?? '')
     || (projection.status === 'failed' && !canRecover);
   const sessionControlPending = Object.values(projection.pendingCommands).some((entry) => ['session.pause', 'session.resume', 'session.cancel'].includes(entry.command.type));
-  const configurationPending = Object.values(projection.pendingCommands).some((entry) => entry.command.type === 'session.configuration.update');
   const usage = Object.values(projection.usageByScope).reduce((total, value) => ({
     inputTokens: total.inputTokens + value.inputTokens,
     outputTokens: total.outputTokens + value.outputTokens,
@@ -68,29 +61,6 @@ export const RuntimeContext: React.FC<RuntimeContextProps> = ({ sessionId }) => 
       : total.costUncertainty === 'estimated' || value.costUncertainty === 'estimated' ? 'estimated' : 'exact',
     durationMs: total.durationMs + value.durationMs,
   }), { inputTokens: 0, outputTokens: 0, normalizedCost: 0 as number | null, costUncertainty: 'exact' as 'exact' | 'estimated' | 'unavailable', durationMs: 0 });
-  const selectedAgentIds = draftAgentIds ?? configuration?.availableAgentIds ?? [];
-  const selectedRules = draftRequiredRules ?? configuration?.requiredRoleRules ?? [];
-  const approvalBehavior = draftApprovalBehavior ?? configuration?.approvalPolicy.behavior ?? 'ask_by_policy';
-  const configurationPatch: SessionConfigurationPatch = {
-    availableAgentIds: selectedAgentIds,
-    requiredRoleRules: selectedRules,
-    approvalBehavior,
-    limitResolution: nextLimitResolution,
-  };
-  const toggleFutureAgent = (agentId: string) => {
-    setDraftAgentIds((current) => (current ?? selectedAgentIds).includes(agentId)
-      ? (current ?? selectedAgentIds).filter((id) => id !== agentId)
-      : [...(current ?? selectedAgentIds), agentId]);
-  };
-  const toggleFutureGate = (role: NonNullable<typeof configuration>['availableAgents'][number]['role']) => {
-    setDraftRequiredRules((current) => {
-      const rules = current ?? selectedRules;
-      const existing = rules.find((rule) => rule.role === role);
-      return existing === undefined
-        ? [...rules, { id: `gate-${role}`, role, applicability: 'when_changes', successEvidence: roleEvidence(role), minimumCompletions: 1 }]
-        : rules.filter((rule) => rule.id !== existing.id);
-    });
-  };
 
   return (
     <section className="runtime-context" aria-label="Session runtime context">
@@ -130,8 +100,7 @@ export const RuntimeContext: React.FC<RuntimeContextProps> = ({ sessionId }) => 
         return <li key={counter}>{costUnavailable ? 'cost: unavailable from provider usage' : `${counter}: ${ceiling === null ? 'unlimited user ceiling' : `${Math.max(0, Number(ceiling) - (observed ?? 0))} remaining of ${ceiling}`}`}{counter === 'cost' && usage.costUncertainty !== 'exact' ? ` (${usage.costUncertainty})` : ''}{projection.limits[counter] === undefined ? '' : ` (${projection.limits[counter].hard ? 'hard' : 'warning'}; ${projection.limits[counter].resolution})`}</li>;
       })}</ul>}</div>
 
-      <div className="runtime-detail"><h3>Update future configuration</h3><p>Changes apply only to future dispatches. Removing an active agent or reducing authority requires a server-provided consequence preview before the backend can accept it.</p>{configuration !== undefined && <><fieldset><legend>Future available team</legend>{configuration.availableAgents.map((agent) => <label key={agent.id}><input type="checkbox" checked={selectedAgentIds.includes(agent.id)} onChange={() => toggleFutureAgent(agent.id)} disabled={terminal || configurationPending} />{agent.label}</label>)}</fieldset><fieldset><legend>Future required gates</legend>{configuration.availableAgents.map((agent) => <label key={agent.id}><input type="checkbox" checked={selectedRules.some((rule) => rule.role === agent.role)} onChange={() => toggleFutureGate(agent.role)} disabled={terminal || configurationPending} />{agent.label}</label>)}</fieldset></>}<label>Approval behavior <select value={approvalBehavior} onChange={(event) => setDraftApprovalBehavior(event.target.value as NonNullable<SessionConfigurationPatch['approvalBehavior']>)} disabled={terminal || configurationPending}><option value="ask_by_policy">Ask by policy</option><option value="preauthorize_session">Pre-authorize session</option><option value="deny_interactive">Deny interactive</option></select></label><label>At a hard limit <select value={nextLimitResolution} onChange={(event) => setNextLimitResolution(event.target.value as 'ask_user' | 'coordinator_decides' | 'stop')} disabled={terminal || configurationPending}><option value="ask_user">Ask user</option><option value="coordinator_decides">Coordinator decides</option><option value="stop">Stop</option></select></label><button type="button" onClick={() => updateConfiguration(projection.configurationVersion, configurationPatch)} disabled={terminal || configurationPending}>Request consequence preview</button></div>
-      {projection.configurationPreview !== null && <div className="runtime-decision"><strong>Server consequence preview</strong><p>{projection.configurationPreview.summary}</p><button type="button" onClick={() => updateConfiguration(projection.configurationVersion, projection.configurationPreview!.patch, true)} disabled={configurationPending}>Confirm and apply future configuration</button></div>}
+      <div className="runtime-detail"><h3>Read-only Alpha authority</h3><p>Runtime team, gate, mutation, and pre-authorization editing is not exposed in this Alpha. Pause, Cancel, participant interruption, and canonical pending decisions remain available; start a new inspection session to choose a different read-only specialist pool.</p></div>
 
       {Object.values(projection.approvals).map((approval) => { const pending = Object.values(projection.pendingCommands).some((entry) => entry.command.type === 'approval.resolve' && entry.command.payload.approvalId === approval.id); return <div className="runtime-decision" key={approval.id}><strong>Approval required: {approval.capability}</strong><p>{pending ? 'Decision pending — waiting for the session event.' : approval.scopeSummary}</p><button type="button" onClick={() => sendApproval(true, approval.id)} disabled={pending}>Approve</button><button type="button" onClick={() => sendApproval(false, approval.id)} disabled={pending}>Reject</button></div>; })}
 

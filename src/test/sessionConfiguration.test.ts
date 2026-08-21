@@ -1,5 +1,8 @@
 import { expect, test } from 'vitest';
-import { applyPreset, authoritySummary, createConfiguration, markCustom, validateConfiguration } from '@/services/sessionConfiguration';
+import {
+  applyPreset, authoritySummary, createConfiguration, createReadOnlyAlphaConfiguration,
+  enforceReadOnlyAlphaConfiguration, markCustom, READ_ONLY_ALPHA_TOOLS, validateConfiguration,
+} from '@/services/sessionConfiguration';
 import type { AgentRole, ModelRef } from '@/types/agent';
 
 const configuredModel: ModelRef = { providerId: 'prv_configured', modelId: 'model-1', displayName: 'Configured model' };
@@ -97,4 +100,49 @@ test('editing a resolved preset transitions it to Custom without hiding its valu
   const custom = markCustom({ ...balanced, executionLimits: { ...balanced.executionLimits, maxToolCallsPerAssignment: 5 } });
   expect(custom.preset).toBe('custom');
   expect(custom.executionLimits.maxToolCallsPerAssignment).toBe(5);
+});
+
+test('the Alpha normalizer strips every unsupported authority from a broad future configuration', () => {
+  const broad = createConfiguration(models, 'thorough');
+  const normalized = enforceReadOnlyAlphaConfiguration({
+    ...broad,
+    workspaceMode: 'direct_write',
+    directWriteAcknowledged: true,
+    preauthorizationAcknowledged: true,
+    preauthorizationScope: '/project',
+    enabledSkills: ['write-skill'],
+    approvalPolicy: {
+      permissionProfile: 'expert_unrestricted', behavior: 'preauthorize_session',
+      preauthorizedCapabilities: ['workspace.write'], capabilityOverrides: { 'workspace.write': 'allow' }, limitResolution: 'ask_user',
+    },
+  });
+
+  expect(normalized).toMatchObject({
+    preset: 'custom', workspaceMode: 'worktree', directWriteAcknowledged: false,
+    preauthorizationAcknowledged: false, preauthorizationScope: '', enabledSkills: [], requiredRoleRules: [],
+    executionLimits: { maxParallelReadOnlyAssignments: 1, maxRevisionsPerFinding: 0 },
+    approvalPolicy: { permissionProfile: 'balanced', behavior: 'ask_by_policy', preauthorizedCapabilities: [], capabilityOverrides: {}, limitResolution: 'stop' },
+  });
+  expect(normalized.availableAgents.every((agent) => agent.permissionProfile === 'balanced')).toBe(true);
+  expect(normalized.availableAgents.every((agent) => agent.capabilities.every((capability) => capability === 'workspace.read'))).toBe(true);
+  expect(normalized.availableAgents.every((agent) => agent.toolAllowlist.every((tool) => (READ_ONLY_ALPHA_TOOLS as readonly string[]).includes(tool)))).toBe(true);
+});
+
+test('the Alpha normalizer preserves stricter authority instead of silently widening it', () => {
+  const configuration = createConfiguration(models, 'custom');
+  const normalized = enforceReadOnlyAlphaConfiguration({
+    ...configuration,
+    coordinatorPermissionProfile: 'strict',
+    availableAgents: configuration.availableAgents.map((agent) => ({ ...agent, permissionProfile: 'strict' })),
+    approvalPolicy: { ...configuration.approvalPolicy, permissionProfile: 'strict' },
+  });
+  expect(normalized.coordinatorPermissionProfile).toBe('strict');
+  expect(normalized.availableAgents.every((agent) => agent.permissionProfile === 'strict')).toBe(true);
+  expect(normalized.approvalPolicy.permissionProfile).toBe('strict');
+});
+
+test('read-only Alpha prefers Planner, falls back deterministically, and fails closed without an eligible model', () => {
+  expect(createReadOnlyAlphaConfiguration(models).availableAgentIds).toEqual(['builtin-planner']);
+  expect(createReadOnlyAlphaConfiguration({ coordinator: configuredModel, reviewer: configuredModel, builder: configuredModel }).availableAgentIds).toEqual(['builtin-builder']);
+  expect(createReadOnlyAlphaConfiguration({ coordinator: configuredModel }).availableAgentIds).toEqual([]);
 });

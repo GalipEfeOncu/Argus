@@ -8,8 +8,6 @@ import { useUIStore } from '@/stores/uiStore';
 const openDirectoryDialog = vi.fn();
 const createSessionRequest = vi.fn();
 const listAgentDefinitions = vi.fn();
-const listSkills = vi.fn();
-const setSkillEnabled = vi.fn();
 const refreshProviderCredential = vi.fn();
 const listProviders = vi.fn();
 const listProviderModels = vi.fn();
@@ -21,7 +19,6 @@ vi.mock('@/services/tauri', () => ({ tauriCommands: { refreshProviderCredential:
 vi.mock('@/services/api', () => ({ api: {
   sessions: { create: (...args: unknown[]) => createSessionRequest(...args) },
   agentDefinitions: { list: () => listAgentDefinitions() },
-  skills: { list: () => listSkills(), setEnabled: (...args: unknown[]) => setSkillEnabled(...args) },
   providers: {
     list: () => listProviders(),
     listModels: () => listProviderModels(),
@@ -32,15 +29,12 @@ beforeEach(() => {
   openDirectoryDialog.mockReset();
   createSessionRequest.mockReset();
   listAgentDefinitions.mockReset();
-  listSkills.mockReset();
-  setSkillEnabled.mockReset();
   refreshProviderCredential.mockReset();
   listProviders.mockReset();
   listProviderModels.mockReset();
   refreshProviderCredential.mockResolvedValue(undefined);
   createSessionRequest.mockResolvedValue({ id: 'ses_live', agentSnapshots: [] });
   listAgentDefinitions.mockResolvedValue([]);
-  listSkills.mockResolvedValue([]);
   listProviders.mockResolvedValue([{ id: 'prv_configured', displayName: 'Configured provider', credentialConfigured: false }]);
   listProviderModels.mockResolvedValue({ models: [{ id: 'model-1', displayName: 'Configured model', supportsStructuredOutput: true }] });
   useSettingsStore.setState({ defaultRoleModels: configuredModels });
@@ -58,9 +52,10 @@ test('a providerless setup remains disabled and explains every missing selected 
   render(<SessionSetup />);
   fireEvent.click(screen.getByRole('button', { name: 'Browse' }));
   await waitFor(() => expect(screen.getByDisplayValue('/project')).toBeInTheDocument());
-  fireEvent.change(screen.getByLabelText('Goal'), { target: { value: 'Do real work' } });
-  expect(screen.getByRole('button', { name: 'Start Coordinator session' })).toBeDisabled();
+  fireEvent.change(screen.getByLabelText('Goal'), { target: { value: 'Inspect the project' } });
+  expect(screen.getByRole('button', { name: 'Start read-only Coordinator session' })).toBeDisabled();
   expect(screen.getByRole('alert')).toHaveTextContent('Coordinator requires a configured model.');
+  expect(screen.getByRole('alert')).toHaveTextContent('A configured read-only specialist model is required.');
   expect(createSessionRequest).not.toHaveBeenCalled();
 });
 
@@ -71,64 +66,68 @@ test('provider catalogue failures disable start and expose a retry without leaki
   const alertText = await screen.findByText(/Configured provider models could not be loaded/);
   expect(alertText.closest('[role="alert"]')).not.toBeNull();
   expect(screen.queryByText('secret provider response body')).not.toBeInTheDocument();
-  expect(screen.getByRole('button', { name: 'Start Coordinator session' })).toBeDisabled();
+  expect(screen.getByRole('button', { name: 'Start read-only Coordinator session' })).toBeDisabled();
 
   fireEvent.click(screen.getByRole('button', { name: 'Retry provider models' }));
   await waitFor(() => expect(listProviders).toHaveBeenCalledTimes(2));
   await waitFor(() => expect(screen.queryByRole('button', { name: 'Retry provider models' })).not.toBeInTheDocument());
 });
 
-test('all seven setup sections are keyboard-focusable and a selected preset creates a live isolated session', async () => {
+test('the truthful read-only setup is keyboard-focusable and creates a narrowed live session', async () => {
   openDirectoryDialog.mockResolvedValue('/project');
   render(<SessionSetup />);
-  expect(screen.getByRole('heading', { name: /1 — Goal and workspace/i })).toBeInTheDocument();
-  expect(screen.getByRole('heading', { name: /7 — Review/i })).toBeInTheDocument();
-
-  fireEvent.click(screen.getByRole('button', { name: 'Quick' }));
-  expect(screen.getByDisplayValue('0')).toBeInTheDocument();
+  expect(screen.getByRole('heading', { name: /1 — Inspection goal and workspace/i })).toBeInTheDocument();
+  expect(screen.getByRole('heading', { name: /5 — Review/i })).toBeInTheDocument();
+  expect(screen.getByRole('note')).toHaveTextContent('at most one specialist per turn');
+  expect(screen.queryByRole('button', { name: 'Quick' })).not.toBeInTheDocument();
+  expect(screen.queryByLabelText('direct write')).not.toBeInTheDocument();
+  expect(screen.queryByLabelText('Permission profile')).not.toBeInTheDocument();
+  expect(screen.queryByText(/Required role gates/i)).not.toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: 'Browse' }));
   await waitFor(() => expect(screen.getByDisplayValue('/project')).toBeInTheDocument());
   const goal = screen.getByLabelText('Goal');
   goal.focus();
   expect(document.activeElement).toBe(goal);
   fireEvent.change(goal, { target: { value: 'Verify keyboard access' } });
-  const start = screen.getByRole('button', { name: 'Start Coordinator session' });
+  const start = screen.getByRole('button', { name: 'Start read-only Coordinator session' });
   start.focus();
   expect(document.activeElement).toBe(start);
   expect(start).toBeEnabled();
   fireEvent.click(start);
   await waitFor(() => expect(createSessionRequest).toHaveBeenCalledOnce());
   expect(createSessionRequest).toHaveBeenCalledWith(expect.objectContaining({
-    projectPath: '/project', goal: 'Verify keyboard access', workspaceMode: 'worktree',
+    projectPath: '/project', goal: 'Verify keyboard access', workspaceMode: 'worktree', acknowledgeDirectWrite: false,
+    configuration: expect.objectContaining({
+      availableAgentIds: ['builtin-planner'], requiredRoleRules: [], acknowledgements: [],
+      executionLimits: expect.objectContaining({ maxParallelReadOnlyAssignments: 1, maxRevisionsPerFinding: 0 }),
+      approvalPolicy: expect.objectContaining({ permissionProfile: 'balanced', behavior: 'ask_by_policy', preauthorizedCapabilities: [], capabilityOverrides: {}, limitResolution: 'stop' }),
+      workspacePolicy: { mode: 'worktree' },
+    }),
   }));
+  const request = createSessionRequest.mock.calls[0]?.[0] as {
+    agents: Array<{ id: string; capabilities?: string[]; permissionProfile: string; skillIds?: string[]; toolAllowlist?: string[] }>;
+  };
+  expect(request.agents).toEqual(expect.arrayContaining([
+    expect.objectContaining({ id: 'coordinator', permissionProfile: 'balanced', skillIds: [] }),
+  ]));
+  expect(request.agents.every((agent) => ['strict', 'balanced'].includes(agent.permissionProfile))).toBe(true);
+  expect(request.agents.every((agent) => (agent.skillIds ?? []).length === 0)).toBe(true);
+  expect(request.agents.every((agent) => (agent.toolAllowlist ?? []).every((tool) => ['read_file', 'list_dir', 'search_files'].includes(tool)))).toBe(true);
+  expect(request.agents.filter((agent) => agent.id !== 'coordinator').every((agent) => (agent.capabilities ?? []).every((capability) => capability === 'workspace.read'))).toBe(true);
   await waitFor(() => expect(useSessionStore.getState().sessions[0]?.id).toBe('ses_live'));
-  expect(useSessionStore.getState().sessions[0]?.configuration.preset).toBe('quick');
-  expect(useSessionStore.getState().sessions[0]?.configuration.availableAgentIds).toEqual(['builtin-builder']);
+  expect(useSessionStore.getState().sessions[0]?.configuration.preset).toBe('custom');
+  expect(useSessionStore.getState().sessions[0]?.configuration.availableAgentIds).toEqual(['builtin-planner']);
 });
 
-test('direct write and Autonomous no-interruption require their visible acknowledgements', async () => {
-  openDirectoryDialog.mockResolvedValue('/project');
+test('unsupported mutation and preauthorization controls are not exposed or submitted', () => {
   render(<SessionSetup />);
-  fireEvent.click(screen.getByRole('button', { name: 'Browse' }));
-  await waitFor(() => expect(screen.getByDisplayValue('/project')).toBeInTheDocument());
-  fireEvent.click(screen.getByLabelText('direct write'));
-  expect(screen.getByText('Direct write has limited rollback.')).toBeInTheDocument();
-  expect(screen.getByLabelText('I understand that rollback is limited.')).not.toBeChecked();
-  fireEvent.change(screen.getByLabelText('Permission profile'), { target: { value: 'autonomous' } });
-  fireEvent.click(screen.getByLabelText('No-interruption mode (pre-authorize session)'));
-  expect(screen.getByText('/project', { selector: 'strong' })).toBeInTheDocument();
-  expect(screen.getByLabelText('I explicitly acknowledge these capabilities for this workspace.')).not.toBeChecked();
-  fireEvent.click(screen.getByLabelText('I explicitly acknowledge these capabilities for this workspace.'));
-  fireEvent.click(screen.getByLabelText('workspace.read'));
-  expect(screen.getByLabelText('I explicitly acknowledge these capabilities for this workspace.')).not.toBeChecked();
-  fireEvent.click(screen.getByLabelText('I explicitly acknowledge these capabilities for this workspace.'));
-  openDirectoryDialog.mockResolvedValueOnce('/next-project');
-  fireEvent.click(screen.getByRole('button', { name: 'Browse' }));
-  await waitFor(() => expect(screen.getByDisplayValue('/next-project')).toBeInTheDocument());
-  expect(screen.getByLabelText('I explicitly acknowledge these capabilities for this workspace.')).not.toBeChecked();
+  expect(screen.queryByText(/Direct write has limited rollback/i)).not.toBeInTheDocument();
+  expect(screen.queryByText(/No-interruption mode/i)).not.toBeInTheDocument();
+  expect(screen.queryByLabelText(/Pre-author/i)).not.toBeInTheDocument();
+  expect(screen.getByText(/Workspace writes, shell commands, test execution/)).toBeInTheDocument();
 });
 
-test('a selected Coordinator override is sent with its immutable definition and permission profile', async () => {
+test('a selected Coordinator override keeps its stricter permission profile', async () => {
   listAgentDefinitions.mockResolvedValueOnce([{
     id: 'team.coordinator.v2', name: 'Focused Coordinator', kind: 'builtin_override',
     role: 'coordinator', baseRole: 'coordinator', templateVersion: '2.0.0',
@@ -143,7 +142,7 @@ test('a selected Coordinator override is sent with its immutable definition and 
   fireEvent.click(screen.getByRole('button', { name: 'Browse' }));
   await waitFor(() => expect(screen.getByDisplayValue('/project')).toBeInTheDocument());
   fireEvent.change(screen.getByLabelText('Goal'), { target: { value: 'Use the selected Coordinator' } });
-  fireEvent.click(screen.getByRole('button', { name: 'Start Coordinator session' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Start read-only Coordinator session' }));
 
   await waitFor(() => expect(createSessionRequest).toHaveBeenCalledOnce());
   expect(createSessionRequest).toHaveBeenCalledWith(expect.objectContaining({
@@ -153,31 +152,6 @@ test('a selected Coordinator override is sent with its immutable definition and 
   }));
 });
 
-test('local skills show a trust review, stay unassigned while disabled, and snapshot only after explicit enablement', async () => {
-  const skill = {
-    id: 'skl_review', manifest: { name: 'Accessibility review', version: '1.0.0' }, enabled: false,
-    trustState: 'review_required', requestedTools: [], requestedPermissions: [],
-  };
-  listSkills.mockResolvedValueOnce([skill]);
-  setSkillEnabled.mockResolvedValueOnce({ ...skill, enabled: true, trustState: 'enabled' });
-  openDirectoryDialog.mockResolvedValue('/project');
-  render(<SessionSetup />);
-  expect(await screen.findByText('Accessibility review 1.0.0')).toBeInTheDocument();
-  expect(screen.getByLabelText('Use for this Coordinator session')).toBeDisabled();
-  fireEvent.click(screen.getByLabelText('Enable after review'));
-  await waitFor(() => expect(setSkillEnabled).toHaveBeenCalledWith('skl_review', true));
-  await waitFor(() => expect(screen.getByLabelText('Use for this Coordinator session')).toBeEnabled());
-  fireEvent.click(screen.getByLabelText('Use for this Coordinator session'));
-  fireEvent.click(screen.getByRole('button', { name: 'Browse' }));
-  await waitFor(() => expect(screen.getByDisplayValue('/project')).toBeInTheDocument());
-  fireEvent.change(screen.getByLabelText('Goal'), { target: { value: 'Review safely' } });
-  fireEvent.click(screen.getByRole('button', { name: 'Start Coordinator session' }));
-
-  await waitFor(() => expect(createSessionRequest).toHaveBeenCalledWith(expect.objectContaining({
-    agents: expect.arrayContaining([expect.objectContaining({ id: 'coordinator', skillIds: ['skl_review'] })]),
-  })));
-});
-
 test('a failed live session creation keeps the simulator inactive and explains the recovery step', async () => {
   createSessionRequest.mockRejectedValueOnce(new Error('backend unavailable'));
   openDirectoryDialog.mockResolvedValue('/project');
@@ -185,7 +159,7 @@ test('a failed live session creation keeps the simulator inactive and explains t
   fireEvent.click(screen.getByRole('button', { name: 'Browse' }));
   await waitFor(() => expect(screen.getByDisplayValue('/project')).toBeInTheDocument());
   fireEvent.change(screen.getByLabelText('Goal'), { target: { value: 'Create a live session' } });
-  fireEvent.click(screen.getByRole('button', { name: 'Start Coordinator session' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Start read-only Coordinator session' }));
 
   expect(await screen.findByRole('alert')).toHaveTextContent('could not create this isolated session');
   expect(useSessionStore.getState().sessions).toEqual([]);

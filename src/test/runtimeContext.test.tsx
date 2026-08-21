@@ -11,11 +11,10 @@ import type { ArgusSessionEvent } from '@/types/events';
 
 const sendInterrupt = vi.fn();
 const controlSession = vi.fn();
-const updateConfiguration = vi.fn();
 const resolveDecision = vi.fn();
 const sendApproval = vi.fn();
 
-vi.mock('@/hooks/useWebSocket', () => ({ useWebSocket: () => ({ sendInterrupt, controlSession, updateConfiguration, resolveDecision, sendApproval }) }));
+vi.mock('@/hooks/useWebSocket', () => ({ useWebSocket: () => ({ sendInterrupt, controlSession, resolveDecision, sendApproval }) }));
 
 const sessionId = 'ses_runtime';
 
@@ -54,13 +53,13 @@ test('context panel groups participants and exposes visible, keyboard-operable r
 
   fireEvent.click(screen.getByRole('button', { name: 'Pause' }));
   fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
-  fireEvent.click(screen.getByRole('button', { name: 'Request consequence preview' }));
+  expect(screen.getByText(/Runtime team, gate, mutation, and pre-authorization editing is not exposed/)).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Request consequence preview' })).not.toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: 'Interrupt' }));
   fireEvent.click(screen.getByRole('button', { name: 'Approve' }));
   fireEvent.click(screen.getByRole('button', { name: 'deliver partial' }));
   expect(controlSession).toHaveBeenCalledWith('pause');
   expect(controlSession).toHaveBeenCalledWith('cancel');
-  expect(updateConfiguration).toHaveBeenCalledWith(1, expect.objectContaining({ limitResolution: 'ask_user' }));
   expect(sendInterrupt).toHaveBeenCalledWith('builder-a');
   expect(sendApproval).toHaveBeenCalledWith(true, 'approval-a');
   expect(resolveDecision).toHaveBeenCalledWith('decision-a', 'deliver_partial');

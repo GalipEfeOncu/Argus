@@ -65,12 +65,12 @@ export const Dashboard: React.FC = () => {
               </svg>
             </div>
             <p className="dashboard-empty-title">No sessions yet</p>
-            <p className="dashboard-empty-sub">Start a new orchestration to put your agents to work.</p>
+            <p className="dashboard-empty-sub">Start a read-only inspection with Coordinator and one specialist at a time.</p>
             <button
               className="dashboard-empty-cta"
               onClick={() => setActivePage('session-setup')}
             >
-              Start your first session
+              Start your first inspection
             </button>
           </div>
           ) : (

@@ -96,7 +96,7 @@ export const Settings: React.FC = () => {
   };
 
   return <div className="settings-page"><div className="settings-inner">
-    <div className="settings-header"><div><h1 className="settings-title">Settings</h1><p className="settings-subtitle">Manage providers and agent configuration</p></div></div>
+    <div className="settings-header"><div><h1 className="settings-title">Provider Settings</h1><p className="settings-subtitle">Manage provider credentials and discover available models.</p></div></div>
     <section className="settings-card" aria-labelledby="providers-heading">
       <h2 id="providers-heading" className="settings-card-label">API PROVIDERS</h2>
       <p className="settings-description">API keys are saved in your operating system’s credential store. Argus only retains a non-secret reference.</p>

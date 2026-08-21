@@ -120,6 +120,8 @@ test('dashboard exposes loading, empty, and retryable error states', () => {
 
   act(() => useWorkspaceStore.setState({ error: null, sessions: [] }));
   expect(screen.getByText('No sessions yet')).toBeInTheDocument();
+  expect(screen.getByText('Start a read-only inspection with Coordinator and one specialist at a time.')).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Start your first inspection' })).toBeInTheDocument();
   view.unmount();
 });
 

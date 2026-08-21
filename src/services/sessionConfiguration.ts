@@ -16,6 +16,11 @@ const agentLabels: Record<Exclude<AgentRole, 'coordinator'>, string> = {
 };
 
 const supportedEvidence = new Set(['approved_review', 'passing_test_run', 'accepted_plan', 'verified_change']);
+export const READ_ONLY_ALPHA_TOOLS = ['read_file', 'list_dir', 'search_files'] as const;
+
+function readOnlyPermissionProfile(profile: SessionConfiguration['coordinatorPermissionProfile']): 'strict' | 'balanced' {
+  return profile === 'strict' ? 'strict' : 'balanced';
+}
 
 export const limitDefinitions: ReadonlyArray<{ key: keyof ExecutionLimits; label: string; unit: string; zeroMeaning: string }> = [
   { key: 'maxRevisionsPerFinding', label: 'Revisions per finding', unit: 'revisions', zeroMeaning: '0 blocks revisions' },
@@ -68,6 +73,66 @@ export function createConfiguration(
     approvalPolicy: { permissionProfile: 'balanced', behavior: 'ask_by_policy', preauthorizedCapabilities: [], capabilityOverrides: {}, limitResolution: 'coordinator_decides' },
   };
   return preset === 'custom' ? base : applyPreset(base, preset);
+}
+
+/** Narrows the current UI snapshot to the production Alpha worker's implemented authority. */
+export function enforceReadOnlyAlphaConfiguration(configuration: SessionConfiguration): SessionConfiguration {
+  const eligibleBeforeNarrowing = configuration.availableAgents
+    .filter((agent) => agent.capabilities.includes('workspace.read') && agent.modelRef !== null)
+    .map((agent) => agent.id);
+  const eligible = new Set(eligibleBeforeNarrowing);
+  const selected = configuration.availableAgentIds.filter((id) => eligible.has(id));
+  const fallback = [...eligibleBeforeNarrowing].sort((left, right) => left.localeCompare(right))[0];
+  return {
+    ...configuration,
+    preset: 'custom',
+    workspaceMode: 'worktree',
+    coordinatorPermissionProfile: readOnlyPermissionProfile(configuration.coordinatorPermissionProfile),
+    enabledSkills: [],
+    directWriteAcknowledged: false,
+    preauthorizationAcknowledged: false,
+    preauthorizationScope: '',
+    availableAgents: configuration.availableAgents.map((agent) => ({
+      ...agent,
+      capabilities: agent.capabilities.includes('workspace.read') ? ['workspace.read'] : [],
+      toolAllowlist: agent.toolAllowlist.filter((tool) => (READ_ONLY_ALPHA_TOOLS as readonly string[]).includes(tool)),
+      permissionProfile: readOnlyPermissionProfile(agent.permissionProfile),
+    })),
+    availableAgentIds: selected.length > 0 ? selected : fallback === undefined ? [] : [fallback],
+    requiredRoleRules: [],
+    executionLimits: {
+      ...configuration.executionLimits,
+      maxRevisionsPerFinding: 0,
+      maxParallelReadOnlyAssignments: 1,
+    },
+    approvalPolicy: {
+      permissionProfile: readOnlyPermissionProfile(configuration.approvalPolicy.permissionProfile),
+      behavior: 'ask_by_policy',
+      preauthorizedCapabilities: [],
+      capabilityOverrides: {},
+      limitResolution: 'stop',
+    },
+  };
+}
+
+export function createReadOnlyAlphaConfiguration(defaultRoleModels: Partial<Record<AgentRole, ModelRef>>): SessionConfiguration {
+  const base = createConfiguration(defaultRoleModels, 'custom');
+  return enforceReadOnlyAlphaConfiguration({
+    ...base,
+    availableAgentIds: defaultRoleModels.planner === undefined ? [] : ['builtin-planner'],
+  });
+}
+
+export function readOnlyAlphaAuthoritySummary(configuration: SessionConfiguration): string[] {
+  const available = configuration.availableAgents
+    .filter((agent) => configuration.availableAgentIds.includes(agent.id))
+    .map((agent) => agent.label);
+  return [
+    'Coordinator receives every room message and may make one specialist assignment per turn.',
+    `Read-only specialist pool: ${available.length ? available.join(', ') : 'none configured'}.`,
+    `Workspace tools are limited to ${READ_ONLY_ALPHA_TOOLS.join(', ')} when the selected specialist definition allows them.`,
+    'Workspace writes, shell commands, test execution, required gates, direct-write mode, and pre-authorization are unavailable in this Alpha runtime.',
+  ];
 }
 
 export function applyPreset(configuration: SessionConfiguration, preset: Exclude<SessionPreset, 'custom'>): SessionConfiguration {

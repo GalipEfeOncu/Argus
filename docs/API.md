@@ -259,6 +259,15 @@ persisted; the Coordinator can submit another bounded assignment on its next
 turn. This avoids implying parallel worker execution before that lifecycle is
 available.
 
+The current frontend session setup submits only this production-safe subset:
+an isolated worktree, Coordinator plus a configured read-capable specialist
+pool, one read-only assignment slot, no required gates, no skills, no
+direct-write acknowledgement, and no pre-authorized or overridden capability.
+Agent capabilities are narrowed to `workspace.read`; effective tools remain the
+intersection with each immutable definition allowlist. The REST model continues
+to accept the broader versioned configuration shape for future runtime clients,
+but the current UI does not claim those paths are operational.
+
 Pause, resume, cancel, approvals, and human messages remain canonical commands. Rejected commands are emitted as
 correlated `error.created` events rather than an out-of-band WebSocket payload,
 allowing clients to clear pending state.

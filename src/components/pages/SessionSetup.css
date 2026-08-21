@@ -22,6 +22,9 @@
 
 .setup-catalog-error { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--spacing-sm); padding: var(--spacing-sm); border: 1px solid var(--status-error); border-radius: var(--radius-md); color: var(--status-error); font-size: 11px; }
 
+.setup-runtime-scope { display: flex; flex-direction: column; gap: var(--spacing-xs); margin-bottom: var(--spacing-md); padding: var(--spacing-md); border: 1px solid var(--border-medium); border-left: 3px solid var(--status-warning); border-radius: var(--radius-md); background: var(--bg-card); color: var(--text-secondary); font-size: 12px; line-height: 1.5; }
+.setup-runtime-scope strong { color: var(--text-primary); }
+
 @media (max-width: 520px) {
   .setup-path-row, .setup-catalog-error { flex-direction: column; }
   .limits-grid { grid-template-columns: minmax(0, 1fr); }

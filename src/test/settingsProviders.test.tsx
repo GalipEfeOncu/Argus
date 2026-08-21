@@ -34,6 +34,9 @@ test('provider catalogue loading failures show a normalized retry state', async 
   listProviders.mockRejectedValueOnce(new Error('credential=should-not-render')).mockResolvedValueOnce([]);
   render(<Settings />);
 
+  expect(screen.getByRole('heading', { name: 'Provider Settings' })).toBeInTheDocument();
+  expect(screen.getByText('Manage provider credentials and discover available models.')).toBeInTheDocument();
+  expect(screen.queryByText(/agent configuration/i)).not.toBeInTheDocument();
   expect(screen.getByRole('status')).toHaveTextContent('Loading configured providers');
   expect(await screen.findByRole('alert')).toHaveTextContent('Configured providers could not be loaded');
   expect(screen.queryByText(/credential=should-not-render/)).not.toBeInTheDocument();

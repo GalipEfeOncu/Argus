@@ -9,10 +9,10 @@ interface StatusBarProps {
 }
 
 const statusConfig: Record<BackendStatus, { label: string; dotClass: string; pulse: boolean }> = {
-  starting: { label: 'Starting…',  dotClass: 'statusbar-dot--warning', pulse: true  },
-  running:  { label: 'Connected',  dotClass: 'statusbar-dot--active',  pulse: false },
-  stopped:  { label: 'Offline',    dotClass: 'statusbar-dot--idle',    pulse: false },
-  error:    { label: 'Error',      dotClass: 'statusbar-dot--error',   pulse: true  },
+  starting: { label: 'Starting local runtime…', dotClass: 'statusbar-dot--warning', pulse: true },
+  running:  { label: 'Local runtime running', dotClass: 'statusbar-dot--active', pulse: false },
+  stopped:  { label: 'Local runtime stopped', dotClass: 'statusbar-dot--idle', pulse: false },
+  error:    { label: 'Local runtime error', dotClass: 'statusbar-dot--error', pulse: true },
 };
 
 export const StatusBar: React.FC<StatusBarProps> = ({ backendStatus }) => {
@@ -29,7 +29,7 @@ export const StatusBar: React.FC<StatusBarProps> = ({ backendStatus }) => {
       {/* Left: backend status */}
       <div className="statusbar-section statusbar-section--left">
         <span className={`statusbar-dot ${dotClass} ${pulse ? 'statusbar-dot--pulse' : ''}`} />
-        <span>Backend: {label}</span>
+        <span>{label}</span>
       </div>
 
       {/* Center: token count */}
@@ -39,10 +39,7 @@ export const StatusBar: React.FC<StatusBarProps> = ({ backendStatus }) => {
         )}
       </div>
 
-      {/* Right: WS endpoint */}
-      <div className="statusbar-section statusbar-section--right">
-        <span className="statusbar-ws">authenticated localhost</span>
-      </div>
+      <div className="statusbar-section statusbar-section--right" aria-hidden="true" />
     </footer>
   );
 };
