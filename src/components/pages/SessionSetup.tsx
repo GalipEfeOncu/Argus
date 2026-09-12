@@ -124,7 +124,7 @@ export const SessionSetup: React.FC = () => {
       if (!active) return;
       const profileIds = new Set(profiles.map((profile) => profile.id));
       const discovered = listed.flatMap((result) => result.status === 'fulfilled'
-        ? result.value.response.models.map((model) => ({ providerId: result.value.profile.id, modelId: model.id, displayName: `${result.value.profile.displayName} · ${model.displayName}${model.supportsStructuredOutput === false ? ' · structured output unavailable' : ''}` }))
+        ? result.value.response.models.filter((model) => model.supportsChat !== false).map((model) => ({ providerId: result.value.profile.id, modelId: model.id, displayName: `${result.value.profile.displayName} · ${model.displayName}${model.supportsStructuredOutput === false ? ' · structured output unavailable' : ''}` }))
         : []);
       setProviderModels([...discovered, ...manualProviderModels.filter((model) => profileIds.has(model.providerId))]);
       setModelsLoaded(true);

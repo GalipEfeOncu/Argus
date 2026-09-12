@@ -8,6 +8,11 @@ All notable user-visible changes to Argus are recorded here. The project follows
 
 ### Added
 
+- Provider Settings now includes presets for OpenAI, Anthropic, Google Gemini,
+  OpenRouter, DeepSeek, Moonshot/Kimi, xAI, Mistral AI, Groq, and local Ollama.
+  Each configured provider discovers its bounded model catalogue, supports
+  search and direct model selection, and keeps non-chat models visible but
+  unavailable for direct chat.
 - Argus now uses its new brand mark in the workspace shell, browser icon, and
   desktop application icon set, alongside a refined responsive control-room UI.
 - Configured Coordinators can now delegate read-only workspace inspection to a
@@ -26,6 +31,11 @@ All notable user-visible changes to Argus are recorded here. The project follows
 
 ### Fixed
 
+- Provider credentials now use the operating-system keyring on Linux and wake
+  an idle native sidecar before handing a key to the local runtime.
+- Provider Settings now explains when API-key providers are being configured
+  outside the Tauri desktop credential-store boundary instead of reporting a
+  generic save failure.
 - Workspace pages now share the direct-chat visual language: quieter surfaces,
   lighter separators, restrained status treatments, and less decorative empty
   states across the dashboard, settings, profile, setup, and session views.

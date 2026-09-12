@@ -52,7 +52,7 @@ export const NewChat: React.FC = () => {
     setCatalogError(null);
     try {
       const profiles = await api.providers.list();
-      const configured = profiles.filter((profile) => profile.credentialConfigured);
+      const configured = profiles.filter((profile) => profile.credentialRequired === false || profile.credentialConfigured);
       if (configured.length === 0) {
         setOptions([]);
         setCatalogState('empty');
@@ -64,7 +64,7 @@ export const NewChat: React.FC = () => {
         response: await api.providers.listModels(profile.id),
       })));
       const discoveredOptions = results.flatMap((result) => result.status === 'fulfilled'
-        ? result.value.response.models.map((model) => ({ profile: result.value.profile, model }))
+        ? result.value.response.models.filter((model) => model.supportsChat !== false).map((model) => ({ profile: result.value.profile, model }))
         : []);
       const configuredIds = new Set(configured.map((profile) => profile.id));
       const knownKeys = new Set(discoveredOptions.map((option) => modelKey(toModelRef(option))));

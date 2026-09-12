@@ -31,7 +31,10 @@ async def list_profiles() -> list[ProviderProfileResponse]:
 async def create_profile(value: ProviderProfileCreate) -> ProviderProfileResponse:
     db = await get_db()
     try:
-        return await ProviderProfileService(db).create(value)
+        try:
+            return await ProviderProfileService(db).create(value)
+        except ProviderProfileError as error:
+            raise _http(error) from error
     finally:
         await db.close()
 

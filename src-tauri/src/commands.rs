@@ -75,12 +75,13 @@ pub async fn store_provider_credential(credential: String) -> Result<String, Str
 
 async fn native_credential_reference(
     profile_id: &str,
+    app: &tauri::AppHandle,
     state: &SidecarState,
 ) -> Result<Option<String>, String> {
     if !profile_id.starts_with("prv_") || profile_id.len() > 160 {
         return Err("Invalid provider profile".to_string());
     }
-    let connection = backend_connection(state)?;
+    let connection = ensure_backend_connection(app, state).await?;
     let response = reqwest::Client::builder()
         .timeout(std::time::Duration::from_secs(5))
         .build()
@@ -108,16 +109,17 @@ async fn native_credential_reference(
 /// local sidecar as a short-lived lease. It never crosses the webview boundary.
 #[tauri::command]
 pub async fn refresh_provider_credential(
+    app: tauri::AppHandle,
     profile_id: String,
     state: State<'_, SidecarState>,
 ) -> Result<(), String> {
-    let credential_reference = native_credential_reference(&profile_id, &state)
+    let credential_reference = native_credential_reference(&profile_id, &app, &state)
         .await?
         .ok_or("Provider does not have a credential reference")?;
     let credential = credential_entry(&credential_reference)?
         .get_password()
         .map_err(|_| "Credential is unavailable".to_string())?;
-    let connection = backend_connection(&state)?;
+    let connection = ensure_backend_connection(&app, &state).await?;
     let response = reqwest::Client::builder()
         .timeout(std::time::Duration::from_secs(5))
         .build().map_err(|_| "Credential handoff is unavailable".to_string())?
@@ -149,15 +151,22 @@ struct CredentialReferenceResponse {
 /// delete it from the OS store without revealing that reference to the webview.
 #[tauri::command]
 pub async fn remove_provider_credential(
+    app: tauri::AppHandle,
     profile_id: String,
     state: State<'_, SidecarState>,
 ) -> Result<(), String> {
-    if let Some(reference) = native_credential_reference(&profile_id, &state).await? {
+    if let Some(reference) = native_credential_reference(&profile_id, &app, &state).await? {
         delete_provider_credential(reference).await?;
     }
     Ok(())
 }
 
-fn backend_connection(state: &SidecarState) -> Result<crate::sidecar::BackendConnection, String> {
-    crate::sidecar::connection(state).ok_or_else(|| "Backend is not ready".to_string())
+async fn ensure_backend_connection(
+    app: &tauri::AppHandle,
+    state: &SidecarState,
+) -> Result<crate::sidecar::BackendConnection, String> {
+    if let Some(connection) = crate::sidecar::connection(state) {
+        return Ok(connection);
+    }
+    crate::sidecar::ensure(app.clone(), state).await
 }

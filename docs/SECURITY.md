@@ -107,8 +107,10 @@ the public provider REST contract. SQLite holds an opaque credential reference
 only. A random token is injected into the sidecar process at launch; the Tauri
 process uses it to resolve the OS-store entry and pass a five-minute in-memory
 credential lease to that exact local sidecar. Neither the webview nor a normal
-REST caller can resolve a reference. Provider failures and discovery errors are
-normalized summaries, never SDK or HTTP exception bodies.
+REST caller can resolve a reference. The native bridge may restart an idle
+sidecar before the handoff, but it still sends only a short-lived in-memory
+lease. Provider failures and discovery errors are normalized summaries, never
+SDK or HTTP exception bodies.
 
 Workspace paths are canonicalized before registration and every tool target is
 resolved relative to the selected session workspace. Parent traversal and

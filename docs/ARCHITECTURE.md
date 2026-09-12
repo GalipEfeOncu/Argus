@@ -103,13 +103,14 @@ requires an authenticated `/health` response with the exact application
 version. The shell owns the child handle, requests graceful shutdown before a
 bounded forced-kill fallback, clears stale handles on exit, and permits at most
 three quick crash restarts. Tauri's single-instance plugin coordinates a second
-launch by focusing the existing window.
+launch by focusing the existing window. Native credential operations ensure the
+sidecar is running again if the idle lifecycle stopped it before a handoff.
 
 Release packaging runs `npm run sidecar:build` to create one PyInstaller binary
 named with Rust's target triple. The build excludes development, unused
 agent-loop, and development-server packages. It includes the lazy OpenAI,
 Anthropic, and Google adapter groups required by the provider kinds available in
-the shipped UI; OpenAI-compatible profiles share the OpenAI adapter. The build
+the shipped UI; OpenAI-compatible presets share the OpenAI adapter. The build
 runs an offline frozen-binary smoke that constructs each supported adapter and
 normalizes a synthetic stream, then emits a SHA-256/byte attribution report with
 provider adapters separated from base dependencies. Tauri consumes that binary
@@ -237,8 +238,15 @@ Provider adapters normalize streaming, tool calls, usage, model metadata, and pr
 
 - OpenAI
 - Anthropic
-- Google
-- OpenAI-compatible endpoints, including OpenRouter and local model servers
+- Google Gemini
+- OpenRouter, DeepSeek, Moonshot/Kimi, xAI, Mistral AI, and Groq through
+  OpenAI-compatible endpoints
+- Ollama and other local OpenAI-compatible model servers
+
+The provider preset registry also supports a custom OpenAI-compatible profile.
+Model catalogues are discovered from the selected provider, bounded before they
+reach the UI, and marked with known chat/tool capability flags. Non-chat models
+can remain visible for transparency but cannot be selected as the chat model.
 
 Provider keys are stored through the native credential service. The runtime only sees a short-lived resolved credential and never emits it in events, logs, exports, or SQLite records.
 

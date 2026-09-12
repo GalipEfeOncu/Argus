@@ -6,7 +6,7 @@ import asyncio
 import importlib
 import json
 from collections.abc import AsyncIterator, Callable, Mapping
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING
 
 from app.providers.protocol import (
     Cancelled,
@@ -22,11 +22,11 @@ from app.providers.protocol import (
     ToolCall,
     Usage,
 )
+from app.providers.registry import ProviderKind
 
 if TYPE_CHECKING:
     from langchain_core.language_models import BaseChatModel
 
-ProviderKind = Literal["openai", "openai_compat", "anthropic", "google"]
 ModuleLoader = Callable[[str], object]
 
 

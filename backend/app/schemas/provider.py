@@ -7,6 +7,7 @@ import re
 
 from pydantic import ConfigDict, Field, HttpUrl, SecretStr, field_validator
 
+from app.providers.registry import ProviderKind, ProviderPreset
 from app.schemas.session_events import CamelModel, Identifier, Summary
 
 
@@ -20,11 +21,9 @@ class ProviderCamelModel(CamelModel):
     )
 
 
-ProviderKind = Literal["openai", "anthropic", "google", "openai_compat"]
-
-
 class ProviderProfileCreate(ProviderCamelModel):
     provider_kind: ProviderKind
+    provider_preset: ProviderPreset | None = None
     display_name: str = Field(min_length=1, max_length=160)
     endpoint: str | None = Field(default=None, max_length=2_000)
     credential_reference: str | None = Field(default=None, min_length=8, max_length=256)
@@ -53,9 +52,11 @@ class ProviderProfileCreate(ProviderCamelModel):
 class ProviderProfileResponse(ProviderCamelModel):
     id: Identifier
     provider_kind: ProviderKind
+    provider_preset: ProviderPreset = "custom"
     display_name: str
     endpoint: str | None = None
     credential_configured: bool
+    credential_required: bool = True
     created_at_ms: int = Field(ge=0)
     updated_at_ms: int = Field(ge=0)
 
@@ -66,6 +67,7 @@ class ModelCapability(ProviderCamelModel):
     context_window: int | None = Field(default=None, ge=1)
     supports_tools: bool | None = None
     supports_structured_output: bool | None = None
+    supports_chat: bool | None = None
     source: Literal["discovered", "catalog", "manual"]
 
 

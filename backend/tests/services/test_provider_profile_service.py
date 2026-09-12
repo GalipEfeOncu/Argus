@@ -3,8 +3,16 @@ from __future__ import annotations
 import pytest
 
 from app.db.database import get_db
+from app.providers.registry import PROVIDER_DEFINITIONS
 from app.schemas.provider import ManualModelRequest, ProviderProfileCreate
 from app.services.provider_profile_service import CredentialLeaseStore, ProviderProfileError, ProviderProfileService
+
+
+def test_provider_registry_contains_the_supported_presets() -> None:
+    assert [definition.preset for definition in PROVIDER_DEFINITIONS] == [
+        "openai", "anthropic", "google", "openrouter", "deepseek", "kimi",
+        "xai", "mistral", "groq", "ollama", "custom",
+    ]
 
 
 @pytest.mark.asyncio
@@ -44,6 +52,46 @@ async def test_provider_model_catalog_manual_model_and_missing_credential_are_no
     assert missing.discovery_status == "credential_required"
     assert manual.models[0].source == "manual"
     assert catalog.models[0].supports_tools is True
+
+
+@pytest.mark.asyncio
+async def test_openai_model_discovery_uses_the_native_models_endpoint(temporary_sqlite_db, monkeypatch: pytest.MonkeyPatch) -> None:
+    db = await get_db()
+    try:
+        service = ProviderProfileService(db, leases=CredentialLeaseStore())
+        profile = await service.create(ProviderProfileCreate(
+            provider_kind="openai", display_name="OpenAI", credential_reference="argus-provider-00000000-0000-4000-8000-000000000005",
+        ))
+        calls: list[tuple[str, str]] = []
+
+        async def discover(endpoint: str, credential: str):
+            calls.append((endpoint, credential))
+            return []
+
+        monkeypatch.setattr(service, "_discover_openai_compat", discover)
+        await service.lease_credential(profile.id, "argus-provider-00000000-0000-4000-8000-000000000005", "not-persisted")
+        result = await service.models(profile.id)
+    finally:
+        await db.close()
+
+    assert result.discovery_status == "available"
+    assert calls == [("https://api.openai.com/v1", "not-persisted")]
+
+
+@pytest.mark.asyncio
+async def test_ollama_preset_is_local_and_does_not_require_a_credential(temporary_sqlite_db) -> None:
+    db = await get_db()
+    try:
+        service = ProviderProfileService(db, leases=CredentialLeaseStore())
+        profile = await service.create(ProviderProfileCreate(
+            provider_kind="openai_compat", provider_preset="ollama", display_name="Local Ollama",
+        ))
+    finally:
+        await db.close()
+
+    assert profile.provider_preset == "ollama"
+    assert profile.endpoint == "http://localhost:11434/v1"
+    assert profile.credential_required is False
 
 
 @pytest.mark.asyncio

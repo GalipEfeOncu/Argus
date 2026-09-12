@@ -3621,6 +3621,17 @@
             "title": "Source",
             "type": "string"
           },
+          "supportsChat": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Supportschat"
+          },
           "supportsStructuredOutput": {
             "anyOf": [
               {
@@ -3975,12 +3986,36 @@
           "providerKind": {
             "enum": [
               "openai",
+              "openai_compat",
               "anthropic",
-              "google",
-              "openai_compat"
+              "google"
             ],
             "title": "Providerkind",
             "type": "string"
+          },
+          "providerPreset": {
+            "anyOf": [
+              {
+                "enum": [
+                  "openai",
+                  "anthropic",
+                  "google",
+                  "openrouter",
+                  "deepseek",
+                  "kimi",
+                  "xai",
+                  "mistral",
+                  "groq",
+                  "ollama",
+                  "custom"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Providerpreset"
           }
         },
         "required": [
@@ -4000,6 +4035,11 @@
           },
           "credentialConfigured": {
             "title": "Credentialconfigured",
+            "type": "boolean"
+          },
+          "credentialRequired": {
+            "default": true,
+            "title": "Credentialrequired",
             "type": "boolean"
           },
           "displayName": {
@@ -4026,11 +4066,29 @@
           "providerKind": {
             "enum": [
               "openai",
+              "openai_compat",
               "anthropic",
-              "google",
-              "openai_compat"
+              "google"
             ],
             "title": "Providerkind",
+            "type": "string"
+          },
+          "providerPreset": {
+            "default": "custom",
+            "enum": [
+              "openai",
+              "anthropic",
+              "google",
+              "openrouter",
+              "deepseek",
+              "kimi",
+              "xai",
+              "mistral",
+              "groq",
+              "ollama",
+              "custom"
+            ],
+            "title": "Providerpreset",
             "type": "string"
           },
           "updatedAtMs": {

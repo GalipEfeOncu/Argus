@@ -147,6 +147,12 @@ pub async fn start(
     start_owned(app, &state).await
 }
 
+/// Ensure the sidecar is available for native-only operations that can run
+/// after the idle lifecycle has stopped it.
+pub async fn ensure(app: tauri::AppHandle, state: &SidecarState) -> Result<BackendConnection, String> {
+    start_owned(app, state).await
+}
+
 async fn start_owned(
     app: tauri::AppHandle,
     state: &SidecarState,

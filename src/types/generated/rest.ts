@@ -1674,6 +1674,8 @@ export interface components {
              * @enum {string}
              */
             source: "discovered" | "catalog" | "manual";
+            /** Supportschat */
+            supportsChat?: boolean | null;
             /** Supportsstructuredoutput */
             supportsStructuredOutput?: boolean | null;
             /** Supportstools */
@@ -1783,7 +1785,9 @@ export interface components {
              * Providerkind
              * @enum {string}
              */
-            providerKind: "openai" | "anthropic" | "google" | "openai_compat";
+            providerKind: "openai" | "openai_compat" | "anthropic" | "google";
+            /** Providerpreset */
+            providerPreset?: ("openai" | "anthropic" | "google" | "openrouter" | "deepseek" | "kimi" | "xai" | "mistral" | "groq" | "ollama" | "custom") | null;
         };
         /** ProviderProfileResponse */
         ProviderProfileResponse: {
@@ -1791,6 +1795,11 @@ export interface components {
             createdAtMs: number;
             /** Credentialconfigured */
             credentialConfigured: boolean;
+            /**
+             * Credentialrequired
+             * @default true
+             */
+            credentialRequired: boolean;
             /** Displayname */
             displayName: string;
             /** Endpoint */
@@ -1801,7 +1810,13 @@ export interface components {
              * Providerkind
              * @enum {string}
              */
-            providerKind: "openai" | "anthropic" | "google" | "openai_compat";
+            providerKind: "openai" | "openai_compat" | "anthropic" | "google";
+            /**
+             * Providerpreset
+             * @default custom
+             * @enum {string}
+             */
+            providerPreset: "openai" | "anthropic" | "google" | "openrouter" | "deepseek" | "kimi" | "xai" | "mistral" | "groq" | "ollama" | "custom";
             /** Updatedatms */
             updatedAtMs: number;
         };

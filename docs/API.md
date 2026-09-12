@@ -649,11 +649,14 @@ profile endpoints.
 ### Provider profiles and native credentials
 
 `GET /providers/` lists non-secret provider profiles. `POST /providers/` accepts
-`providerKind` (`openai`, `anthropic`, `google`, or `openai_compat`), a display
-name, an optional safe endpoint, and an opaque `credentialReference`; it never
-accepts a credential value. The response exposes only whether a credential is
-configured. `DELETE /providers/{profileId}` revokes its in-memory lease and
-removes the profile.
+`providerKind` (`openai`, `anthropic`, `google`, or `openai_compat`), an optional
+`providerPreset` (`openai`, `anthropic`, `google`, `openrouter`, `deepseek`,
+`kimi`, `xai`, `mistral`, `groq`, `ollama`, or `custom`), a display name, an
+optional safe endpoint, and an opaque `credentialReference`; it never accepts a
+credential value. The response exposes the resolved preset, endpoint, and
+whether a credential is configured or required. Ollama uses a loopback endpoint
+and does not require a credential. `DELETE /providers/{profileId}` revokes its
+in-memory lease and removes the profile.
 
 The Tauri shell saves credentials in the operating-system credential service.
 It alone resolves a reference and hands a credential to its own sidecar over a
@@ -661,12 +664,16 @@ random, process-local native-bridge token. The sidecar keeps that value only in
 a five-minute memory lease. Credential handoff and native reference lookup are
 not public REST contract endpoints and are omitted from OpenAPI.
 
-`POST /providers/{profileId}/models` returns discovered or curated model
-metadata, including known tools/structured-output capabilities. A body of
-`{ "modelId": "…" }` explicitly accepts a manual model ID and reports unknown
-capabilities rather than assuming authority. OpenAI-compatible discovery uses a
-bounded, non-redirecting request; provider/network details are reduced to a
-safe availability status.
+`POST /providers/{profileId}/models` discovers the provider's complete bounded
+chat/model catalogue through its model endpoint and returns model IDs, display
+names, context metadata where available, and known tool, structured-output, and
+chat capability flags. The Settings screen provides search and direct model
+selection; non-chat models remain visible but cannot be selected for direct chat.
+A body of `{ "modelId": "…" }` explicitly accepts a manual model ID and reports
+unknown capabilities rather than assuming authority. Discovery uses bounded,
+non-redirecting requests; provider/network details are reduced to a safe
+availability status. A small non-secret fallback catalogue is used only when a
+provider's discovery endpoint is temporarily unavailable.
 
 ### Project registration
 

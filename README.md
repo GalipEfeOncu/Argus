@@ -41,7 +41,7 @@ for implemented boundaries and planned work.
 | Area | MVP capability |
 | --- | --- |
 | Participants | Coordinator, Planner, Builder, Reviewer, Tester, UI Agent, and custom capability-based roles |
-| Providers | Native OpenAI, Anthropic, Google, plus an OpenAI-compatible adapter for OpenRouter and local servers |
+| Providers | OpenAI, Anthropic, Google Gemini, OpenRouter, DeepSeek, Moonshot/Kimi, xAI, Mistral AI, Groq, and local Ollama through native or OpenAI-compatible adapters |
 | Collaboration | Ordered shared timeline, mentions, assignments, handoffs, pause/resume/cancel, and reconnect/replay |
 | Safety | Worktree isolation, policy profiles, scoped approvals, diffs, and project-level writer locks |
 | Skills | Built-in bundles plus validated local skill-package import |

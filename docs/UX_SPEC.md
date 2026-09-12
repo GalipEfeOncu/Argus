@@ -111,13 +111,16 @@ cannot expand them.
 
 ## Provider settings
 
-Provider settings list only a provider name, kind, endpoint, and whether a
-credential is configured. Adding a provider uses a masked, non-autocompleted
-field; after saving, the typed value is cleared and never appears in application
-state or browser storage. Model discovery is optional and may report that a
-credential is unavailable or that a capability is unknown. Users can enter an
-explicit model ID, but the UI must present unknown tools/structured-output
-support as unsupported until the runtime can confirm it.
+Provider settings list a provider name, preset, endpoint, model catalogue, and
+whether a credential is configured. Adding a provider uses a masked,
+non-autocompleted field; after saving, the typed value is cleared and never
+appears in application state or browser storage. API-key providers require the
+Tauri desktop client and its operating-system credential store; the web
+development client must explain this boundary instead of showing a generic
+save failure. Ollama is a local, no-key preset. Model discovery is optional and
+may report that a credential is unavailable or that a capability is unknown.
+Users can enter an explicit model ID, but the UI must present unknown
+tools/structured-output support as unsupported until the runtime can confirm it.
 
 The last selected provider/model reference for direct chat is remembered as a
 non-secret local preference. An unconfigured provider is a blocking send
