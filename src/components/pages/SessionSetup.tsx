@@ -28,6 +28,7 @@ function toSessionCreateRequest(
 ): Parameters<typeof api.sessions.create>[0] {
   const runtimeConfiguration = enforceReadOnlyAlphaConfiguration(configuration);
   return {
+    sessionType: 'project',
     projectPath,
     goal,
     coordinatorAgentId: 'coordinator',
@@ -235,7 +236,7 @@ export const SessionSetup: React.FC = () => {
       <div className="setup-inner">
         <header className="setup-header">
           <button type="button" className="setup-back-btn" onClick={() => setActivePage('dashboard')} aria-label="Back to dashboard">←</button>
-          <div><h1 className="setup-title">New Read-only Session</h1><p className="setup-subtitle">Configure a bounded workspace inspection with a visible Coordinator.</p></div>
+        <div><h1 className="setup-title">New Project Session</h1><p className="setup-subtitle">Configure a bounded workspace inspection with a visible Coordinator.</p></div>
         </header>
 
         <div className="setup-runtime-scope" role="note"><strong>Read-only Alpha runtime</strong><span>Coordinator may dispatch at most one specialist per turn. Specialists can only inspect with {READ_ONLY_ALPHA_TOOLS.join(', ')} when their immutable definition allows the requested tool. No files are changed and no tests or shell commands run.</span></div>
@@ -264,19 +265,19 @@ export const SessionSetup: React.FC = () => {
             <p className="setup-muted">Coordinator receives no workspace tools. It routes one bounded read-only specialist assignment, then receives the specialist’s redacted result.</p>
           </section>
 
-          <section className="setup-card" aria-labelledby="setup-team">
+          <section className="setup-card setup-card--team" aria-labelledby="setup-team">
             <h2 id="setup-team" className="setup-card-label">3 — Read-only specialist pool</h2><p className="setup-static">Coordinator may choose one selected specialist per turn. Role names do not grant build, write, test, or shell authority in this runtime.</p>
             <div className="agent-config-list">{configuration.availableAgents.filter((agent) => agent.capabilities.includes('workspace.read')).map((agent) => { const selected = configuration.availableAgentIds.includes(agent.id); const modelValue = agent.modelRef === null ? 'missing' : `${agent.modelRef.providerId}:${agent.modelRef.modelId}`; return <div className="agent-config-row" key={agent.id}><label><input type="checkbox" checked={selected} onChange={() => toggleAgent(agent)} /> <strong>{agent.label}</strong> — inspection only</label><label className="setup-label" htmlFor={`agent-model-${agent.id}`}>Model<select id={`agent-model-${agent.id}`} className="setup-select" value={modelValue} disabled={!selected} onChange={(event) => { const model = providerModels.find((item) => `${item.providerId}:${item.modelId}` === event.target.value) ?? null; update((current) => ({ ...current, availableAgents: current.availableAgents.map((item) => item.id === agent.id ? { ...item, modelRef: model } : item) })); }}><option value="missing">No model configured</option>{agent.modelRef !== null && !providerModels.some((model) => model.providerId === agent.modelRef?.providerId && model.modelId === agent.modelRef.modelId) && <option value={modelValue}>{agent.modelRef.displayName}</option>}{providerModels.map((model) => <option key={`${model.providerId}:${model.modelId}`} value={`${model.providerId}:${model.modelId}`}>{model.displayName}</option>)}</select></label><span className="agent-capabilities">workspace.read · allowed tools are intersected with {READ_ONLY_ALPHA_TOOLS.join(', ')}</span>{agent.agentDefinitionId.startsWith('builtin.') ? null : <span className="setup-muted">Custom definition</span>}</div>; })}</div>
             <p className="setup-muted">Selected: {visibleAgentNames(configuration)}</p>
           </section>
 
-          <section className="setup-card setup-card--wide" aria-labelledby="setup-limits">
+          <section className="setup-card setup-card--limits" aria-labelledby="setup-limits">
             <h2 id="setup-limits" className="setup-card-label">4 — Read-only execution limits</h2><p className="setup-static">Blank is unlimited user ceiling. The worker still caps each read-only assignment to its production safety maximums; parallel work is fixed to one.</p>
             <div className="limits-grid">{readOnlyLimitDefinitions.map(({ key, label, unit, zeroMeaning }) => <label key={key} className="limit-field">{label}<input className="argus-input" type="number" min="0" step={key === 'maxSessionCost' ? '0.01' : '1'} value={configuration.executionLimits[key] ?? ''} onChange={(event) => setLimit(key, event.target.value)} /><span>{unit} · {zeroMeaning}</span></label>)}</div>
             <label className="limit-field">Soft warning ratio<input className="argus-input" type="number" min="0.01" max="1" step="0.01" value={configuration.executionLimits.softWarningRatio} onChange={(event) => update((current) => ({ ...current, executionLimits: { ...current.executionLimits, softWarningRatio: Number(event.target.value) } }))} /><span>fraction of each hard limit</span></label>
           </section>
 
-          <section className="setup-card" aria-labelledby="setup-review">
+          <section className="setup-card setup-card--review" aria-labelledby="setup-review">
             <h2 id="setup-review" className="setup-card-label">5 — Review read-only authority</h2>
             <ul className="review-summary">{readOnlyAlphaAuthoritySummary(enforceReadOnlyAlphaConfiguration(configuration)).map((item) => <li key={item}>{item}</li>)}</ul>
             {validation.length > 0 && <div className="setup-validation" role="alert"><strong>Resolve before starting</strong><ul>{validation.map((error) => <li key={error}>{error}</li>)}</ul></div>}

@@ -4,11 +4,12 @@ import { useUIStore } from '@/stores/uiStore';
 import { useWorkspaceStore } from '@/stores/workspaceStore';
 import { ChatPanel } from '../chat/ChatPanel';
 import { AgentPanel } from '../workflow/AgentPanel';
+import type { SessionKind } from '@/types/session';
 import './SessionView.css';
 
 export const SessionView: React.FC = () => {
   const { getActiveSession, activeSessionId } = useSessionStore();
-  const { agentPanelVisible } = useUIStore();
+  const { agentPanelVisible, newChatDraft, setNewChatDraft } = useUIStore();
   const localSession = getActiveSession();
   const durableSession = useWorkspaceStore((state) => state.sessions.find((session) => session.id === activeSessionId));
   const projects = useWorkspaceStore((state) => state.projects);
@@ -22,6 +23,9 @@ export const SessionView: React.FC = () => {
     );
   }
 
+  const sessionKind: SessionKind = durableSession?.sessionType ?? localSession?.kind ?? 'project';
+  const isDirectChat = sessionKind === 'chat';
+
   return (
     <div className="session-view w-full h-full flex overflow-hidden bg-[var(--bg-main)]">
       
@@ -30,10 +34,13 @@ export const SessionView: React.FC = () => {
         <ChatPanel
           sessionId={session.id}
           sessionName={session.name}
-          projectName={durableSession?.projectDisplayName
+          projectName={isDirectChat ? 'Local chat' : durableSession?.projectDisplayName
             ?? projects.find((project) => project.canonicalPath === localSession?.projectPath)?.displayName
             ?? localSession?.projectPath.split(/[\\/]/).filter(Boolean).at(-1)
             ?? 'Local project'}
+          sessionKind={sessionKind}
+          initialDraft={isDirectChat ? newChatDraft : undefined}
+          onDraftChange={isDirectChat ? setNewChatDraft : undefined}
         />
       </div>
 

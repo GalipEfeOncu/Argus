@@ -51,6 +51,22 @@ card, but their assignment, handoff, tool, evidence, and result events remain
 inspectable. The UI must never imply a private agent conversation that is absent
 from the event log.
 
+### Direct chat
+
+The primary **New** action opens a direct chat composer immediately. It does not
+show a second choice screen and it does not create a project workspace or a
+specialist team. The user may write a draft before a provider is configured;
+the send action stays disabled and the screen presents one clear link to
+Provider Settings. Returning from Settings preserves that draft.
+
+When at least one provider credential and model are available, Argus creates a
+projectless `chat` session using the selected provider/model reference and
+opens the normal timeline. The selected reference is remembered locally for
+the next direct chat; credentials remain in the operating-system credential
+store and never enter browser state or session history. Direct chat uses the
+same ordered event timeline and WebSocket transport as a project session, but
+its Coordinator response is ordinary text and has no workspace tools.
+
 ## Session setup
 
 The target session-configuration contract uses progressive disclosure and
@@ -102,6 +118,10 @@ state or browser storage. Model discovery is optional and may report that a
 credential is unavailable or that a capability is unknown. Users can enter an
 explicit model ID, but the UI must present unknown tools/structured-output
 support as unsupported until the runtime can confirm it.
+
+The last selected provider/model reference for direct chat is remembered as a
+non-secret local preference. An unconfigured provider is a blocking send
+condition, not a reason to discard the user's draft.
 
 Presets (`Quick`, `Balanced`, `Thorough`, and `Custom`) populate fields but do
 not hide their resolved values. Changing any resolved value marks the preset as

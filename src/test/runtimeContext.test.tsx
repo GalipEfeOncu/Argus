@@ -36,7 +36,7 @@ beforeEach(() => {
     event(8, 'decision.requested', { decisionId: 'decision-a', scopeId: 'assignment-a', choices: ['reassign', 'deliver_partial'], reasonSummary: 'A hard limit needs a decision.' }),
   ].forEach((next) => { state = reduceSessionEvent(state, next).state; });
   useSessionRoomStore.setState({ projections: { [sessionId]: state } });
-  useSessionStore.setState({ sessions: [{ id: sessionId, name: 'Runtime', projectPath: '/project', task: 'Runtime test', status: 'running', roleConfigs: [], configuration: createConfiguration({}), messages: [], startedAt: 0, tokenUsage: { inputTokens: 0, outputTokens: 0, totalTokens: 0 } }], activeSessionId: sessionId });
+  useSessionStore.setState({ sessions: [{ id: sessionId, kind: 'project', name: 'Runtime', projectPath: '/project', task: 'Runtime test', status: 'running', roleConfigs: [], configuration: createConfiguration({}), messages: [], startedAt: 0, tokenUsage: { inputTokens: 0, outputTokens: 0, totalTokens: 0 } }], activeSessionId: sessionId });
 });
 
 afterEach(cleanup);

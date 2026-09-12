@@ -65,6 +65,42 @@ def test_session_creation_prepares_a_default_isolated_workspace(tmp_path: Path, 
     assert Path(workspace[1]).is_dir() and Path(workspace[1]) != project
 
 
+def test_direct_chat_session_has_no_project_workspace_and_is_listed_as_chat(tmp_path: Path, monkeypatch) -> None:
+    database_path = tmp_path / "direct-chat.db"
+    monkeypatch.setattr(settings, "db_path", str(database_path))
+    with TestClient(app) as client:
+        profile = client.post("/providers/", json={"providerKind": "openai", "displayName": "Local OpenAI"})
+        response = client.post("/sessions/", json={
+            "sessionType": "chat",
+            "name": "New chat",
+            "goal": "Direct conversation",
+            "coordinatorAgentId": "coordinator",
+            "agents": [{
+                "id": "coordinator",
+                "role": "coordinator",
+                "modelBinding": {"providerProfileId": profile.json()["id"], "modelId": "gpt-4o-mini"},
+            }],
+            "configuration": {"availableAgentIds": [], "workspacePolicy": {"mode": "snapshot"}},
+            "workspaceMode": "snapshot",
+        })
+        listed = client.get("/sessions/")
+        detail = client.get(f"/sessions/{response.json()['id']}")
+
+    assert profile.status_code == 201
+    assert response.status_code == 200
+    assert response.json()["sessionType"] == "chat"
+    assert response.json()["projectId"] is None
+    assert listed.status_code == 200
+    assert listed.json()[0]["sessionType"] == "chat"
+    assert listed.json()[0]["projectId"] is None
+    assert listed.json()[0]["projectDisplayName"] == "Direct chat"
+    assert detail.status_code == 200
+    assert detail.json()["workspacePath"] is None
+    with sqlite3.connect(database_path) as database:
+        workspace_count = database.execute("SELECT COUNT(*) FROM workspaces WHERE session_id = ?", (response.json()["id"],)).fetchone()[0]
+    assert workspace_count == 0
+
+
 def test_session_shell_resources_return_original_project_metadata(tmp_path: Path, monkeypatch) -> None:
     database_path = tmp_path / "shell.db"
     monkeypatch.setattr(settings, "db_path", str(database_path))
@@ -82,6 +118,7 @@ def test_session_shell_resources_return_original_project_metadata(tmp_path: Path
     assert listed.json() == [{
         "id": created.json()["id"],
         "name": created.json()["name"],
+        "sessionType": "project",
         "projectId": registered.json()["id"],
         "projectDisplayName": "Argus UI",
         "originalProjectPath": str(project.resolve()),

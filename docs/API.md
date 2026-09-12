@@ -530,13 +530,26 @@ The REST API manages durable configuration; real-time execution uses WebSocket c
 | `/artifacts` | Diffs, exports, and session files |
 
 `GET /sessions` returns at most 50 recent `SessionSummaryResponse` records for
-the local navigation shell. Each summary contains the stable project ID,
-registered project display name and canonical original path, goal, lifecycle
-status, and millisecond timestamps. It never substitutes the managed worktree
+the local navigation shell. Each summary contains `sessionType`, goal,
+lifecycle status, and millisecond timestamps. A project session also contains
+its stable project ID, registered display name, and canonical original path; a
+direct `chat` session has `projectId: null`, `projectDisplayName: "Direct chat"`,
+and `originalProjectPath: null`. The list never substitutes a managed worktree
 or snapshot path for the original project path. `GET /sessions/{sessionId}`
-returns the same bounded metadata plus `workspacePath`, the managed path used by
-that session. Both endpoints use strict response models so the generated client
-does not infer shell state from legacy database rows.
+returns the same bounded metadata plus `workspacePath`; this is `null` for a
+direct chat because it has no project workspace. Both endpoints use strict
+response models so the generated client does not infer shell state from legacy
+database rows.
+
+`POST /sessions` accepts `sessionType: "chat"` for a projectless direct
+conversation. The request must omit `projectId` and `projectPath`, provide a
+Coordinator agent with a configured provider/model binding, and use snapshot
+workspace policy (the server does not provision a workspace). The response
+returns the normalized immutable Coordinator snapshot and the same `chat`
+session type. Subsequent human messages use the ordinary `message.send`
+WebSocket command; the runtime streams plain Coordinator text as canonical
+`message.created`, `message.delta`, and `message.completed` events. Chat errors
+are recoverable room events so the user can retry without losing the session.
 
 Session deletion remains unavailable until the retention-policy workflow is
 implemented. The current `DELETE /sessions/{sessionId}` endpoint returns 405;

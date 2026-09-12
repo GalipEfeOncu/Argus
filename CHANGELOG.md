@@ -8,18 +8,38 @@ All notable user-visible changes to Argus are recorded here. The project follows
 
 ### Added
 
+- Argus now uses its new brand mark in the workspace shell, browser icon, and
+  desktop application icon set, alongside a refined responsive control-room UI.
 - Configured Coordinators can now delegate read-only workspace inspection to a
   configured specialist, with bounded audited tools and a follow-up Coordinator
   turn that reports the verified result; mutating specialist work remains denied.
 - Starting a session now runs its explicitly configured Coordinator provider in
   a durable background lifecycle, with visible final or failure outcomes,
   reconnectable events, safe pause/cancel fencing, and no provider fallback.
+- The primary New action now opens a direct chat immediately when a provider is
+  configured, remembers the selected non-secret model reference, and keeps a
+  draft available with a clear Provider Settings path when no API credential is
+  ready.
 - An optional offline profile now lets the device owner set a local display name
   and bio, with accessible edit, loading, retry, and save states and no online
   account or browser-persisted identity.
 
 ### Fixed
 
+- Workspace pages now share the direct-chat visual language: quieter surfaces,
+  lighter separators, restrained status treatments, and less decorative empty
+  states across the dashboard, settings, profile, setup, and session views.
+- The direct-chat entry screen now keeps the composer as its single panel,
+  blends the welcome copy into the page background, and reduces provider setup
+  to a compact inline prompt.
+- The empty Dashboard now presents one clear primary start action, uses a
+  semantic sessions heading, labels catalogue recovery controls for assistive
+  technology, and keeps runtime status readable at narrow window widths.
+- Session entry now uses consistent session terminology, removes ambiguous
+  decorative symbols, and makes each choice describe its actual destination.
+- Direct chats now use projectless durable sessions with the shared ordered
+  timeline, while project sessions retain their existing isolated workspace and
+  specialist setup flow.
 - Typography now uses local operating-system font stacks, avoiding an external
   font request and preserving the desktop interface when offline.
 - Session setup and runtime copy now match the production read-only worker:

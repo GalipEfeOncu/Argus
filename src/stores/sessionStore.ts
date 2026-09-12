@@ -30,6 +30,7 @@ export const useSessionStore = create<SessionStoreState>()(
       createSession: (config, id = crypto.randomUUID()) => {
         const session: Session = {
           id,
+          kind: config.kind ?? 'project',
           name: config.name ?? `Session #${Date.now()}`,
           projectPath: config.projectPath,
           task: config.task,

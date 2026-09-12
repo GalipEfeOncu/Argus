@@ -4,16 +4,28 @@ import { MessageList } from './MessageList';
 import { MessageInput } from './MessageInput';
 import { ApprovalBar } from './ApprovalBar';
 import { SessionControls } from './SessionControls';
+import type { SessionKind } from '@/types/session';
 import './ChatPanel.css';
 
 interface ChatPanelProps {
   sessionId: string;
   sessionName: string;
   projectName: string;
+  sessionKind?: SessionKind;
+  initialDraft?: string;
+  onDraftChange?: (draft: string) => void;
 }
 
-export const ChatPanel: React.FC<ChatPanelProps> = ({ sessionId, sessionName, projectName }) => {
+export const ChatPanel: React.FC<ChatPanelProps> = ({
+  sessionId,
+  sessionName,
+  projectName,
+  sessionKind = 'project',
+  initialDraft,
+  onDraftChange,
+}) => {
   const { setActivePage, agentPanelVisible, toggleAgentPanel } = useUIStore();
+  const isDirectChat = sessionKind === 'chat';
 
   return (
     <div className="chat-panel flex flex-col h-full">
@@ -35,13 +47,13 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ sessionId, sessionName, pr
             </svg>
           </button>
 
-          <nav className="chat-breadcrumb" aria-label="Session breadcrumb">
+          <nav className="chat-breadcrumb" aria-label={isDirectChat ? 'Chat breadcrumb' : 'Session breadcrumb'}>
             <button type="button" className="chat-breadcrumb-parent" onClick={() => setActivePage('dashboard')}>{projectName}</button>
             <span className="chat-breadcrumb-sep" aria-hidden="true">/</span>
             <span className="chat-breadcrumb-current" aria-current="page">{sessionName || 'Session'}</span>
           </nav>
 
-          <span className="chat-env-badge">LOCAL</span>
+          <span className="chat-env-badge">{isDirectChat ? 'CHAT' : 'LOCAL'}</span>
         </div>
 
         {/* Right: toggle agents + menu */}
@@ -71,14 +83,14 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ sessionId, sessionName, pr
       {/* ── Message List ─────────────────────────────────── */}
       <div className="chat-messages-area flex-1 min-h-0 message-list-container">
 
-        <MessageList sessionId={sessionId} />
+        <MessageList sessionId={sessionId} sessionKind={sessionKind} />
 
       </div>
 
       {/* ── Bottom: Approval + Input ─────────────────────── */}
       <div className="chat-bottom-area">
         <ApprovalBar sessionId={sessionId} />
-        <MessageInput sessionId={sessionId} />
+        <MessageInput sessionId={sessionId} sessionKind={sessionKind} initialDraft={initialDraft} onDraftChange={onDraftChange} />
       </div>
     </div>
   );

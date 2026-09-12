@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { api } from '@/services/api';
 import { tauriCommands } from '@/services/tauri';
 import { useSettingsStore } from '@/stores/settingsStore';
+import { useUIStore } from '@/stores/uiStore';
 import type { ModelInfo, ProviderProfile, ProviderType } from '@/types/provider';
 import './Settings.css';
 
@@ -9,6 +10,8 @@ type LoadState = 'loading' | 'ready' | 'error';
 
 export const Settings: React.FC = () => {
   const [providers, setProviders] = useState<ProviderProfile[]>([]);
+  const settingsReturnPage = useUIStore((state) => state.settingsReturnPage);
+  const setActivePage = useUIStore((state) => state.setActivePage);
   const addManualProviderModel = useSettingsStore((state) => state.addManualProviderModel);
   const [models, setModels] = useState<Record<string, ModelInfo[]>>({});
   const [modelStates, setModelStates] = useState<Record<string, LoadState>>({});
@@ -96,7 +99,10 @@ export const Settings: React.FC = () => {
   };
 
   return <div className="settings-page"><div className="settings-inner">
-    <div className="settings-header"><div><h1 className="settings-title">Provider Settings</h1><p className="settings-subtitle">Manage provider credentials and discover available models.</p></div></div>
+    <div className="settings-header">
+      <div><h1 className="settings-title">Provider Settings</h1><p className="settings-subtitle">Manage provider credentials and discover available models.</p></div>
+      {settingsReturnPage === 'new-chat' && <button type="button" className="settings-back-btn" onClick={() => setActivePage('new-chat')}>Back to chat</button>}
+    </div>
     <section className="settings-card" aria-labelledby="providers-heading">
       <h2 id="providers-heading" className="settings-card-label">API PROVIDERS</h2>
       <p className="settings-description">API keys are saved in your operating system’s credential store. Argus only retains a non-secret reference.</p>

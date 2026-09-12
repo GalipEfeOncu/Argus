@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { Settings } from '@/components/pages/Settings';
+import { useUIStore } from '@/stores/uiStore';
 
 const { listProviders, listModels } = vi.hoisted(() => ({ listProviders: vi.fn(), listModels: vi.fn() }));
 
@@ -26,6 +27,7 @@ const provider = {
 beforeEach(() => {
   listProviders.mockReset();
   listModels.mockReset();
+  useUIStore.setState({ activePage: 'settings', settingsReturnPage: null, newChatDraft: '' });
 });
 
 afterEach(cleanup);
@@ -58,4 +60,15 @@ test('one provider model failure keeps its provider visible and supports a bound
   fireEvent.click(screen.getByRole('button', { name: 'Retry models' }));
   expect(await screen.findByText(/Model one · tools supported/)).toBeInTheDocument();
   expect(listModels).toHaveBeenCalledTimes(2);
+});
+
+test('returns to direct chat without dropping its draft', async () => {
+  listProviders.mockResolvedValue([]);
+  useUIStore.setState({ settingsReturnPage: 'new-chat', newChatDraft: 'Keep this message' });
+  render(<Settings />);
+
+  expect(await screen.findByText('No providers configured yet.')).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Back to chat' }));
+  expect(useUIStore.getState().activePage).toBe('new-chat');
+  expect(useUIStore.getState().newChatDraft).toBe('Keep this message');
 });

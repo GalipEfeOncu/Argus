@@ -1,14 +1,18 @@
 import React, { useEffect, useState } from 'react';
 import { useWebSocket } from '@/hooks/useWebSocket';
 import { useSessionRoomStore } from '@/stores/sessionRoomStore';
+import type { SessionKind } from '@/types/session';
 import './MessageInput.css';
 
 interface MessageInputProps {
   sessionId: string;
+  sessionKind?: SessionKind;
+  initialDraft?: string;
+  onDraftChange?: (draft: string) => void;
 }
 
-export const MessageInput: React.FC<MessageInputProps> = ({ sessionId }) => {
-  const [content, setContent] = useState('');
+export const MessageInput: React.FC<MessageInputProps> = ({ sessionId, sessionKind = 'project', initialDraft = '', onDraftChange }) => {
+  const [content, setContent] = useState(initialDraft);
   const [submission, setSubmission] = useState<{ commandId: string; draft: string } | null>(null);
   const [dispatchError, setDispatchError] = useState<string | null>(null);
   const { sendMessage, sendInterrupt } = useWebSocket(sessionId);
@@ -19,12 +23,18 @@ export const MessageInput: React.FC<MessageInputProps> = ({ sessionId }) => {
   const dispatchAvailable = connection === 'connected';
   const mentions = extractMentions(content);
   const targetLabel = mentions.length === 0 ? 'Coordinator' : mentions.join(', ');
+  const isDirectChat = sessionKind === 'chat';
+
+  const updateContent = (nextContent: string) => {
+    setContent(nextContent);
+    onDraftChange?.(nextContent);
+  };
 
   useEffect(() => {
     if (submission === null || projection === undefined) return;
     const result = projection.events.find((event) => event.correlationId === submission.commandId);
     if (result?.type === 'message.created') {
-      setContent((current) => current === submission.draft ? '' : current);
+      if (content === submission.draft) updateContent('');
       setSubmission(null);
       setDispatchError(null);
     } else if (result?.type === 'error.created') {
@@ -34,7 +44,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({ sessionId }) => {
   }, [projection, submission]);
 
   const handleSend = () => {
-    if (!content.trim() || !dispatchAvailable || submission !== null) return;
+    if (!content.trim() || !dispatchAvailable || submission !== null || (isDirectChat && isStreaming)) return;
     const draft = content;
     const result = sendMessage(content.trim(), mentions);
     if (result.status === 'unavailable') {
@@ -65,10 +75,10 @@ export const MessageInput: React.FC<MessageInputProps> = ({ sessionId }) => {
         <textarea
           className="input-textarea"
           rows={3}
-          aria-label="Message for shared room"
-          placeholder="Describe your task; @name explicitly targets a participant"
+          aria-label={isDirectChat ? 'Message for direct chat' : 'Message for shared room'}
+          placeholder={isDirectChat ? 'Write a message…' : 'Describe your task; @name explicitly targets a participant'}
           value={content}
-          onChange={(e) => setContent(e.target.value)}
+          onChange={(e) => updateContent(e.target.value)}
           onKeyDown={handleKeyDown}
         />
 
@@ -79,10 +89,10 @@ export const MessageInput: React.FC<MessageInputProps> = ({ sessionId }) => {
           <button
             className="btn-execute"
             onClick={handleSend}
-            disabled={!content.trim() || !dispatchAvailable || submission !== null}
+            disabled={!content.trim() || !dispatchAvailable || submission !== null || (isDirectChat && isStreaming)}
             type="button"
           >
-            <span>Execute Task</span>
+            <span>{isDirectChat ? 'Send message' : 'Execute Task'}</span>
             <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
               <line x1="22" y1="2" x2="11" y2="13" />
               <polyline points="22 2 15 22 11 13 2 9 22 2" />

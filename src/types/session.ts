@@ -19,8 +19,11 @@ export type SessionStatus =
   | 'failed'
   | 'error';
 
+export type SessionKind = 'project' | 'chat';
+
 export interface Session {
   id: string;
+  kind: SessionKind;
   name: string;
   projectPath: string;
   task: string;
@@ -35,6 +38,7 @@ export interface Session {
 }
 
 export interface SessionConfig {
+  kind?: SessionKind;
   projectPath: string;
   task: string;
   roleConfigs: RoleConfig[];

@@ -36,6 +36,7 @@ from app.db.migrations import (
     v0018_recovery,
     v0019_acceptance,
     v0020_local_profile,
+    v0021_direct_chat,
 )
 
 
@@ -79,6 +80,7 @@ MIGRATIONS: tuple[Migration, ...] = (
     Migration(18, "restart_recovery", v0018_recovery.apply),
     Migration(19, "diff_review_and_acceptance", v0019_acceptance.apply),
     Migration(20, "offline_local_profile", v0020_local_profile.apply),
+    Migration(21, "direct_chat_sessions", v0021_direct_chat.apply),
 )
 
 

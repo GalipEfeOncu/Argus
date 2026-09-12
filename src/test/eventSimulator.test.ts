@@ -37,6 +37,7 @@ test('simulator streams canonical deltas and an interrupt closes the active stre
 test('simulator approval scenario is deterministic and projects canonical events through the shared store path', () => {
   const session: Session = {
     id: sessionId,
+    kind: 'project',
     name: 'Simulator test',
     projectPath: 'test-project',
     task: 'Exercise an approval',

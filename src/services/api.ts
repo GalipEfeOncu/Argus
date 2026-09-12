@@ -2,8 +2,8 @@ import type { components, operations } from '@/types/generated/rest';
 import { authorizationHeaders, ensureBackendConnection } from '@/services/backendConnection';
 
 type RequestMethod = 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
-type SessionCreateRequest = components['schemas']['SessionCreateRequest'];
-type SessionCreateResponse = operations['create_session_sessions__post']['responses'][200]['content']['application/json'];
+export type SessionCreateRequest = components['schemas']['SessionCreateRequest'];
+export type SessionCreateResponse = operations['create_session_sessions__post']['responses'][200]['content']['application/json'];
 type SessionConfigurationResponse = operations['get_session_configuration_sessions__session_id__configuration_get']['responses'][200]['content']['application/json'];
 type AgentDefinition = components['schemas']['AgentDefinitionResponse'];
 type AgentDefinitionCreate = components['schemas']['AgentDefinitionCreate'];
@@ -60,6 +60,21 @@ export const api = {
   // ── Sessions ──────────────────────────────────────────────
   sessions: {
     create: (config: SessionCreateRequest) => request<SessionCreateResponse>('POST', '/sessions/', config),
+    createChat: (model: { providerId: string; modelId: string }) => request<SessionCreateResponse>('POST', '/sessions/', {
+      sessionType: 'chat',
+      name: 'New chat',
+      goal: 'Direct conversation',
+      coordinatorAgentId: 'coordinator',
+      agents: [{
+        id: 'coordinator',
+        role: 'coordinator',
+        modelBinding: { providerProfileId: model.providerId, modelId: model.modelId },
+        systemPrompt: 'You are Argus in a direct chat. Answer the user clearly and helpfully. Do not claim to have used tools or changed files.',
+      }],
+      configuration: { availableAgentIds: [], workspacePolicy: { mode: 'snapshot' } },
+      workspaceMode: 'snapshot',
+      acknowledgeDirectWrite: false,
+    }),
     list: () => request<SessionSummary[]>('GET', '/sessions/'),
     get: (id: string) => request<SessionDetail>('GET', `/sessions/${id}`),
     configuration: (id: string) => request<SessionConfigurationResponse>('GET', `/sessions/${id}/configuration`),

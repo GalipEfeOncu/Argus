@@ -4,15 +4,17 @@ import { createTimelineEntries, isTimelineEntrySpecialist } from '@/services/tim
 import { TimelineRow } from './TimelineRow';
 import { LiveTimelineAnnouncer } from './LiveTimelineAnnouncer';
 import './MessageList.css';
+import type { SessionKind } from '@/types/session';
 
 interface MessageListProps {
   sessionId: string;
+  sessionKind?: SessionKind;
 }
 
 const ESTIMATED_ROW_HEIGHT = 92;
 const OVERSCAN_ROWS = 6;
 
-export const MessageList: React.FC<MessageListProps> = ({ sessionId }) => {
+export const MessageList: React.FC<MessageListProps> = ({ sessionId, sessionKind = 'project' }) => {
   const projection = useSessionRoomStore((state) => state.projections[sessionId]);
   const entries = useMemo(() => projection === undefined ? [] : createTimelineEntries(projection), [projection]);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -116,13 +118,13 @@ export const MessageList: React.FC<MessageListProps> = ({ sessionId }) => {
     return (
       <div className="empty-state flex flex-col items-center justify-center h-full text-muted">
         <span className="text-4xl mb-3 opacity-50" aria-hidden="true">✦</span>
-        <p>No room events yet. Send a task to Coordinator to get started.</p>
+        <p>{sessionKind === 'chat' ? 'No messages yet. Write something below to start the conversation.' : 'No room events yet. Send a task to Coordinator to get started.'}</p>
       </div>
     );
   }
 
   return (
-    <section className="timeline-shell" aria-label="Shared room timeline">
+    <section className="timeline-shell" aria-label={sessionKind === 'chat' ? 'Conversation timeline' : 'Shared room timeline'}>
       <div className="timeline-toolbar">
         <span>{entries.length.toLocaleString()} ordered events</span>
         <button type="button" aria-pressed={collapseSpecialists} onClick={() => setCollapseSpecialists((value) => !value)}>
@@ -134,7 +136,7 @@ export const MessageList: React.FC<MessageListProps> = ({ sessionId }) => {
         ref={containerRef}
         role="log"
         aria-live="off"
-        aria-label="Ordered shared-room events"
+        aria-label={sessionKind === 'chat' ? 'Ordered conversation events' : 'Ordered shared-room events'}
         onScroll={(event) => {
           const target = event.currentTarget;
           setScrollTop(target.scrollTop);

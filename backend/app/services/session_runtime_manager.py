@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import Awaitable, Callable
+from hashlib import sha256
 import json
 import uuid
 
@@ -11,7 +12,8 @@ import aiosqlite
 
 from app.db.database import get_db, transaction
 from app.db.repositories import EventRepository, StoredEvent, _now_ms, _safe_json
-from app.providers.protocol import Provider, ProviderRequest
+from app.providers.protocol import Cancelled, Finished, Provider, ProviderRequest, RetryableError, TerminalError, TextDelta, Usage
+from app.services.budget_counter_service import BudgetCounterService
 from app.schemas.coordinator_actions import (
     AskUserAction,
     AssignmentsAction,
@@ -41,6 +43,7 @@ class SessionRuntimeManager:
         self._provider_resolver = provider_resolver
         self._publisher = publisher
         self._tasks: dict[str, asyncio.Task[None]] = {}
+        self._active_chat_streams: dict[str, tuple[Provider, str]] = {}
         self._lock = asyncio.Lock()
         self._shutting_down = False
 
@@ -59,6 +62,16 @@ class SessionRuntimeManager:
             task = self._tasks.get(session_id)
         if task is not None:
             await asyncio.shield(task)
+
+    async def interrupt(self, session_id: str) -> bool:
+        """Interrupt an active direct-chat provider response, if present."""
+
+        active = self._active_chat_streams.get(session_id)
+        if active is None:
+            return False
+        provider, request_id = active
+        await provider.cancel(request_id)
+        return True
 
     async def shutdown(self, timeout_seconds: float = 2.0) -> None:
         async with self._lock:
@@ -87,14 +100,14 @@ class SessionRuntimeManager:
                 """SELECT DISTINCT session.id FROM sessions session
                    JOIN provider_operations operation ON operation.session_id = session.id
                    WHERE session.status IN ('preparing', 'running')
-                     AND operation.operation_kind = 'coordinator'
+                     AND operation.operation_kind IN ('coordinator', 'chat')
                      AND operation.state = 'outcome_unknown'"""
             ) as cursor:
                 session_ids = [str(row["id"]) for row in await cursor.fetchall()]
             for session_id in session_ids:
                 await self._terminal_error(
                     db, session_id, "coordinator_restart_interrupted",
-                    "The Coordinator was interrupted by a runtime restart and was not replayed.",
+                    "The provider response was interrupted by a runtime restart and was not replayed.",
                     expected={"preparing", "running"},
                 )
             return len(session_ids)
@@ -127,7 +140,10 @@ class SessionRuntimeManager:
                 return
             if context is None:
                 return
-            goal, coordinator_id, profile_id, model_id, system_prompt, participant_context, initial_status = context
+            goal, coordinator_id, profile_id, model_id, system_prompt, participant_context, initial_status, session_type = context
+            if session_type == "chat":
+                await self._run_direct_chat(db, session_id, profile_id, model_id, system_prompt)
+                return
             try:
                 provider = await self._resolve_provider(db, profile_id, model_id)
             except Exception:
@@ -172,8 +188,8 @@ class SessionRuntimeManager:
         finally:
             await db.close()
 
-    async def _context(self, db: aiosqlite.Connection, session_id: str) -> tuple[str, str, str, str, str, str, str] | None:
-        async with db.execute("SELECT COALESCE(goal, task) AS goal, status FROM sessions WHERE id = ?", (session_id,)) as cursor:
+    async def _context(self, db: aiosqlite.Connection, session_id: str) -> tuple[str, str, str, str, str, str, str, str] | None:
+        async with db.execute("SELECT COALESCE(goal, task) AS goal, status, session_type FROM sessions WHERE id = ?", (session_id,)) as cursor:
             session = await cursor.fetchone()
         if session is None or session["status"] not in {"preparing", "running"}:
             return None
@@ -203,7 +219,132 @@ class SessionRuntimeManager:
             {"id": agent["id"], "role": agent["role"], "capabilities": agent["capabilities"], "toolAllowlist": agent["toolAllowlist"]}
             for agent in configuration.agent_snapshots if agent["id"] in available
         ])
-        return str(session["goal"]), str(row["id"]), profile_id, model_id, prompt, participant_context, str(session["status"])
+        return str(session["goal"]), str(row["id"]), profile_id, model_id, prompt, participant_context, str(session["status"]), str(session["session_type"])
+
+    async def _run_direct_chat(
+        self, db: aiosqlite.Connection, session_id: str, profile_id: str, model_id: str, system_prompt: str,
+    ) -> None:
+        """Stream one ordinary provider response without workspace orchestration."""
+
+        try:
+            provider = await self._resolve_provider(db, profile_id, model_id)
+        except Exception:
+            await self._commit_chat_error(db, session_id, "chat_provider_unavailable", "The configured provider is unavailable. Check its credential and try again.")
+            return
+
+        request = ProviderRequest(
+            request_id=f"chat_{uuid.uuid4().hex}", model_id=model_id,
+            messages=(
+                {"role": "system", "content": system_prompt},
+                *(await self._recent_human_messages(db, session_id)),
+            ),
+            metadata={"sessionId": session_id, "participantId": "coordinator", "sessionType": "chat"},
+        )
+        operation_id = f"provider_{request.request_id}"
+        fingerprint = sha256(f"{request.request_id}:{request.model_id}".encode()).hexdigest()
+        audit_db = await get_db()
+        try:
+            async with transaction(audit_db):
+                await audit_db.execute(
+                    """INSERT INTO provider_operations (id, session_id, assignment_id, operation_kind, mutation_class,
+                       state, request_fingerprint, started_at_ms) VALUES (?, ?, NULL, 'chat', 'read_only', 'running', ?, ?)""",
+                    (operation_id, session_id, fingerprint, _now_ms()),
+                )
+        finally:
+            await audit_db.close()
+
+        message_id = f"msg_{uuid.uuid4().hex}"
+        created = False
+        finished = False
+        cancelled = False
+        outcome = "failed"
+        self._active_chat_streams[session_id] = (provider, request.request_id)
+        try:
+            async for event in provider.stream(request):
+                if isinstance(event, TextDelta) and event.text:
+                    if not created:
+                        committed = await self._commit(db, session_id, {"running"}, [(
+                            "message.created", "coordinator", {
+                                "messageId": message_id, "authorId": "coordinator", "authorKind": "coordinator",
+                                "content": event.text[:64_000], "mentionIds": [], "streaming": True,
+                            },
+                        )])
+                        await self._publish(session_id, committed)
+                        created = bool(committed)
+                    else:
+                        committed = await self._commit(db, session_id, {"running"}, [(
+                            "message.delta", "coordinator", {"messageId": message_id, "delta": event.text[:64_000]},
+                        )])
+                        await self._publish(session_id, committed)
+                elif isinstance(event, Usage):
+                    try:
+                        before = await EventRepository(db).last_sequence(session_id)
+                        await BudgetCounterService(db).record_coordinator_usage(
+                            session_id, input_tokens=event.input_tokens or 0, output_tokens=event.output_tokens or 0,
+                            normalized_cost=event.cost_usd, duration_ms=0,
+                            cost_uncertainty="exact" if event.cost_usd is not None and event.exact else ("estimated" if event.cost_usd is not None else "unavailable"),
+                            scope_id=request.request_id,
+                        )
+                        usage_page = await EventRepository(db).page_after(session_id, after_sequence=before)
+                        await self._publish(session_id, list(usage_page.events))
+                    except Exception:
+                        await provider.cancel(request.request_id)
+                        await self._commit_chat_error(db, session_id, "chat_usage_limit", "This chat reached its configured usage limit.", message_id if created else None)
+                        return
+                elif isinstance(event, (RetryableError, TerminalError)):
+                    await self._commit_chat_error(db, session_id, "chat_provider_error", "The provider could not complete this response. Try again.", message_id if created else None)
+                    return
+                elif isinstance(event, Cancelled):
+                    cancelled = True
+                    break
+                elif isinstance(event, Finished):
+                    outcome = "succeeded"
+                    finished = True
+                    break
+                await asyncio.sleep(0)
+            if created and finished:
+                completed = await self._commit(db, session_id, {"running"}, [(
+                    "message.completed", "coordinator", {"messageId": message_id},
+                )])
+                await self._publish(session_id, completed)
+            elif created and cancelled:
+                completed = await self._commit(db, session_id, {"running"}, [(
+                    "message.completed", "coordinator", {"messageId": message_id},
+                )])
+                await self._publish(session_id, completed)
+            elif created:
+                await self._commit_chat_error(db, session_id, "chat_incomplete_response", "The provider ended the response unexpectedly. Try again.", message_id)
+            else:
+                await self._commit_chat_error(db, session_id, "chat_empty_response", "The provider returned an empty response. Try again.")
+        except asyncio.CancelledError:
+            await provider.cancel(request.request_id)
+            raise
+        except Exception:
+            await self._commit_chat_error(db, session_id, "chat_provider_error", "The provider could not complete this response. Try again.", message_id if created else None)
+        finally:
+            if self._active_chat_streams.get(session_id) == (provider, request.request_id):
+                self._active_chat_streams.pop(session_id, None)
+            audit_db = await get_db()
+            try:
+                async with transaction(audit_db):
+                    await audit_db.execute(
+                        "UPDATE provider_operations SET state = ?, completed_at_ms = ? WHERE id = ? AND state = 'running'",
+                        (outcome, _now_ms(), operation_id),
+                    )
+            finally:
+                await audit_db.close()
+
+    async def _commit_chat_error(
+        self, db: aiosqlite.Connection, session_id: str, code: str, summary: str, message_id: str | None = None,
+    ) -> None:
+        specs: list[tuple[str, str, dict]] = []
+        if message_id is not None:
+            specs.append(("message.completed", "coordinator", {"messageId": message_id}))
+        specs.append((
+            "error.created", "system", {"errorId": f"chat_{uuid.uuid4().hex}", "code": code, "summary": summary, "recoverable": True},
+        ))
+        events = await self._commit(db, session_id, {"running"}, specs)
+        await self._publish(session_id, events)
 
     async def _resolve_provider(self, db: aiosqlite.Connection, profile_id: str, model_id: str) -> Provider:
         if self._provider_resolver is not None:

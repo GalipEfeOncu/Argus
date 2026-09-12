@@ -31,46 +31,32 @@ export const Dashboard: React.FC = () => {
         {/* ── Header ──────────────────────────────────────── */}
         <div className="dashboard-header">
           <div>
+            <p className="dashboard-eyebrow">ARGUS / LOCAL-FIRST</p>
             <h1 className="dashboard-title">{selectedProject?.displayName ?? 'Local workspace'}</h1>
             <p className="dashboard-subtitle">{selectedProject?.canonicalPath ?? 'Durable projects and Coordinator sessions on this device'}</p>
           </div>
-          <button
-            className="dashboard-new-btn"
-            onClick={() => setActivePage('session-setup')}
-          >
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-              <line x1="12" y1="5" x2="12" y2="19" />
-              <line x1="5" y1="12" x2="19" y2="12" />
-            </svg>
-            New Session
-          </button>
         </div>
 
         {/* ── Sessions ─────────────────────────────────────── */}
         <div className="dashboard-section-heading">
-          <div className="dashboard-section-label">RECENT SESSIONS</div>
+          <h2 className="dashboard-section-label">RECENT SESSIONS</h2>
           {selectedProjectId !== null && <button type="button" className="dashboard-clear-filter" onClick={() => selectProject(null)}>Show all projects</button>}
         </div>
 
         {loading && sessions.length === 0 ? (
           <div className="dashboard-empty" role="status"><p className="dashboard-empty-title">Loading local sessions…</p></div>
         ) : <>
-          {error !== null && <div className="dashboard-catalog-alert" role="alert"><span>{error}</span><button type="button" onClick={() => void refresh()}>Retry</button></div>}
+          {error !== null && <div className="dashboard-catalog-alert" role="alert"><div><strong>Local catalogue unavailable</strong><span>{error}</span></div><button type="button" aria-label="Retry loading local projects and sessions" onClick={() => void refresh()}>Retry</button></div>}
           {visibleSessions.length === 0 ? (
           /* ── Empty State ─────────────────────────────────── */
           <div className="dashboard-empty">
-            <div className="dashboard-empty-icon">
-              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-              </svg>
-            </div>
             <p className="dashboard-empty-title">No sessions yet</p>
-            <p className="dashboard-empty-sub">Start a read-only inspection with Coordinator and one specialist at a time.</p>
+            <p className="dashboard-empty-sub">Start a read-only session with Coordinator and one specialist at a time.</p>
             <button
               className="dashboard-empty-cta"
-              onClick={() => setActivePage('session-setup')}
+              onClick={() => setActivePage('new-chat')}
             >
-              Start your first inspection
+              Start your first session
             </button>
           </div>
           ) : (

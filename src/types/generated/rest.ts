@@ -2055,6 +2055,12 @@ export interface components {
             projectPath?: string | null;
             /** Roleconfigs */
             roleConfigs?: components["schemas"]["RoleConfigSchema"][];
+            /**
+             * Sessiontype
+             * @default project
+             * @enum {string}
+             */
+            sessionType: "project" | "chat";
             /** Task */
             task?: string | null;
             workspaceMode?: components["schemas"]["WorkspaceMode"] | null;
@@ -2080,9 +2086,15 @@ export interface components {
             /** Policyhash */
             policyHash: string;
             /** Projectid */
-            projectId: string;
+            projectId?: string | null;
             /** Requiredrolerules */
             requiredRoleRules: components["schemas"]["RequiredRoleRule"][];
+            /**
+             * Sessiontype
+             * @default project
+             * @enum {string}
+             */
+            sessionType: "project" | "chat";
             workspacePolicy: components["schemas"]["WorkspacePolicy"];
         };
         /**
@@ -2099,11 +2111,17 @@ export interface components {
             /** Name */
             name: string;
             /** Originalprojectpath */
-            originalProjectPath: string;
+            originalProjectPath?: string | null;
             /** Projectdisplayname */
             projectDisplayName: string;
             /** Projectid */
-            projectId: string;
+            projectId?: string | null;
+            /**
+             * Sessiontype
+             * @default project
+             * @enum {string}
+             */
+            sessionType: "project" | "chat";
             /** Startedatms */
             startedAtMs: number;
             /**
@@ -2114,7 +2132,7 @@ export interface components {
             /** Updatedatms */
             updatedAtMs: number;
             /** Workspacepath */
-            workspacePath: string;
+            workspacePath?: string | null;
         };
         /** SessionSnapshotEvent */
         SessionSnapshotEvent: {
@@ -2208,11 +2226,17 @@ export interface components {
             /** Name */
             name: string;
             /** Originalprojectpath */
-            originalProjectPath: string;
+            originalProjectPath?: string | null;
             /** Projectdisplayname */
             projectDisplayName: string;
             /** Projectid */
-            projectId: string;
+            projectId?: string | null;
+            /**
+             * Sessiontype
+             * @default project
+             * @enum {string}
+             */
+            sessionType: "project" | "chat";
             /** Startedatms */
             startedAtMs: number;
             /**

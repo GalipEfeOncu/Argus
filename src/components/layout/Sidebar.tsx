@@ -1,18 +1,11 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useUIStore } from '@/stores/uiStore';
 import { useWorkspaceStore } from '@/stores/workspaceStore';
 import { useLocalProfileStore } from '@/stores/localProfileStore';
 import { useWorkspaceCatalog } from '@/hooks/useWorkspaceCatalog';
 import './Sidebar.css';
 
-/* ── Role-specific SVG icons for agent roles ── */
-const AgusLogoIcon: React.FC = () => (
-  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M12 2L2 7l10 5 10-5-10-5z" />
-    <path d="M2 17l10 5 10-5" />
-    <path d="M2 12l10 5 10-5" />
-  </svg>
-);
+const ArgusMark: React.FC = () => <img className="argus-mark" src="/Argus.png" alt="" aria-hidden="true" />;
 
 const ChevronLeftIcon: React.FC = () => (
   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -31,7 +24,7 @@ function initials(displayName: string): string {
 }
 
 export const Sidebar: React.FC = () => {
-  const { activePage, setActivePage, sidebarCollapsed, toggleSidebar } = useUIStore();
+  const { activePage, setActivePage, sidebarCollapsed, toggleSidebar, setSidebarCollapsed } = useUIStore();
   const { refresh } = useWorkspaceCatalog();
   const projects = useWorkspaceStore((state) => state.projects);
   const selectedProjectId = useWorkspaceStore((state) => state.selectedProjectId);
@@ -41,8 +34,19 @@ export const Sidebar: React.FC = () => {
   const localProfile = useLocalProfileStore((state) => state.profile);
   const profileStatus = useLocalProfileStore((state) => state.status);
 
+  useEffect(() => {
+    const media = window.matchMedia?.('(max-width: 720px)');
+    if (!media) return undefined;
+    const collapseForCompactLayout = () => {
+      if (media.matches) setSidebarCollapsed(true);
+    };
+    collapseForCompactLayout();
+    media.addEventListener?.('change', collapseForCompactLayout);
+    return () => media.removeEventListener?.('change', collapseForCompactLayout);
+  }, [setSidebarCollapsed]);
+
   const handleNewSession = () => {
-    setActivePage('session-setup');
+    setActivePage('new-chat');
   };
 
   const navItems = [
@@ -81,14 +85,13 @@ export const Sidebar: React.FC = () => {
       <div className="sidebar-header flex items-center justify-between px-3 py-3">
         {!sidebarCollapsed ? (
           <button type="button" className="sidebar-home flex items-center gap-2.5 select-none" onClick={() => { selectProject(null); setActivePage('dashboard'); }} aria-label="Go to dashboard">
-            {/* Red icon box */}
             <div className="logo-icon-box">
-              <AgusLogoIcon />
+              <ArgusMark />
             </div>
-            <span className="logo-wordmark">ARGUS</span>
+            <span className="logo-lockup"><span className="logo-wordmark">ARGUS</span><span className="logo-context">LOCAL WORKSPACE</span></span>
           </button>
         ) : (
-          <button type="button" className="sidebar-home logo-icon-box logo-icon-box--center" onClick={() => { selectProject(null); setActivePage('dashboard'); }} aria-label="Go to dashboard"><AgusLogoIcon /></button>
+          <button type="button" className="sidebar-home logo-icon-box logo-icon-box--center" onClick={() => { selectProject(null); setActivePage('dashboard'); }} aria-label="Go to dashboard"><ArgusMark /></button>
         )}
 
         <button 
@@ -103,15 +106,17 @@ export const Sidebar: React.FC = () => {
       {/* ── New Session Button ───────────────────────────── */}
       <div className="px-3 pb-2">
         <button
+          type="button"
           onClick={handleNewSession}
           className={`btn-new-session flex items-center justify-center gap-2 font-semibold text-sm transition-all w-full ${sidebarCollapsed ? 'btn-new-session--icon' : 'btn-new-session--full'}`}
-          title="New Session"
+          aria-label="New chat"
+          title="New chat"
         >
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
             <line x1="12" y1="5" x2="12" y2="19" />
             <line x1="5" y1="12" x2="19" y2="12" />
           </svg>
-          {!sidebarCollapsed && <span>New Session</span>}
+          {!sidebarCollapsed && <span>New</span>}
         </button>
       </div>
 
@@ -144,7 +149,7 @@ export const Sidebar: React.FC = () => {
             </div>
             <div className="flex-1 overflow-y-auto px-2 flex flex-col gap-0.5 projects-scroll" aria-live="polite">
               {loading && projects.length === 0 && <p className="projects-state" role="status">Loading local projects…</p>}
-              {!loading && error !== null && <div className="projects-state" role="alert"><span>{error}</span><button type="button" onClick={() => void refresh()}>Retry</button></div>}
+              {!loading && error !== null && <div className="projects-state" role="alert"><span>{error}</span><button type="button" aria-label="Retry loading local projects" onClick={() => void refresh()}>Retry</button></div>}
               {!loading && error === null && projects.length === 0 && <p className="projects-state">No local projects registered.</p>}
               {projects.map((project) => (
                 <button
@@ -167,7 +172,7 @@ export const Sidebar: React.FC = () => {
         ) : (
           <div className="flex flex-col items-center gap-1.5 py-2 border-t border-border-subtle mt-1 px-1">
             <span className="text-muted text-[8px] font-bold tracking-wider uppercase mb-1">PRJ</span>
-            {error !== null && <button type="button" className="project-avatar-pill project-avatar-pill--default" onClick={() => void refresh()} title="Retry loading local projects">!</button>}
+            {error !== null && <button type="button" aria-label="Retry loading local projects" className="project-avatar-pill project-avatar-pill--default" onClick={() => void refresh()} title="Retry loading local projects">!</button>}
             {error === null && projects.map((project) => (
                 <button
                   key={project.id}

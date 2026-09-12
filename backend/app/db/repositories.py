@@ -79,22 +79,36 @@ class SessionRepository:
 
     async def create_legacy_session(
         self, *, session_id: str, name: str, project_path: str, task: str, role_configs: list[dict[str, Any]],
-        project_id: str | None = None,
+        project_id: str | None = None, session_type: str = "project", initial_status: str = "setup",
     ) -> None:
+        if session_type not in {"project", "chat"} or initial_status not in {"setup", "running"}:
+            raise ValueError("invalid session type or initial status")
         now_ms = _now_ms()
         safe_name = _safe_text(name)
         safe_project_path = _safe_text(project_path)
         safe_task = _safe_text(task)
         async with transaction(self._db):
+            async with self._db.execute("PRAGMA table_info(sessions)") as cursor:
+                available_columns = {row[1] for row in await cursor.fetchall()}
+            values = {
+                "id": session_id,
+                "name": safe_name,
+                "project_path": safe_project_path,
+                "task": safe_task,
+                "status": initial_status,
+                "role_configs": _safe_json(role_configs),
+                "started_at": now_ms,
+                "goal": safe_task,
+                "created_at_ms": now_ms,
+                "updated_at_ms": now_ms,
+                "project_id": project_id,
+                "session_type": session_type,
+            }
+            columns = [column for column in values if column in available_columns]
+            placeholders = ", ".join("?" for _ in columns)
             await self._db.execute(
-                """INSERT INTO sessions (
-                    id, name, project_path, task, status, role_configs, started_at,
-                    goal, created_at_ms, updated_at_ms, project_id
-                ) VALUES (?, ?, ?, ?, 'setup', ?, ?, ?, ?, ?, ?)""",
-                (
-                    session_id, safe_name, safe_project_path, safe_task, _safe_json(role_configs),
-                    now_ms, safe_task, now_ms, now_ms, project_id,
-                ),
+                f"INSERT INTO sessions ({', '.join(columns)}) VALUES ({placeholders})",
+                tuple(values[column] for column in columns),
             )
 
     async def set_workspace_path(self, session_id: str, workspace_path: str) -> None:
@@ -119,12 +133,13 @@ class SessionRepository:
 
     async def list_session_summaries(self, *, limit: int = 50) -> list[dict[str, Any]]:
         async with self._db.execute(
-            """SELECT s.id, s.name, s.project_id AS "projectId", p.display_name AS "projectDisplayName",
+            """SELECT s.id, s.name, s.session_type AS "sessionType", s.project_id AS "projectId",
+                      CASE WHEN s.session_type = 'chat' THEN 'Direct chat' ELSE p.display_name END AS "projectDisplayName",
                       p.canonical_path AS "originalProjectPath", COALESCE(s.goal, s.task) AS goal,
                       s.status, s.started_at AS "startedAtMs", s.updated_at_ms AS "updatedAtMs",
                       s.completed_at AS "completedAtMs"
                FROM sessions AS s
-               JOIN projects AS p ON p.id = s.project_id
+               LEFT JOIN projects AS p ON p.id = s.project_id
                ORDER BY s.started_at DESC
                LIMIT ?""",
             (limit,),
@@ -133,12 +148,13 @@ class SessionRepository:
 
     async def get_session_detail(self, session_id: str) -> dict[str, Any] | None:
         async with self._db.execute(
-            """SELECT s.id, s.name, s.project_id AS "projectId", p.display_name AS "projectDisplayName",
+            """SELECT s.id, s.name, s.session_type AS "sessionType", s.project_id AS "projectId",
+                      CASE WHEN s.session_type = 'chat' THEN 'Direct chat' ELSE p.display_name END AS "projectDisplayName",
                       p.canonical_path AS "originalProjectPath", COALESCE(s.goal, s.task) AS goal,
                       s.status, s.started_at AS "startedAtMs", s.updated_at_ms AS "updatedAtMs",
-                      s.completed_at AS "completedAtMs", s.project_path AS "workspacePath"
+                      s.completed_at AS "completedAtMs", NULLIF(s.project_path, '') AS "workspacePath"
                FROM sessions AS s
-               JOIN projects AS p ON p.id = s.project_id
+               LEFT JOIN projects AS p ON p.id = s.project_id
                WHERE s.id = ?""",
             (session_id,),
         ) as cursor:

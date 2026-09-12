@@ -154,6 +154,7 @@ class SessionConfigurationInput(CamelModel):
 class SessionCreateRequest(CamelModel):
     # projectPath/task/roleConfigs are preserved while callers move to the
     # documented projectId/goal/agents configuration contract.
+    session_type: Literal["project", "chat"] = "project"
     project_id: Identifier | None = None
     project_path: str | None = Field(default=None, min_length=1, max_length=4096)
     goal: Summary | None = None
@@ -172,7 +173,10 @@ class SessionCreateRequest(CamelModel):
 
     @model_validator(mode="after")
     def require_project_and_goal(self) -> "SessionCreateRequest":
-        if (self.project_id is None) == (self.project_path is None):
+        if self.session_type == "chat":
+            if self.project_id is not None or self.project_path is not None:
+                raise ValueError("chat sessions must not reference a project")
+        elif (self.project_id is None) == (self.project_path is None):
             raise ValueError("exactly one of projectId or projectPath is required")
         if (self.goal is None) == (self.task is None):
             raise ValueError("exactly one of goal or task is required")
@@ -200,9 +204,10 @@ class SessionSummaryResponse(CamelModel):
 
     id: Identifier
     name: str = Field(min_length=1, max_length=256)
-    project_id: Identifier
+    session_type: Literal["project", "chat"] = "project"
+    project_id: Identifier | None = None
     project_display_name: str = Field(min_length=1, max_length=256)
-    original_project_path: str = Field(min_length=1, max_length=4096)
+    original_project_path: str | None = Field(default=None, min_length=1, max_length=4096)
     goal: Summary
     status: ShellSessionStatus
     started_at_ms: int = Field(ge=0)
@@ -213,7 +218,7 @@ class SessionSummaryResponse(CamelModel):
 class SessionDetailResponse(SessionSummaryResponse):
     """Shell metadata plus the managed path used by the active session."""
 
-    workspace_path: str = Field(min_length=1, max_length=4096)
+    workspace_path: str | None = Field(default=None, min_length=1, max_length=4096)
 
 
 class SessionConfigurationResponse(CamelModel):
@@ -248,5 +253,6 @@ class SessionAgentSnapshotResponse(CamelModel):
 class SessionCreateResponse(SessionConfigurationResponse):
     id: Identifier
     name: str
-    project_id: Identifier
+    session_type: Literal["project", "chat"] = "project"
+    project_id: Identifier | None = None
     goal: Summary

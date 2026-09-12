@@ -29,6 +29,7 @@ const project: ProjectSummary = {
 };
 const session: SessionSummary = {
   id: 'ses_argus', name: 'Navigation polish', projectId: project.id, projectDisplayName: project.displayName,
+  sessionType: 'project',
   originalProjectPath: project.canonicalPath, goal: 'Connect durable workspace data', status: 'running',
   startedAtMs: Date.now(), updatedAtMs: Date.now(), completedAtMs: null,
 };
@@ -71,6 +72,12 @@ test('sidebar and dashboard navigation expose semantic current-page state to key
   expect(useUIStore.getState().activePage).toBe('dashboard');
 });
 
+test('primary New action opens direct chat', () => {
+  render(<Sidebar />);
+  fireEvent.click(screen.getByRole('button', { name: 'New chat' }));
+  expect(useUIStore.getState().activePage).toBe('new-chat');
+});
+
 test('shell hydrates its catalog from the typed local API', async () => {
   listProjects.mockResolvedValue([project]);
   listSessions.mockResolvedValue([session]);
@@ -93,7 +100,7 @@ test('workspace refresh preserves successful project data when session loading f
   expect(await screen.findByRole('alert')).toHaveTextContent('Local sessions could not be refreshed');
   expect(useWorkspaceStore.getState().projects).toEqual([project]);
   expect(screen.queryByText('private runtime detail')).not.toBeInTheDocument();
-  expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Retry loading local projects and sessions' })).toBeInTheDocument();
 });
 
 test('sidebar exposes loading, empty, and retryable error states', () => {
@@ -103,7 +110,7 @@ test('sidebar exposes loading, empty, and retryable error states', () => {
 
   act(() => useWorkspaceStore.setState({ loading: false, error: 'Local projects and sessions could not be loaded.' }));
   expect(screen.getByRole('alert')).toHaveTextContent('could not be loaded');
-  expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Retry loading local projects' })).toBeInTheDocument();
 
   act(() => useWorkspaceStore.setState({ error: null, projects: [] }));
   expect(screen.getByText('No local projects registered.')).toBeInTheDocument();
@@ -116,12 +123,12 @@ test('dashboard exposes loading, empty, and retryable error states', () => {
 
   act(() => useWorkspaceStore.setState({ loading: false, error: 'Local projects and sessions could not be loaded.' }));
   expect(screen.getByRole('alert')).toHaveTextContent('Local projects and sessions could not be loaded');
-  expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Retry loading local projects and sessions' })).toBeInTheDocument();
 
   act(() => useWorkspaceStore.setState({ error: null, sessions: [] }));
   expect(screen.getByText('No sessions yet')).toBeInTheDocument();
-  expect(screen.getByText('Start a read-only inspection with Coordinator and one specialist at a time.')).toBeInTheDocument();
-  expect(screen.getByRole('button', { name: 'Start your first inspection' })).toBeInTheDocument();
+  expect(screen.getByText('Start a read-only session with Coordinator and one specialist at a time.')).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Start your first session' })).toBeInTheDocument();
   view.unmount();
 });
 

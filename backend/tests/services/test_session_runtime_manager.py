@@ -11,7 +11,7 @@ from fastapi.testclient import TestClient
 from app.config import settings
 from app.db.database import get_db, transaction
 from app.db.repositories import EventRepository, SessionRepository, _now_ms
-from app.providers.protocol import ProviderRequest, StructuredOutput, ToolCall
+from app.providers.protocol import Finished, ProviderRequest, StructuredOutput, TextDelta, ToolCall, Usage
 from app.providers.scripted import ScriptedProvider, SlowStream
 from app.providers.adapters import ProviderDependencyUnavailable
 from app.schemas.provider import ProviderProfileCreate
@@ -268,6 +268,62 @@ async def test_provider_resolution_failure_is_redacted_and_terminal(temporary_sq
     error = next(event for event in events if event.event_type == "error.created")
     assert error.payload["code"] == "coordinator_provider_unavailable"
     assert "secret" not in json.dumps(error.payload)
+
+
+@pytest.mark.asyncio
+async def test_direct_chat_streams_plain_text_into_the_ordered_timeline(temporary_sqlite_db) -> None:
+    database = await get_db()
+    requests: list[ProviderRequest] = []
+    published: list[dict] = []
+
+    async def resolver(_profile_id: str, _model_id: str):
+        provider = ScriptedProvider(((TextDelta("Hello"), TextDelta(" from chat"), Usage(input_tokens=2, output_tokens=3), Finished()),))
+        original = provider.stream
+
+        async def stream(request: ProviderRequest):
+            requests.append(request)
+            async for event in original(request):
+                yield event
+
+        provider.stream = stream  # type: ignore[method-assign]
+        return provider
+
+    async def publisher(_session_id: str, values: list[dict]) -> None:
+        published.extend(values)
+
+    manager = SessionRuntimeManager(provider_resolver=resolver, publisher=publisher)
+    try:
+        profile_id, _ = await _session(database)
+        await database.execute(
+            "UPDATE sessions SET session_type = 'chat', project_path = '', status = 'running' WHERE id = ?",
+            ("runtime-session",),
+        )
+        await database.commit()
+        await CommandProcessor(database).process("runtime-session", parse_session_command({
+            "commandId": "chat-message", "type": "message.send", "payload": {"content": "Say hello."},
+        }))
+        assert await manager.start("runtime-session") is True
+        await manager.wait("runtime-session")
+        events = await EventRepository(database).list_for_session("runtime-session")
+        async with database.execute(
+            "SELECT operation_kind, state FROM provider_operations WHERE session_id = ?", ("runtime-session",)
+        ) as cursor:
+            operation = await cursor.fetchone()
+    finally:
+        await manager.shutdown()
+        await database.close()
+
+    assert requests[0].messages[-1] == {"role": "user", "content": "Say hello."}
+    assert [event.event_type for event in events if event.event_type.startswith("message.")] == [
+        "message.created", "message.created", "message.delta", "message.completed",
+    ]
+    assert events[-1].event_type == "message.completed"
+    assert any(event.event_type == "usage.updated" for event in events)
+    assert [value["type"] for value in published] == [
+        "message.created", "message.delta", "usage.updated", "message.completed",
+    ]
+    assert operation is not None and operation["operation_kind"] == "chat" and operation["state"] == "succeeded"
+    assert profile_id
 
 
 @pytest.mark.asyncio

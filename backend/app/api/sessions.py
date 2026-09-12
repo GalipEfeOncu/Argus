@@ -39,7 +39,10 @@ async def create_session(req: SessionCreateRequest):
         workspace_service = ProjectWorkspaceService(
             db, managed_root=Path(settings.db_path).expanduser().resolve().parent / "workspaces"
         )
-        if req.project_id is not None:
+        project: dict | None
+        if req.session_type == "chat":
+            project = None
+        elif req.project_id is not None:
             projects = [project for project in await workspace_service.list_projects() if project["id"] == req.project_id]
             if not projects:
                 raise ConfigurationError("project_not_found", "The selected project is not registered.")
@@ -50,7 +53,9 @@ async def create_session(req: SessionCreateRequest):
         configured_mode = req.configuration.workspace_policy.mode
         if req.workspace_mode is not None and configured_mode is not None and req.workspace_mode != configured_mode:
             raise ConfigurationError("workspace_mode_conflict", "workspaceMode must match configuration.workspacePolicy.mode.")
-        mode = configured_mode or req.workspace_mode or (WorkspaceMode.worktree if project["gitMetadata"]["isGit"] else WorkspaceMode.snapshot)
+        mode = WorkspaceMode.snapshot if req.session_type == "chat" else (configured_mode or req.workspace_mode or (WorkspaceMode.worktree if project["gitMetadata"]["isGit"] else WorkspaceMode.snapshot))
+        if req.session_type == "chat" and (configured_mode not in {None, WorkspaceMode.snapshot} or req.workspace_mode not in {None, WorkspaceMode.snapshot}):
+            raise ConfigurationError("chat_workspace_forbidden", "Direct chats do not have a project workspace.")
         agents = list(req.agents) or SessionConfigurationService.legacy_agents(
             [role_config.model_dump(by_alias=True) for role_config in req.role_configs]
         )
@@ -81,19 +86,21 @@ async def create_session(req: SessionCreateRequest):
                     f"{agent.name or agent.role} references a provider profile that is not configured.",
                 ) from error
         await SessionRepository(db).create_legacy_session(
-            session_id=session_id, name=name, project_path=project["canonicalPath"], task=goal,
+            session_id=session_id, name=name, project_path="" if project is None else project["canonicalPath"], task=goal,
             role_configs=[role_config.model_dump() for role_config in req.role_configs],
-            project_id=str(project["id"]),
+            project_id=None if project is None else str(project["id"]), session_type=req.session_type,
+            initial_status="running" if req.session_type == "chat" else "setup",
         )
-        try:
-            workspace = await workspace_service.prepare_workspace(
-                session_id=session_id, project_id=str(project["id"]), mode=mode,
-                acknowledged_direct_write=req.acknowledge_direct_write,
-            )
-        except BaseException:
-            await SessionRepository(db).discard_unstarted_session(session_id)
-            raise
-        await SessionRepository(db).set_workspace_path(session_id, str(workspace.root_path))
+        if project is not None:
+            try:
+                workspace = await workspace_service.prepare_workspace(
+                    session_id=session_id, project_id=str(project["id"]), mode=mode,
+                    acknowledged_direct_write=req.acknowledge_direct_write,
+                )
+            except BaseException:
+                await SessionRepository(db).discard_unstarted_session(session_id)
+                raise
+            await SessionRepository(db).set_workspace_path(session_id, str(workspace.root_path))
         try:
             async with transaction(db):
                 snapshot = await SessionConfigurationService(db).create_initial(
@@ -117,7 +124,7 @@ async def create_session(req: SessionCreateRequest):
     finally:
         await db.close()
 
-    return {"id": session_id, "name": name, "projectId": project["id"], "goal": goal, **snapshot.wire_value()}
+    return {"id": session_id, "name": name, "sessionType": req.session_type, "projectId": None if project is None else project["id"], "goal": goal, **snapshot.wire_value()}
 
 
 @router.get("/", response_model=list[SessionSummaryResponse])

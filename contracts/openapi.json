@@ -4932,6 +4932,15 @@
             "title": "Roleconfigs",
             "type": "array"
           },
+          "sessionType": {
+            "default": "project",
+            "enum": [
+              "project",
+              "chat"
+            ],
+            "title": "Sessiontype",
+            "type": "string"
+          },
           "task": {
             "anyOf": [
               {
@@ -5021,10 +5030,17 @@
             "type": "string"
           },
           "projectId": {
-            "maxLength": 160,
-            "minLength": 1,
-            "title": "Projectid",
-            "type": "string"
+            "anyOf": [
+              {
+                "maxLength": 160,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Projectid"
           },
           "requiredRoleRules": {
             "items": {
@@ -5032,6 +5048,15 @@
             },
             "title": "Requiredrolerules",
             "type": "array"
+          },
+          "sessionType": {
+            "default": "project",
+            "enum": [
+              "project",
+              "chat"
+            ],
+            "title": "Sessiontype",
+            "type": "string"
           },
           "workspacePolicy": {
             "$ref": "#/components/schemas/WorkspacePolicy"
@@ -5049,7 +5074,6 @@
           "agentSnapshots",
           "id",
           "name",
-          "projectId",
           "goal"
         ],
         "title": "SessionCreateResponse",
@@ -5090,10 +5114,17 @@
             "type": "string"
           },
           "originalProjectPath": {
-            "maxLength": 4096,
-            "minLength": 1,
-            "title": "Originalprojectpath",
-            "type": "string"
+            "anyOf": [
+              {
+                "maxLength": 4096,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Originalprojectpath"
           },
           "projectDisplayName": {
             "maxLength": 256,
@@ -5102,9 +5133,25 @@
             "type": "string"
           },
           "projectId": {
-            "maxLength": 160,
-            "minLength": 1,
-            "title": "Projectid",
+            "anyOf": [
+              {
+                "maxLength": 160,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Projectid"
+          },
+          "sessionType": {
+            "default": "project",
+            "enum": [
+              "project",
+              "chat"
+            ],
+            "title": "Sessiontype",
             "type": "string"
           },
           "startedAtMs": {
@@ -5136,23 +5183,27 @@
             "type": "integer"
           },
           "workspacePath": {
-            "maxLength": 4096,
-            "minLength": 1,
-            "title": "Workspacepath",
-            "type": "string"
+            "anyOf": [
+              {
+                "maxLength": 4096,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Workspacepath"
           }
         },
         "required": [
           "id",
           "name",
-          "projectId",
           "projectDisplayName",
-          "originalProjectPath",
           "goal",
           "status",
           "startedAtMs",
-          "updatedAtMs",
-          "workspacePath"
+          "updatedAtMs"
         ],
         "title": "SessionDetailResponse",
         "type": "object"
@@ -5407,10 +5458,17 @@
             "type": "string"
           },
           "originalProjectPath": {
-            "maxLength": 4096,
-            "minLength": 1,
-            "title": "Originalprojectpath",
-            "type": "string"
+            "anyOf": [
+              {
+                "maxLength": 4096,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Originalprojectpath"
           },
           "projectDisplayName": {
             "maxLength": 256,
@@ -5419,9 +5477,25 @@
             "type": "string"
           },
           "projectId": {
-            "maxLength": 160,
-            "minLength": 1,
-            "title": "Projectid",
+            "anyOf": [
+              {
+                "maxLength": 160,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Projectid"
+          },
+          "sessionType": {
+            "default": "project",
+            "enum": [
+              "project",
+              "chat"
+            ],
+            "title": "Sessiontype",
             "type": "string"
           },
           "startedAtMs": {
@@ -5456,9 +5530,7 @@
         "required": [
           "id",
           "name",
-          "projectId",
           "projectDisplayName",
-          "originalProjectPath",
           "goal",
           "status",
           "startedAtMs",

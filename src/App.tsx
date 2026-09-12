@@ -6,6 +6,8 @@ import { Dashboard } from '@/components/pages/Dashboard';
 import { SessionSetup } from '@/components/pages/SessionSetup';
 import { Settings } from '@/components/pages/Settings';
 import { Profile } from '@/components/pages/Profile';
+import { NewSession } from '@/components/pages/NewSession';
+import { NewChat } from '@/components/pages/NewChat';
 import { useTauri } from '@/hooks/useTauri';
 import { useLocalProfile } from '@/hooks/useLocalProfile';
 import './App.css';
@@ -24,6 +26,8 @@ const PageRenderer: React.FC = () => {
   
   switch (activePage) {
     case 'dashboard':     return <Dashboard />;
+    case 'new-chat':      return <NewChat />;
+    case 'new-session':   return <NewSession />;
     case 'session-setup': return <SessionSetup />;
     case 'session':       return <React.Suspense fallback={<SessionWorkspaceFallback />}><SessionView /></React.Suspense>;
     case 'settings':      return <Settings />;
@@ -40,7 +44,7 @@ const App: React.FC = () => {
     switch (status) {
       case 'starting':
         return (
-          <div role="status" aria-live="polite" className="absolute top-2 right-1/2 translate-x-1/2 z-50 flex items-center gap-2 bg-[var(--status-warning)] text-[#111111] px-3 py-1 rounded-full text-xs font-medium animate-pulse shadow-md">
+          <div role="status" aria-live="polite" className="runtime-banner runtime-banner--starting">
             Starting backend service…
           </div>
         );
@@ -48,7 +52,7 @@ const App: React.FC = () => {
         return (
           <button
             type="button"
-            className="absolute top-2 right-1/2 translate-x-1/2 z-50 flex items-center gap-2 bg-[var(--status-error)] text-[#111111] px-3 py-1 rounded-full text-xs font-medium cursor-pointer shadow-md"
+            className="runtime-banner runtime-banner--error"
             title={errorMsg ?? undefined}
             onClick={() => startBackend()}
           >
@@ -59,7 +63,7 @@ const App: React.FC = () => {
         return (
           <button
             type="button"
-            className="absolute top-2 right-1/2 translate-x-1/2 z-50 flex items-center gap-2 bg-[var(--status-idle)] text-white px-3 py-1 rounded-full text-xs font-medium cursor-pointer shadow-md"
+            className="runtime-banner runtime-banner--stopped"
             onClick={() => startBackend()}
           >
             Backend stopped — click to start
