@@ -15,6 +15,33 @@ def test_provider_registry_contains_the_supported_presets() -> None:
     ]
 
 
+def test_openai_model_capabilities_exclude_extraction_models_from_chat_and_prefer_free_models() -> None:
+    models = ProviderProfileService._openai_model_capabilities([
+        {
+            "id": "inference-net/schematron-v2-turbo",
+            "name": "Inference.net: Schematron V2 Turbo",
+            "description": "An HTML-to-JSON extraction model.",
+            "pricing": {"prompt": "0.00000003", "completion": "0.00000015"},
+        },
+        {
+            "id": "paid/chat-model",
+            "name": "Paid Chat Model",
+            "description": "A general-purpose text model.",
+            "pricing": {"prompt": "0.000001", "completion": "0.000002"},
+        },
+        {
+            "id": "free/chat-model:free",
+            "name": "Free Chat Model",
+            "description": "A general-purpose text model.",
+            "pricing": {"prompt": "0", "completion": "0"},
+        },
+    ])
+
+    assert [model.id for model in models] == ["free/chat-model:free", "paid/chat-model", "inference-net/schematron-v2-turbo"]
+    assert models[0].display_name == "Free Chat Model"
+    assert models[-1].supports_chat is False
+
+
 @pytest.mark.asyncio
 async def test_provider_profile_persists_only_an_opaque_credential_reference(temporary_sqlite_db) -> None:
     db = await get_db()

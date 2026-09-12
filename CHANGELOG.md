@@ -33,6 +33,10 @@ All notable user-visible changes to Argus are recorded here. The project follows
 
 - Provider credentials now use the operating-system keyring on Linux and wake
   an idle native sidecar before handing a key to the local runtime.
+- Provider catalogues now exclude extraction, embedding, transcription, and
+  other non-chat models from direct-chat selection while keeping them visible
+  in Settings; zero-cost discovered models are preferred for automatic chat
+  startup.
 - Provider Settings now explains when API-key providers are being configured
   outside the Tauri desktop credential-store boundary instead of reporting a
   generic save failure.

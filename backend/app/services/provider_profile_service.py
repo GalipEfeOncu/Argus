@@ -283,33 +283,59 @@ class ProviderProfileService:
     def _openai_model_capabilities(raw: object) -> list[ModelCapability]:
         if not isinstance(raw, list):
             raise ValueError("provider model response is invalid")
-        models: list[ModelCapability] = []
+        models: list[tuple[bool, ModelCapability]] = []
         for item in raw:
             if not isinstance(item, dict) or not isinstance(item.get("id"), str):
                 continue
             model_id = item["id"]
             supported_parameters = item.get("supported_parameters")
             supports_tools = "tools" in supported_parameters if isinstance(supported_parameters, list) else None
-            models.append(ModelCapability(
+            model = ModelCapability(
                 id=model_id,
-                display_name=str(item.get("display_name") or model_id),
+                display_name=str(item.get("display_name") or item.get("name") or model_id),
                 context_window=_positive_int(item.get("context_length") or item.get("context_window")),
                 supports_tools=supports_tools,
                 supports_structured_output=None,
-                supports_chat=_supports_chat_model(model_id),
+                supports_chat=_supports_chat_model(
+                    model_id,
+                    name=item.get("name"),
+                    description=item.get("description"),
+                ),
                 source="discovered",
-            ))
-        return _unique_models(models)
+            )
+            models.append((_is_free_model(item), model))
+        # Prefer zero-cost models when the UI opens a provider catalogue. This
+        # keeps the direct-chat auto-selection from unexpectedly choosing a
+        # paid model while preserving every discovered model in the list.
+        models.sort(key=lambda item: (not item[0], item[1].supports_chat is False))
+        return _unique_models([model for _, model in models])
 
 
 def _positive_int(value: object) -> int | None:
     return value if isinstance(value, int) and not isinstance(value, bool) and value > 0 else None
 
 
-def _supports_chat_model(model_id: str) -> bool:
-    normalized = model_id.lower()
+def _supports_chat_model(model_id: str, *, name: object = None, description: object = None) -> bool:
+    normalized = " ".join(str(value).lower() for value in (model_id, name or "", description or ""))
     non_chat_markers = ("embedding", "whisper", "moderation", "dall-e", "gpt-image", "tts", "transcrib", "rerank")
-    return not any(marker in normalized for marker in non_chat_markers)
+    non_chat_descriptions = (
+        "embedding model",
+        "extraction model",
+        "html-to-json",
+        "image generation",
+        "speech-to-text",
+        "text-to-speech",
+        "transcription model",
+        "rerank model",
+    )
+    return not any(marker in normalized for marker in (*non_chat_markers, *non_chat_descriptions))
+
+
+def _is_free_model(item: dict[object, object]) -> bool:
+    pricing = item.get("pricing")
+    if not isinstance(pricing, dict):
+        return False
+    return pricing.get("prompt") in {0, "0", "0.0", "0.00000000"} and pricing.get("completion") in {0, "0", "0.0", "0.00000000"}
 
 
 def _unique_models(models: list[ModelCapability]) -> list[ModelCapability]:
