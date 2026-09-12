@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useSessionStore } from '@/stores/sessionStore';
+import { tauriCommands } from '@/services/tauri';
 import { useUIStore } from '@/stores/uiStore';
 import { useWorkspaceStore } from '@/stores/workspaceStore';
 import { ChatPanel } from '../chat/ChatPanel';
@@ -14,6 +15,18 @@ export const SessionView: React.FC = () => {
   const durableSession = useWorkspaceStore((state) => state.sessions.find((session) => session.id === activeSessionId));
   const projects = useWorkspaceStore((state) => state.projects);
   const session = durableSession ?? localSession;
+  const sessionKind: SessionKind = durableSession?.sessionType ?? localSession?.kind ?? 'project';
+  const credentialProfileIds = [...new Set(
+    localSession?.kind === 'chat'
+      ? localSession.roleConfigs.map((config) => config.modelRef.providerId)
+      : [],
+  )];
+  const credentialProfileKey = credentialProfileIds.join('|');
+
+  useEffect(() => {
+    if (sessionKind !== 'chat' || credentialProfileIds.length === 0) return;
+    void Promise.all(credentialProfileIds.map((profileId) => tauriCommands.refreshProviderCredential(profileId).catch(() => undefined)));
+  }, [credentialProfileKey, sessionKind]);
 
   if (!session) {
     return (
@@ -23,7 +36,6 @@ export const SessionView: React.FC = () => {
     );
   }
 
-  const sessionKind: SessionKind = durableSession?.sessionType ?? localSession?.kind ?? 'project';
   const isDirectChat = sessionKind === 'chat';
 
   return (

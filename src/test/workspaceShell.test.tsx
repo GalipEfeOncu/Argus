@@ -9,13 +9,19 @@ import { useUIStore } from '@/stores/uiStore';
 import { useWorkspaceStore } from '@/stores/workspaceStore';
 import { useSessionRoomStore } from '@/stores/sessionRoomStore';
 import { createSessionProjection } from '@/services/sessionProjection';
+import { createConfiguration } from '@/services/sessionConfiguration';
 import type { ProjectSummary, SessionSummary } from '@/services/api';
 
-const { listProjects, listSessions } = vi.hoisted(() => ({ listProjects: vi.fn(), listSessions: vi.fn() }));
+const { listProjects, listSessions, refreshProviderCredential } = vi.hoisted(() => ({
+  listProjects: vi.fn(), listSessions: vi.fn(), refreshProviderCredential: vi.fn(),
+}));
 
 vi.mock('@/services/api', () => ({ api: {
   projects: { list: () => listProjects() },
   sessions: { list: () => listSessions() },
+} }));
+vi.mock('@/services/tauri', () => ({ tauriCommands: {
+  refreshProviderCredential: (...args: unknown[]) => refreshProviderCredential(...args),
 } }));
 vi.mock('@/components/chat/MessageList', () => ({ MessageList: () => <div>Timeline</div> }));
 vi.mock('@/components/chat/MessageInput', () => ({ MessageInput: () => <div>Composer</div> }));
@@ -37,6 +43,8 @@ const session: SessionSummary = {
 beforeEach(() => {
   listProjects.mockReset();
   listSessions.mockReset();
+  refreshProviderCredential.mockReset();
+  refreshProviderCredential.mockResolvedValue(undefined);
   useUIStore.setState({ activePage: 'dashboard', sidebarCollapsed: false, agentPanelVisible: false });
   useSessionStore.setState({ sessions: [], activeSessionId: null });
   useWorkspaceStore.setState({ projects: [], sessions: [], selectedProjectId: null, loading: false, loaded: true, error: null });
@@ -161,6 +169,18 @@ test('a durable dashboard selection opens the real session and project breadcrum
   expect(screen.getByText('Argus')).toBeInTheDocument();
   expect(screen.getByText('Navigation polish')).toBeInTheDocument();
   expect(screen.getByText('Timeline')).toBeInTheDocument();
+});
+
+test('restored direct chats renew their native provider lease', async () => {
+  const modelRef = { providerId: 'provider-openrouter', modelId: 'free/chat-model:free', displayName: 'OpenRouter · Free chat model' };
+  useSessionStore.getState().createSession({
+    kind: 'chat', projectPath: '', task: 'Direct conversation', name: 'New chat',
+    roleConfigs: [{ instanceId: 'coordinator', role: 'coordinator', enabled: true, modelRef }],
+    configuration: createConfiguration({ coordinator: modelRef }),
+  }, 'chat-session');
+  render(<SessionView />);
+
+  await waitFor(() => expect(refreshProviderCredential).toHaveBeenCalledWith('provider-openrouter'));
 });
 
 test('session context reports canonical status and restores toggle focus on close and Escape', async () => {
