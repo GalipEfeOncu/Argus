@@ -4,14 +4,14 @@
 
 .statusbar {
   height: var(--statusbar-height);
-  background-color: var(--bg-status);
+  background-color: color-mix(in srgb, var(--bg-status) 90%, var(--bg-main));
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 0 16px;
   font-size: 11px;
   color: var(--text-muted);
-  border-top: 1px solid var(--border-subtle);
+  border-top: 1px solid color-mix(in srgb, var(--border-subtle) 80%, transparent);
   position: relative;
   z-index: 40;
   box-sizing: border-box;
@@ -26,9 +26,16 @@
   gap: 6px;
 }
 
-.statusbar-section--left   { flex: 1; justify-content: flex-start; }
+.statusbar-section--left   { flex: 1; min-width: 0; justify-content: flex-start; }
 .statusbar-section--center { flex: 1; justify-content: center; }
 .statusbar-section--right  { flex: 1; justify-content: flex-end; }
+
+.statusbar-section--left > span:last-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 
 .statusbar-dot {
   width: 5px;
@@ -44,6 +51,22 @@
 
 .statusbar-dot--pulse {
   animation: statusBarPulse 1.2s ease-in-out infinite;
+}
+
+@media (max-width: 720px) {
+  .statusbar-section--center,
+  .statusbar-section--right {
+    display: none;
+  }
+
+  .statusbar-section--left {
+    flex: 0 1 auto;
+  }
+
+  .statusbar-section--left > span:last-child {
+    overflow: visible;
+    text-overflow: clip;
+  }
 }
 
 @keyframes statusBarPulse {

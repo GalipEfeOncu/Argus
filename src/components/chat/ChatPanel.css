@@ -3,7 +3,9 @@
    ============================================================ */
 
 .chat-panel {
-  background-color: var(--bg-main);
+  background:
+    radial-gradient(circle at 50% 0%, var(--accent-transparent), transparent 30%),
+    linear-gradient(135deg, var(--bg-main), var(--bg-desktop));
 }
 
 .session-emergency-controls { display: inline-flex; align-items: center; gap: 5px; }
@@ -20,9 +22,9 @@
   align-items: center;
   justify-content: space-between;
   padding: 0 20px;
-  height: 50px;
-  border-bottom: 1px solid var(--border-subtle);
-  background-color: rgba(23, 23, 23, 0.6);
+  height: 56px;
+  border-bottom: 1px solid color-mix(in srgb, var(--border-subtle) 72%, transparent);
+  background-color: color-mix(in srgb, var(--bg-main) 76%, transparent);
   backdrop-filter: blur(8px);
   flex-shrink: 0;
   z-index: 10;
@@ -224,6 +226,6 @@
 .chat-bottom-area {
   display: flex;
   flex-direction: column;
-  border-top: 1px solid var(--border-subtle);
-  background-color: var(--bg-main);
+  border-top: 1px solid color-mix(in srgb, var(--border-subtle) 72%, transparent);
+  background-color: color-mix(in srgb, var(--bg-main) 86%, transparent);
 }

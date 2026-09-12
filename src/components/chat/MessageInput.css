@@ -3,8 +3,8 @@
    ============================================================ */
 
 .input-section {
-  padding: 12px 20px 16px;
-  background-color: var(--bg-main);
+  padding: 12px 20px 18px;
+  background-color: transparent;
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -13,16 +13,16 @@
 .input-box-container {
   display: flex;
   flex-direction: column;
-  background-color: var(--bg-card);
+  background: linear-gradient(145deg, var(--bg-card), var(--bg-element));
   border: 1px solid var(--border-medium);
-  border-radius: var(--radius-lg);
+  border-radius: 14px;
   padding: 10px 12px;
   transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
 }
 
 .input-box-container:focus-within {
-  border-color: var(--border-focus);
-  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.03);
+  border-color: var(--accent-text);
+  box-shadow: 0 0 0 2px var(--accent-transparent);
 }
 
 .input-textarea {
@@ -79,7 +79,7 @@
 
 .btn-execute:hover:not(:disabled) {
   background-color: var(--accent-hover);
-  box-shadow: 0 0 14px var(--accent-glow-md);
+  box-shadow: 0 4px 12px var(--accent-glow-sm);
 }
 
 .btn-execute:disabled {
@@ -91,6 +91,6 @@
   transform: scale(0.97);
 }
 
-.composer-target { margin: 0; padding: 0 2px; color: var(--text-muted); font-size: 11px; }
-.composer-state { margin: 0; padding: 0 2px; color: var(--text-secondary); font-size: 11px; line-height: 1.4; }
+.composer-target { margin: 0; padding: 0 2px; color: var(--text-muted); font-size: 10px; }
+.composer-state { margin: 0; padding: 0 2px; color: var(--text-secondary); font-size: 10px; line-height: 1.4; }
 .composer-state--error { color: var(--status-error); }

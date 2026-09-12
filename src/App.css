@@ -1,5 +1,7 @@
 .app-container {
   font-family: var(--font-sans);
+  position: relative;
+  background: var(--bg-desktop);
 }
 
 .workspace-main { min-width: 0; }
@@ -13,4 +15,41 @@
   color: var(--text-secondary);
   background: var(--bg-main);
   font-size: 12px;
+}
+
+.runtime-banner {
+  position: absolute;
+  z-index: 50;
+  top: 14px;
+  right: 18px;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  min-height: 28px;
+  padding: 5px 9px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--bg-card) 88%, transparent);
+  box-shadow: var(--shadow-sm);
+  backdrop-filter: blur(10px);
+  color: var(--text-primary);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+button.runtime-banner { cursor: pointer; }
+.runtime-banner--starting { border-color: var(--status-warning); color: var(--status-warning); animation: runtime-banner-pulse 1.2s ease-in-out infinite; }
+.runtime-banner--error { border-color: var(--status-error); color: var(--status-error); }
+.runtime-banner--stopped { color: var(--text-secondary); }
+button.runtime-banner:hover { border-color: var(--accent-text); color: var(--text-primary); }
+button.runtime-banner:focus-visible { outline: 2px solid var(--accent-text); outline-offset: 3px; }
+
+@keyframes runtime-banner-pulse { 50% { opacity: 0.68; } }
+
+@media (max-width: 720px) {
+  .runtime-banner { top: auto; right: 12px; bottom: calc(var(--statusbar-height) + 12px); max-width: calc(100% - 76px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .runtime-banner--starting { animation: none; }
 }

@@ -3,9 +3,9 @@
    ============================================================ */
 
 .tool-call-block {
-  border-radius: var(--radius-md);
+  border-radius: 10px;
   border: 1px solid var(--border-subtle);
-  background-color: var(--bg-element);
+  background-color: color-mix(in srgb, var(--bg-element) 80%, var(--bg-main));
   overflow: hidden;
   transition: border-color var(--transition-fast);
 }
@@ -86,7 +86,7 @@
 
 .tool-call-details {
   border-top: 1px solid var(--border-subtle);
-  background: rgba(0, 0, 0, 0.15);
+  background: color-mix(in srgb, var(--bg-main) 78%, transparent);
   padding: 10px 12px;
   display: flex;
   flex-direction: column;

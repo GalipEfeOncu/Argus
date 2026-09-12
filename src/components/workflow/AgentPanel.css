@@ -9,8 +9,8 @@
   box-sizing: border-box;
   overflow: hidden;
   border-left: 1px solid var(--border-subtle);
-  background-color: var(--bg-sidebar);
-  box-shadow: var(--shadow-md);
+  background: linear-gradient(180deg, var(--bg-sidebar), var(--bg-main));
+  box-shadow: var(--shadow-lg);
 }
 
 .agent-panel-header {
@@ -19,7 +19,7 @@
   align-items: flex-start;
   justify-content: space-between;
   gap: var(--spacing-sm);
-  padding: 14px 14px 12px;
+  padding: 16px 16px 14px;
   border-bottom: 1px solid var(--border-subtle);
 }
 
@@ -47,7 +47,7 @@
   flex: 0 0 auto;
   border: 1px solid var(--border-medium);
   border-radius: var(--radius-sm);
-  background: var(--bg-element);
+  background: transparent;
   color: var(--text-secondary);
   cursor: pointer;
   font: inherit;

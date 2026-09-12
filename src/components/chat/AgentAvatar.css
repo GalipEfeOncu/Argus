@@ -2,10 +2,10 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border-radius: var(--radius-full);
-  background: var(--bg-surface);
+  border-radius: var(--radius-lg);
+  background: var(--bg-element);
   border: 1px solid var(--border-medium);
-  box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+  box-shadow: var(--shadow-sm);
   color: var(--text-primary);
   flex-shrink: 0;
   transition: all var(--transition-fast);
