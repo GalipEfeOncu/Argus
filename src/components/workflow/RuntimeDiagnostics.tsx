@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { api } from '@/services/api';
 import { tauriCommands } from '@/services/tauri';
 import type { components } from '@/types/generated/rest';
@@ -16,10 +16,14 @@ export function RuntimeDiagnostics({ sessionId }: RuntimeDiagnosticsProps) {
   const [error, setError] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
   const [credentialStoreUnavailable, setCredentialStoreUnavailable] = useState(false);
+  const mountedRef = useRef(true);
 
   const refresh = () => {
     setError(null);
-    void api.runtime.health().then(setHealth).catch(() => {
+    void api.runtime.health().then((nextHealth) => {
+      if (mountedRef.current) setHealth(nextHealth);
+    }).catch(() => {
+      if (!mountedRef.current) return;
       setHealth(null);
       setError('The local sidecar is unavailable.');
     });
@@ -28,8 +32,15 @@ export function RuntimeDiagnostics({ sessionId }: RuntimeDiagnosticsProps) {
   useEffect(() => {
     refresh();
     if ('__TAURI_INTERNALS__' in window) {
-      void tauriCommands.credentialStoreAvailable().then((available) => setCredentialStoreUnavailable(!available)).catch(() => setCredentialStoreUnavailable(true));
+      void tauriCommands.credentialStoreAvailable().then((available) => {
+        if (mountedRef.current) setCredentialStoreUnavailable(!available);
+      }).catch(() => {
+        if (mountedRef.current) setCredentialStoreUnavailable(true);
+      });
     }
+    return () => {
+      mountedRef.current = false;
+    };
   }, []);
 
   const exportBundle = async () => {
