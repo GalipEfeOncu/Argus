@@ -265,6 +265,30 @@ test('direct chat presents one message card while retaining streaming events in 
   ]);
 });
 
+test('direct chat anchors a new user prompt at the top of the conversation viewport', () => {
+  const initial = projection([
+    snapshot(),
+    event(1, 'message.created', { messageId: 'msg_human_1', authorId: 'human', authorKind: 'human', content: 'First prompt' }, 'human'),
+    event(2, 'message.created', { messageId: 'msg_reply_1', authorId: 'coordinator', authorKind: 'coordinator', content: 'First answer' }, 'coordinator'),
+  ]);
+  useSessionRoomStore.setState({ projections: { [sessionId]: initial } });
+  render(<MessageList sessionId={sessionId} sessionKind="chat" />);
+
+  const viewport = screen.getByRole('log');
+  const scrollTo = vi.fn();
+  Object.defineProperty(viewport, 'scrollTo', { configurable: true, value: scrollTo });
+  const later = projection([
+    snapshot(),
+    event(1, 'message.created', { messageId: 'msg_human_1', authorId: 'human', authorKind: 'human', content: 'First prompt' }, 'human'),
+    event(2, 'message.created', { messageId: 'msg_reply_1', authorId: 'coordinator', authorKind: 'coordinator', content: 'First answer' }, 'coordinator'),
+    event(3, 'message.created', { messageId: 'msg_human_2', authorId: 'human', authorKind: 'human', content: 'Second prompt' }, 'human'),
+  ]);
+
+  act(() => useSessionRoomStore.setState({ projections: { [sessionId]: later } }));
+
+  expect(scrollTo).toHaveBeenLastCalledWith({ top: 184, behavior: 'auto' });
+});
+
 test('direct chat stays busy before the first assistant token and becomes idle after a response or error', () => {
   const waiting = projection([
     snapshot(),

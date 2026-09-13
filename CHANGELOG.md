@@ -48,6 +48,13 @@ All notable user-visible changes to Argus are recorded here. The project follows
 - Direct chats now use a centered, margin-preserving conversation layout, keep
   provider/model context compact, and show an interruptible thinking state while
   waiting for the first provider token instead of accepting overlapping turns.
+- Direct chats now place each new user prompt at the top of the conversation,
+  keep the scroll rail on the chat pane edge, and retain the full recent
+  user/Argus transcript so follow-up answers do not restart from generic
+  introductions.
+- Direct chat requests now use concise language-aware guidance plus bounded
+  output and provider-supported reasoning controls to reduce repetitive output
+  and runaway waits on supported providers.
 - Streamed message deltas now preserve meaningful leading spaces across the
   canonical event boundary, so words no longer run together in chat.
 - Provider Settings now explains when API-key providers are being configured

@@ -12,7 +12,7 @@ import aiosqlite
 
 from app.db.database import get_db, transaction
 from app.db.repositories import EventRepository, StoredEvent, _now_ms, _safe_json
-from app.providers.protocol import Cancelled, Finished, Provider, ProviderRequest, RetryableError, TerminalError, TextDelta, Usage
+from app.providers.protocol import Cancelled, Finished, Provider, ProviderMessage, ProviderRequest, RetryableError, TerminalError, TextDelta, Usage
 from app.services.budget_counter_service import BudgetCounterService
 from app.schemas.coordinator_actions import (
     AskUserAction,
@@ -31,6 +31,14 @@ from app.services.session_configuration_service import SessionConfigurationServi
 
 ProviderResolver = Callable[[str, str], Awaitable[Provider]]
 EventPublisher = Callable[[str, list[dict]], Awaitable[None]]
+
+DIRECT_CHAT_GUIDANCE = """You are Argus, a concise and capable general assistant.
+Answer the user's latest message directly and naturally in the user's language.
+If the user writes Turkish, answer in natural Turkish; do not announce that you can speak Turkish.
+Do not repeat introductions, capabilities, or facts already stated unless the user asks.
+For simple questions, be brief. Use short paragraphs or bullets only when helpful.
+Do not add a generic capability list or a closing question unless it is useful.
+Do not claim to have browsed, used tools, edited files, or know hidden provider/model details.""".strip()
 
 
 class SessionRuntimeManager:
@@ -227,18 +235,28 @@ class SessionRuntimeManager:
         """Stream one ordinary provider response without workspace orchestration."""
 
         try:
+            profile = await ProviderProfileService(db).get(profile_id)
             provider = await self._resolve_provider(db, profile_id, model_id)
         except Exception:
             await self._commit_chat_error(db, session_id, "chat_provider_unavailable", "The configured provider is unavailable. Check its credential and try again.")
             return
 
+        direct_system_prompt = f"{DIRECT_CHAT_GUIDANCE}\n\nSession-specific instructions:\n{system_prompt.strip()}"
         request = ProviderRequest(
             request_id=f"chat_{uuid.uuid4().hex}", model_id=model_id,
             messages=(
-                {"role": "system", "content": system_prompt},
-                *(await self._recent_human_messages(db, session_id)),
+                {"role": "system", "content": direct_system_prompt},
+                *(await self._recent_chat_messages(db, session_id)),
             ),
-            metadata={"sessionId": session_id, "participantId": "coordinator", "sessionType": "chat"},
+            max_output_tokens=1024,
+            reasoning_effort="low" if profile.provider_preset == "openrouter" else None,
+            metadata={
+                "sessionId": session_id,
+                "participantId": "coordinator",
+                "sessionType": "chat",
+                "providerKind": profile.provider_kind,
+                "providerPreset": profile.provider_preset,
+            },
         )
         operation_id = f"provider_{request.request_id}"
         fingerprint = sha256(f"{request.request_id}:{request.model_id}".encode()).hexdigest()
@@ -364,6 +382,70 @@ class SessionRuntimeManager:
         for row in rows:
             content = json.loads(row["payload_json"]).get("content")
             if isinstance(content, str):
+                messages.append({"role": "user", "content": content})
+        return tuple(messages)
+
+    async def _recent_chat_messages(
+        self, db: aiosqlite.Connection, session_id: str,
+    ) -> tuple[ProviderMessage, ...]:
+        """Rebuild the recent alternating direct-chat transcript from ordered events."""
+
+        async with db.execute(
+            """SELECT sequence, payload_json FROM events
+               WHERE session_id = ? AND event_type = 'message.created'
+               ORDER BY sequence DESC LIMIT 100""",
+            (session_id,),
+        ) as cursor:
+            created_rows = list(reversed(await cursor.fetchall()))
+
+        selected: list[tuple[int, str, str]] = []
+        for row in created_rows:
+            payload = json.loads(row["payload_json"])
+            message_id = payload.get("messageId")
+            author_kind = payload.get("authorKind")
+            if not isinstance(message_id, str) or author_kind not in {"human", "coordinator"}:
+                continue
+            selected.append((int(row["sequence"]), message_id, "assistant" if author_kind == "coordinator" else "user"))
+        selected = selected[-20:]
+        if not selected:
+            return ()
+
+        selected_ids = {message_id for _, message_id, _ in selected}
+        roles = {message_id: role for _, message_id, role in selected}
+        contents = {message_id: "" for message_id in selected_ids}
+        order: list[str] = []
+        first_sequence = selected[0][0]
+        async with db.execute(
+            """SELECT event_type, payload_json FROM events
+               WHERE session_id = ? AND sequence >= ?
+                 AND event_type IN ('message.created', 'message.delta')
+               ORDER BY sequence ASC""",
+            (session_id, first_sequence),
+        ) as cursor:
+            rows = await cursor.fetchall()
+
+        for row in rows:
+            payload = json.loads(row["payload_json"])
+            message_id = payload.get("messageId")
+            if not isinstance(message_id, str) or message_id not in selected_ids:
+                continue
+            if row["event_type"] == "message.created":
+                content = payload.get("content")
+                if isinstance(content, str):
+                    contents[message_id] = content
+                if message_id not in order:
+                    order.append(message_id)
+            else:
+                delta = payload.get("delta")
+                if isinstance(delta, str):
+                    contents[message_id] += delta
+
+        messages: list[ProviderMessage] = []
+        for message_id in order:
+            content = contents[message_id]
+            if roles[message_id] == "assistant":
+                messages.append({"role": "assistant", "content": content, "tool_calls": []})
+            else:
                 messages.append({"role": "user", "content": content})
         return tuple(messages)
 

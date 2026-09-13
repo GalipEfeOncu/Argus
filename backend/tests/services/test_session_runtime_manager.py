@@ -29,10 +29,10 @@ from app.main import app
 
 async def _session(
     database, session_id: str = "runtime-session", *, required_builder_gate: bool = False,
-    zero_limit: str | None = None,
+    zero_limit: str | None = None, provider_kind: str = "openai", provider_preset: str | None = None,
 ) -> tuple[str, str]:
     profile = await ProviderProfileService(database).create(ProviderProfileCreate(
-        providerKind="openai", displayName="Configured provider",
+        providerKind=provider_kind, providerPreset=provider_preset, displayName="Configured provider",
     ))
     await SessionRepository(database).create_legacy_session(
         session_id=session_id, name="Runtime", project_path="workspace",
@@ -293,12 +293,25 @@ async def test_direct_chat_streams_plain_text_into_the_ordered_timeline(temporar
 
     manager = SessionRuntimeManager(provider_resolver=resolver, publisher=publisher)
     try:
-        profile_id, _ = await _session(database)
+        profile_id, _ = await _session(database, provider_kind="openai_compat", provider_preset="openrouter")
         await database.execute(
             "UPDATE sessions SET session_type = 'chat', project_path = '', status = 'running' WHERE id = ?",
             ("runtime-session",),
         )
         await database.commit()
+        repository = EventRepository(database)
+        await repository.append(
+            event_id="prior-human", session_id="runtime-session", event_type="message.created", actor_id="human",
+            payload={"messageId": "prior-human-message", "authorId": "human", "authorKind": "human", "content": "Earlier question.", "mentionIds": []}, timestamp_ms=_now_ms(),
+        )
+        await repository.append(
+            event_id="prior-assistant", session_id="runtime-session", event_type="message.created", actor_id="coordinator",
+            payload={"messageId": "prior-assistant-message", "authorId": "coordinator", "authorKind": "coordinator", "content": "Earlier answer", "streaming": True}, timestamp_ms=_now_ms(),
+        )
+        await repository.append(
+            event_id="prior-assistant-delta", session_id="runtime-session", event_type="message.delta", actor_id="coordinator",
+            payload={"messageId": "prior-assistant-message", "delta": " with context."}, timestamp_ms=_now_ms(),
+        )
         await CommandProcessor(database).process("runtime-session", parse_session_command({
             "commandId": "chat-message", "type": "message.send", "payload": {"content": "Say hello."},
         }))
@@ -314,8 +327,15 @@ async def test_direct_chat_streams_plain_text_into_the_ordered_timeline(temporar
         await database.close()
 
     assert requests[0].messages[-1] == {"role": "user", "content": "Say hello."}
+    assert requests[0].messages[1:3] == (
+        {"role": "user", "content": "Earlier question."},
+        {"role": "assistant", "content": "Earlier answer with context.", "tool_calls": []},
+    )
+    assert "do not announce that you can speak Turkish" in requests[0].messages[0]["content"]
+    assert requests[0].max_output_tokens == 1024
+    assert requests[0].reasoning_effort == "low"
     assert [event.event_type for event in events if event.event_type.startswith("message.")] == [
-        "message.created", "message.created", "message.delta", "message.completed",
+        "message.created", "message.created", "message.delta", "message.created", "message.created", "message.delta", "message.completed",
     ]
     assert events[-1].event_type == "message.completed"
     assert any(event.event_type == "usage.updated" for event in events)

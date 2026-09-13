@@ -547,9 +547,13 @@ Coordinator agent with a configured provider/model binding, and use snapshot
 workspace policy (the server does not provision a workspace). The response
 returns the normalized immutable Coordinator snapshot and the same `chat`
 session type. Subsequent human messages use the ordinary `message.send`
-WebSocket command; the runtime streams plain Coordinator text as canonical
-`message.created`, `message.delta`, and `message.completed` events. Chat errors
-are recoverable room events so the user can retry without losing the session.
+WebSocket command; the runtime rebuilds the latest bounded alternating user /
+Coordinator transcript from canonical message events before each turn and
+streams plain Coordinator text as canonical `message.created`, `message.delta`,
+and `message.completed` events. Direct chat applies a bounded output budget and
+provider-supported reasoning controls, while the configured session prompt
+remains part of the request. Chat errors are recoverable room events so the
+user can retry without losing the session.
 
 Session deletion remains unavailable until the retention-policy workflow is
 implemented. The current `DELETE /sessions/{sessionId}` endpoint returns 405;

@@ -35,7 +35,9 @@ export const MessageList: React.FC<MessageListProps> = ({ sessionId, sessionKind
   const [rowHeights, setRowHeights] = useState<Record<string, number>>({});
   const [isFollowingLatest, setIsFollowingLatest] = useState(true);
   const [unreadCount, setUnreadCount] = useState(0);
-  const previousEntryCount = useRef(0);
+  const previousEntryCount = useRef<number | null>(null);
+  const previousHumanEntryId = useRef<string | null>(null);
+  const promptAnchor = useRef<{ id: string; offset: number } | null>(null);
 
   const layout = useMemo(() => {
     const offsets: number[] = [];
@@ -46,6 +48,19 @@ export const MessageList: React.FC<MessageListProps> = ({ sessionId, sessionKind
     }
     return { offsets, totalHeight };
   }, [entries, rowHeights]);
+
+  let latestHumanIndex = -1;
+  if (sessionKind === 'chat') {
+    entries.forEach((entry, index) => {
+      if (entry.event.type === 'message.created' && entry.event.payload.authorKind === 'human') {
+        latestHumanIndex = index;
+      }
+    });
+  }
+  const latestHumanEntryId = latestHumanIndex >= 0 ? entries[latestHumanIndex]?.id ?? null : null;
+  const latestHumanOffset = latestHumanIndex >= 0 ? layout.offsets[latestHumanIndex] ?? 0 : null;
+  const trailingScrollSpace = sessionKind === 'chat' ? viewportHeight : 0;
+  const latestScrollTop = Math.max(0, layout.totalHeight + trailingScrollSpace - viewportHeight);
 
   const findIndexAtOffset = useCallback((offset: number) => {
     let low = 0;
@@ -61,6 +76,15 @@ export const MessageList: React.FC<MessageListProps> = ({ sessionId, sessionKind
   const measureRow = useCallback((eventId: string, height: number) => {
     if (height <= 0) return;
     setRowHeights((current) => current[eventId] === height ? current : { ...current, [eventId]: height });
+  }, []);
+
+  const moveViewport = useCallback((targetScrollTop: number) => {
+    const nextScrollTop = Math.max(0, targetScrollTop);
+    setScrollTop(nextScrollTop);
+    const container = containerRef.current;
+    if (container !== null && typeof container.scrollTo === 'function') {
+      container.scrollTo({ top: nextScrollTop, behavior: 'auto' });
+    }
   }, []);
 
   const visibleStart = Math.max(0, findIndexAtOffset(scrollTop) - OVERSCAN_ROWS);
@@ -86,18 +110,43 @@ export const MessageList: React.FC<MessageListProps> = ({ sessionId, sessionKind
   }, []);
 
   useEffect(() => {
-    const added = entries.length - previousEntryCount.current;
+    const previousCount = previousEntryCount.current;
+    const previousHumanId = previousHumanEntryId.current;
+    const added = entries.length - (previousCount ?? 0);
     previousEntryCount.current = entries.length;
+    previousHumanEntryId.current = latestHumanEntryId;
     if (added <= 0) return;
-    if (!isFollowingLatest) {
-      setUnreadCount((count) => count + added);
+
+    if (
+      sessionKind === 'chat'
+      && previousCount !== null
+      && latestHumanEntryId !== null
+      && latestHumanEntryId !== previousHumanId
+    ) {
+      const targetScrollTop = latestHumanOffset ?? 0;
+      promptAnchor.current = { id: latestHumanEntryId, offset: targetScrollTop };
+      setUnreadCount(0);
+      moveViewport(targetScrollTop);
       return;
     }
-    const targetScrollTop = Math.max(0, layout.totalHeight - viewportHeight);
-    setScrollTop(targetScrollTop);
-    const container = containerRef.current;
-    if (container !== null && typeof container.scrollTo === 'function') container.scrollTo({ top: targetScrollTop, behavior: 'auto' });
-  }, [entries.length, isFollowingLatest, layout.totalHeight, viewportHeight]);
+
+    if (sessionKind === 'chat' && promptAnchor.current !== null) return;
+
+    if (!isFollowingLatest) {
+      if (promptAnchor.current === null) setUnreadCount((count) => count + added);
+      return;
+    }
+    promptAnchor.current = null;
+    moveViewport(latestScrollTop);
+  }, [entries.length, isFollowingLatest, latestHumanEntryId, latestHumanOffset, latestScrollTop, moveViewport, sessionKind]);
+
+  useEffect(() => {
+    if (sessionKind !== 'chat' || latestHumanEntryId === null || latestHumanOffset === null) return;
+    const anchor = promptAnchor.current;
+    if (anchor === null || anchor.id !== latestHumanEntryId || anchor.offset === latestHumanOffset) return;
+    anchor.offset = latestHumanOffset;
+    moveViewport(latestHumanOffset);
+  }, [latestHumanEntryId, latestHumanOffset, moveViewport, sessionKind]);
 
   useEffect(() => {
     if (focusedEventId === null) return;
@@ -108,21 +157,16 @@ export const MessageList: React.FC<MessageListProps> = ({ sessionId, sessionKind
     const index = entries.findIndex((entry) => entry.id === eventId);
     if (index < 0) return;
     const targetScrollTop = Math.max(0, layout.offsets[index] - ESTIMATED_ROW_HEIGHT);
-    setScrollTop(targetScrollTop);
+    promptAnchor.current = null;
+    moveViewport(targetScrollTop);
     setFocusedEventId(eventId);
-    const container = containerRef.current;
-    if (container !== null && typeof container.scrollTo === 'function') {
-      container.scrollTo({ top: targetScrollTop, behavior: 'auto' });
-    }
   };
 
   const jumpToLatest = () => {
-    const targetScrollTop = Math.max(0, layout.totalHeight - viewportHeight);
+    promptAnchor.current = null;
     setIsFollowingLatest(true);
     setUnreadCount(0);
-    setScrollTop(targetScrollTop);
-    const container = containerRef.current;
-    if (container !== null && typeof container.scrollTo === 'function') container.scrollTo({ top: targetScrollTop, behavior: 'auto' });
+    moveViewport(latestScrollTop);
   };
 
   if (entries.length === 0) {
@@ -151,6 +195,8 @@ export const MessageList: React.FC<MessageListProps> = ({ sessionId, sessionKind
         onScroll={(event) => {
           const target = event.currentTarget;
           setScrollTop(target.scrollTop);
+          const anchor = promptAnchor.current;
+          if (anchor !== null && Math.abs(target.scrollTop - anchor.offset) > 1) promptAnchor.current = null;
           const distanceFromLatest = target.scrollHeight - target.clientHeight - target.scrollTop;
           const followsLatest = distanceFromLatest <= ESTIMATED_ROW_HEIGHT;
           setIsFollowingLatest(followsLatest);
@@ -161,23 +207,25 @@ export const MessageList: React.FC<MessageListProps> = ({ sessionId, sessionKind
           if (row !== null) setFocusedEventId(row.dataset.eventId ?? null);
         }}
       >
-        <div style={{ height: layout.offsets[start] ?? 0 }} aria-hidden="true" />
-        {visibleEntries.map((entry) => (
-          <TimelineRow
-            key={entry.id}
-            entry={entry}
-            collapsed={collapseSpecialists && isTimelineEntrySpecialist(entry)}
-            onJumpToEvent={jumpToEvent}
-            onMeasuredHeight={measureRow}
-            presentation={sessionKind === 'chat' ? 'chat' : 'room'}
-            messageStreaming={entry.event.type === 'message.created' && projection?.messages[entry.event.payload.messageId]?.streaming === true}
-          />
-        ))}
-        {waitingForAssistant && end === entries.length && <div className="chat-typing-indicator" role="status" aria-label="Argus is thinking">
-          <span className="chat-typing-indicator__dot" />
-          <span>Argus is thinking</span>
-        </div>}
-        <div style={{ height: Math.max(0, layout.totalHeight - (layout.offsets[end] ?? layout.totalHeight)) }} aria-hidden="true" />
+        <div className="timeline-content-column">
+          <div style={{ height: layout.offsets[start] ?? 0 }} aria-hidden="true" />
+          {visibleEntries.map((entry) => (
+            <TimelineRow
+              key={entry.id}
+              entry={entry}
+              collapsed={collapseSpecialists && isTimelineEntrySpecialist(entry)}
+              onJumpToEvent={jumpToEvent}
+              onMeasuredHeight={measureRow}
+              presentation={sessionKind === 'chat' ? 'chat' : 'room'}
+              messageStreaming={entry.event.type === 'message.created' && projection?.messages[entry.event.payload.messageId]?.streaming === true}
+            />
+          ))}
+          {waitingForAssistant && end === entries.length && <div className="chat-typing-indicator" role="status" aria-label="Argus is thinking">
+            <span className="chat-typing-indicator__dot" />
+            <span>Argus is thinking</span>
+          </div>}
+          <div style={{ height: Math.max(0, layout.totalHeight - (layout.offsets[end] ?? layout.totalHeight)) + trailingScrollSpace }} aria-hidden="true" />
+        </div>
       </div>
       {unreadCount > 0 && (
         <button className="timeline-unread" type="button" onClick={jumpToLatest}>

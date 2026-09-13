@@ -3,8 +3,9 @@
    ============================================================ */
 
 .chat-panel {
+  --chat-edge-gap: clamp(14px, 2.8vw, 40px);
   background: var(--bg-main);
-  padding: 0 clamp(14px, 2.8vw, 40px) 22px;
+  padding: 0 0 22px;
 }
 
 .session-emergency-controls { display: inline-flex; align-items: center; gap: 5px; }
@@ -20,7 +21,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  width: min(100%, 1120px);
+  width: min(calc(100% - var(--chat-edge-gap) - var(--chat-edge-gap)), 1120px);
   margin: 14px auto 0;
   padding: 0 16px;
   height: 56px;
@@ -175,21 +176,8 @@
 
 .chat-messages-area {
   position: relative;
-  width: min(100%, 920px);
-  margin: 0 auto;
-}
-
-.message-list-container::-webkit-scrollbar {
-  width: 4px;
-}
-
-.message-list-container::-webkit-scrollbar-thumb {
-  background: var(--border-subtle);
-  border-radius: 2px;
-}
-
-.message-list-container::-webkit-scrollbar-thumb:hover {
-  background: var(--border-medium);
+  width: 100%;
+  margin: 0;
 }
 
 /* ── AGENTS WORKING separator ────────────────────────────────── */
@@ -243,14 +231,14 @@
 .chat-bottom-area {
   display: flex;
   flex-direction: column;
-  width: min(100%, 920px);
+  width: min(calc(100% - var(--chat-edge-gap) - var(--chat-edge-gap)), 920px);
   margin: 10px auto 0;
   border-top: 0;
   background-color: transparent;
 }
 
 @media (max-width: 760px) {
-  .chat-panel { padding: 0 10px 12px; }
-  .chat-header { width: 100%; margin-top: 8px; }
+  .chat-panel { --chat-edge-gap: 10px; padding: 0 0 12px; }
+  .chat-header { width: calc(100% - var(--chat-edge-gap) - var(--chat-edge-gap)); margin-top: 8px; }
   .chat-model-pill { max-width: 42vw; }
 }

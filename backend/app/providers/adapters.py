@@ -137,6 +137,17 @@ class LangChainProvider(Provider):
                 # All adapters share a bounded JSON-text fallback. The caller
                 # still validates the resulting value against its own schema.
                 structured_fallback = True
+        generation_kwargs: dict[str, object] = {}
+        if request.max_output_tokens is not None:
+            token_limit_key = "max_output_tokens" if request.metadata.get("providerKind") == "google" else "max_tokens"
+            generation_kwargs[token_limit_key] = request.max_output_tokens
+        if request.reasoning_effort is not None:
+            generation_kwargs["reasoning"] = {"effort": request.reasoning_effort}
+        if generation_kwargs:
+            bind = getattr(model, "bind", None)
+            if not callable(bind):
+                raise ProviderRequestUnsupported
+            model = bind(**generation_kwargs)
         if not callable(getattr(model, "astream", None)):
             raise ProviderRequestUnsupported
         return model, structured_fallback

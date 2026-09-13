@@ -182,6 +182,33 @@ async def test_production_adapter_normalizes_a_lazy_chat_model_stream() -> None:
 
 
 @pytest.mark.asyncio
+async def test_production_adapter_binds_direct_chat_generation_controls() -> None:
+    class FakeModel:
+        def __init__(self) -> None:
+            self.bound: dict[str, object] | None = None
+
+        def bind(self, **kwargs: object) -> "FakeModel":
+            self.bound = kwargs
+            return self
+
+        async def astream(self, _: list[object]):
+            yield SimpleNamespace(content="Bound response", tool_calls=[], additional_kwargs={}, usage_metadata={}, response_metadata={"finish_reason": "stop"})
+
+    fake_model = FakeModel()
+    provider = create_provider(
+        "openai_compat", model_id="test", api_key="runtime-only",
+        module_loader=lambda _: SimpleNamespace(ChatOpenAI=lambda **_: fake_model),
+    )
+    events = [event async for event in provider.stream(ProviderRequest(
+        request_id="direct-chat", model_id="test", messages=({"role": "user", "content": "Keep it short."},),
+        max_output_tokens=1024, reasoning_effort="low",
+    ))]
+
+    assert events == [TextDelta("Bound response"), Finished()]
+    assert fake_model.bound == {"max_tokens": 1024, "reasoning": {"effort": "low"}}
+
+
+@pytest.mark.asyncio
 async def test_production_adapter_fails_closed_on_incomplete_tool_call() -> None:
     class FakeModel:
         async def astream(self, _: list[object]):

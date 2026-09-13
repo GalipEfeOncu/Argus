@@ -57,6 +57,8 @@ class ProviderRequest:
     messages: tuple[ProviderMessage, ...]
     tools: tuple[Mapping[str, JsonValue], ...] = ()
     response_schema: Mapping[str, JsonValue] | None = None
+    max_output_tokens: int | None = None
+    reasoning_effort: Literal["none", "minimal", "low", "medium", "high", "xhigh", "max"] | None = None
     metadata: Mapping[str, str] = field(default_factory=dict)
 
 
