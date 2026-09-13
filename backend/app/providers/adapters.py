@@ -6,7 +6,7 @@ import asyncio
 import importlib
 import json
 from collections.abc import AsyncIterator, Callable, Mapping
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 
 from app.providers.protocol import (
     Cancelled,
@@ -75,10 +75,7 @@ class LangChainProvider(Provider):
         except ProviderRequestUnsupported:
             yield TerminalError("provider_request_unsupported", "The configured provider cannot satisfy this request.")
         except Exception as error:
-            if _is_retryable(error):
-                yield RetryableError("provider_unavailable", "The provider is temporarily unavailable.")
-            else:
-                yield TerminalError("provider_error", "The provider could not complete this request.")
+            yield _provider_error(error)
 
     async def cancel(self, request_id: str) -> None:
         # Task cancellation stops the in-flight coroutine.  This marker also
@@ -255,8 +252,35 @@ def _finish_reason(value: str) -> Literal["stop", "length", "tool_call", "conten
 
 
 def _is_retryable(error: Exception) -> bool:
-    status_code = getattr(error, "status_code", None)
+    status_code = _status_code(error)
     return status_code == 429 or isinstance(status_code, int) and status_code >= 500
+
+
+def _provider_error(error: Exception) -> RetryableError | TerminalError:
+    """Normalize provider failures without exposing SDK, response, or secret data."""
+
+    if _is_retryable(error):
+        return RetryableError("provider_unavailable", "The provider is temporarily unavailable.")
+
+    status_code = _status_code(error)
+    if status_code in {401, 403}:
+        return TerminalError("provider_authentication", "The provider rejected the API key. Check the credential and try again.")
+    if status_code == 402:
+        return TerminalError("provider_billing", "The provider requires available credits for this model. Choose a free model or check the provider account.")
+    if status_code == 404:
+        return TerminalError("provider_model_unavailable", "The selected model is unavailable for this provider. Choose another chat model.")
+    if status_code in {400, 409, 422}:
+        return TerminalError("provider_request_invalid", "The selected model rejected this chat request. Choose another chat-capable model.")
+    return TerminalError("provider_error", "The provider could not complete this request.")
+
+
+def _status_code(error: Exception) -> int | None:
+    direct = getattr(error, "status_code", None)
+    if isinstance(direct, int):
+        return direct
+    response = getattr(error, "response", None)
+    nested = getattr(response, "status_code", None)
+    return nested if isinstance(nested, int) else None
 
 
 def _is_json_value(value: object) -> bool:

@@ -198,6 +198,39 @@ async def test_production_adapter_fails_closed_on_incomplete_tool_call() -> None
     assert events[0] == TerminalError("provider_tool_call_invalid", "The provider returned an incomplete tool call.")
 
 
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("status_code", "expected"),
+    [
+        (401, TerminalError("provider_authentication", "The provider rejected the API key. Check the credential and try again.")),
+        (402, TerminalError("provider_billing", "The provider requires available credits for this model. Choose a free model or check the provider account.")),
+        (404, TerminalError("provider_model_unavailable", "The selected model is unavailable for this provider. Choose another chat model.")),
+        (422, TerminalError("provider_request_invalid", "The selected model rejected this chat request. Choose another chat-capable model.")),
+        (503, RetryableError("provider_unavailable", "The provider is temporarily unavailable.")),
+    ],
+)
+async def test_production_adapter_classifies_safe_provider_failures(status_code: int, expected: object) -> None:
+    class ProviderFailure(Exception):
+        pass
+
+    class FakeModel:
+        async def astream(self, _: list[object]):
+            error = ProviderFailure("raw provider detail must not escape")
+            error.status_code = status_code  # type: ignore[attr-defined]
+            raise error
+            yield  # pragma: no cover
+
+    provider = create_provider(
+        "openai_compat", model_id="test", api_key="runtime-only",
+        module_loader=lambda _: SimpleNamespace(ChatOpenAI=lambda **_: FakeModel()),
+    )
+
+    events = [event async for event in provider.stream(request())]
+
+    assert events == [expected]
+    assert "raw provider detail" not in str(events)
+
+
 def test_minimal_sidecar_import_avoids_optional_provider_and_langgraph_modules() -> None:
     backend_root = Path(__file__).resolve().parents[2]
     result = subprocess.run(

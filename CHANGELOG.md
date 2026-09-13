@@ -39,6 +39,9 @@ All notable user-visible changes to Argus are recorded here. The project follows
   startup.
 - Restored direct chats now renew their short-lived native provider lease when
   the session view opens after an Argus restart.
+- Direct-chat provider failures now explain whether the API key, account
+  credits, selected model, request, or temporary provider availability needs
+  attention instead of showing one generic error.
 - Provider Settings now explains when API-key providers are being configured
   outside the Tauri desktop credential-store boundary instead of reporting a
   generic save failure.

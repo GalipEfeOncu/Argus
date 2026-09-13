@@ -292,7 +292,7 @@ class SessionRuntimeManager:
                         await self._commit_chat_error(db, session_id, "chat_usage_limit", "This chat reached its configured usage limit.", message_id if created else None)
                         return
                 elif isinstance(event, (RetryableError, TerminalError)):
-                    await self._commit_chat_error(db, session_id, "chat_provider_error", "The provider could not complete this response. Try again.", message_id if created else None)
+                    await self._commit_chat_error(db, session_id, event.code, event.summary, message_id if created else None)
                     return
                 elif isinstance(event, Cancelled):
                     cancelled = True

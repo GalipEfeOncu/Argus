@@ -11,7 +11,7 @@ from fastapi.testclient import TestClient
 from app.config import settings
 from app.db.database import get_db, transaction
 from app.db.repositories import EventRepository, SessionRepository, _now_ms
-from app.providers.protocol import Finished, ProviderRequest, StructuredOutput, TextDelta, ToolCall, Usage
+from app.providers.protocol import Finished, ProviderRequest, RetryableError, StructuredOutput, TerminalError, TextDelta, ToolCall, Usage
 from app.providers.scripted import ScriptedProvider, SlowStream
 from app.providers.adapters import ProviderDependencyUnavailable
 from app.schemas.provider import ProviderProfileCreate
@@ -324,6 +324,38 @@ async def test_direct_chat_streams_plain_text_into_the_ordered_timeline(temporar
     ]
     assert operation is not None and operation["operation_kind"] == "chat" and operation["state"] == "succeeded"
     assert profile_id
+
+
+@pytest.mark.asyncio
+async def test_direct_chat_preserves_safe_provider_failure_reason(temporary_sqlite_db) -> None:
+    database = await get_db()
+
+    async def resolver(_profile_id: str, _model_id: str):
+        return ScriptedProvider(((TerminalError(
+            "provider_authentication", "The provider rejected the API key. Check the credential and try again.",
+        ),),))
+
+    manager = SessionRuntimeManager(provider_resolver=resolver, publisher=lambda _session, _events: asyncio.sleep(0))
+    try:
+        await _session(database)
+        await database.execute(
+            "UPDATE sessions SET session_type = 'chat', project_path = '', status = 'running' WHERE id = ?",
+            ("runtime-session",),
+        )
+        await database.commit()
+        await CommandProcessor(database).process("runtime-session", parse_session_command({
+            "commandId": "chat-auth-error", "type": "message.send", "payload": {"content": "Say hello."},
+        }))
+        assert await manager.start("runtime-session") is True
+        await manager.wait("runtime-session")
+        events = await EventRepository(database).list_for_session("runtime-session")
+    finally:
+        await manager.shutdown()
+        await database.close()
+
+    error = next(event for event in events if event.event_type == "error.created")
+    assert error.payload["code"] == "provider_authentication"
+    assert error.payload["summary"] == "The provider rejected the API key. Check the credential and try again."
 
 
 @pytest.mark.asyncio
