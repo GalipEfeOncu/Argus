@@ -244,6 +244,28 @@ test('live announcements throttle updates and never narrate streaming deltas', (
   expect(screen.getByText(/Streaming update: First message more/)).toBeInTheDocument();
 });
 
+test('direct chat presents one message card while retaining streaming events in the projection', () => {
+  const state = projection([
+    snapshot(),
+    event(1, 'message.created', { messageId: 'msg_human', authorId: 'human', authorKind: 'human', content: 'Hi' }, 'human'),
+    event(2, 'message.created', { messageId: 'msg_reply', authorId: 'coordinator', authorKind: 'coordinator', content: 'Hi', streaming: true }, 'coordinator'),
+    event(3, 'message.delta', { messageId: 'msg_reply', delta: '! How can I help you?' }, 'coordinator'),
+    event(4, 'message.completed', { messageId: 'msg_reply' }, 'coordinator'),
+    event(5, 'usage.updated', { scopeId: 'chat_1', inputTokens: 2, outputTokens: 6, normalizedCost: null, costUncertainty: 'unavailable', durationMs: 0 }),
+  ]);
+  useSessionRoomStore.setState({ projections: { [sessionId]: state } });
+
+  render(<MessageList sessionId={sessionId} sessionKind="chat" />);
+
+  expect(screen.getByText('2 messages')).toBeInTheDocument();
+  expect(screen.getByText('Hi! How can I help you?')).toBeInTheDocument();
+  expect(screen.queryByText('Streaming update')).not.toBeInTheDocument();
+  expect(screen.queryByText('Usage updated')).not.toBeInTheDocument();
+  expect(state.events.map((entry) => entry.type)).toEqual([
+    'message.created', 'message.created', 'message.delta', 'message.completed', 'usage.updated',
+  ]);
+});
+
 describe('projection render batching', () => {
   test('coalesces streaming paints and flushes the latest projection once', () => {
     const first = projection([snapshot()]);

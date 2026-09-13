@@ -42,6 +42,9 @@ All notable user-visible changes to Argus are recorded here. The project follows
 - Direct-chat provider failures now explain whether the API key, account
   credits, selected model, request, or temporary provider availability needs
   attention instead of showing one generic error.
+- Direct chats now render one conversational card per message while retaining
+  ordered streaming, completion, and usage events in the underlying session
+  projection.
 - Provider Settings now explains when API-key providers are being configured
   outside the Tauri desktop credential-store boundary instead of reporting a
   generic save failure.

@@ -16,7 +16,16 @@ const OVERSCAN_ROWS = 6;
 
 export const MessageList: React.FC<MessageListProps> = ({ sessionId, sessionKind = 'project' }) => {
   const projection = useSessionRoomStore((state) => state.projections[sessionId]);
-  const entries = useMemo(() => projection === undefined ? [] : createTimelineEntries(projection), [projection]);
+  const entries = useMemo(() => {
+    if (projection === undefined) return [];
+    const next = createTimelineEntries(projection);
+    // Direct chat keeps the ordered event log in the projection, but presents
+    // only conversational messages and actionable errors. Deltas and usage
+    // events update the message projection and should not become chat cards.
+    return sessionKind === 'chat'
+      ? next.filter((entry) => entry.event.type === 'message.created' || entry.event.type === 'error.created')
+      : next;
+  }, [projection, sessionKind]);
   const containerRef = useRef<HTMLDivElement>(null);
   const [scrollTop, setScrollTop] = useState(0);
   const [viewportHeight, setViewportHeight] = useState(640);
@@ -126,10 +135,12 @@ export const MessageList: React.FC<MessageListProps> = ({ sessionId, sessionKind
   return (
     <section className="timeline-shell" aria-label={sessionKind === 'chat' ? 'Conversation timeline' : 'Shared room timeline'}>
       <div className="timeline-toolbar">
-        <span>{entries.length.toLocaleString()} ordered events</span>
-        <button type="button" aria-pressed={collapseSpecialists} onClick={() => setCollapseSpecialists((value) => !value)}>
-          {collapseSpecialists ? 'Show specialist detail' : 'Collapse specialist detail'}
-        </button>
+        <span>{sessionKind === 'chat' ? `${entries.filter((entry) => entry.event.type === 'message.created').length.toLocaleString()} messages` : `${entries.length.toLocaleString()} ordered events`}</span>
+        {sessionKind !== 'chat' && (
+          <button type="button" aria-pressed={collapseSpecialists} onClick={() => setCollapseSpecialists((value) => !value)}>
+            {collapseSpecialists ? 'Show specialist detail' : 'Collapse specialist detail'}
+          </button>
+        )}
       </div>
       <div
         className="timeline-viewport"
