@@ -193,7 +193,7 @@ class WebSocketManager {
     if (projection === undefined) return null;
     const streamingAuthor = Object.values(projection.messages).find((message) => message.streaming)?.authorId;
     if (streamingAuthor !== undefined) return streamingAuthor;
-    return Object.values(projection.participants).find((participant) => participant.status === 'working')?.id ?? null;
+    return Object.values(projection.participants).find((participant) => participant.status === 'working')?.id ?? 'coordinator';
   }
 }
 

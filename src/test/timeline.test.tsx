@@ -4,7 +4,7 @@ import type { ArgusSessionEvent } from '@/types/events';
 import { MessageInput, extractMentions } from '@/components/chat/MessageInput';
 import { MessageList } from '@/components/chat/MessageList';
 import { LiveTimelineAnnouncer } from '@/components/chat/LiveTimelineAnnouncer';
-import { createSessionProjection, reduceSessionEvent, type SessionProjection } from '@/services/sessionProjection';
+import { createSessionProjection, hasPendingAssistantResponse, reduceSessionEvent, type SessionProjection } from '@/services/sessionProjection';
 import { createTimelineEntries } from '@/services/timelineModel';
 import { useSessionRoomStore } from '@/stores/sessionRoomStore';
 import { useSessionStore } from '@/stores/sessionStore';
@@ -257,13 +257,52 @@ test('direct chat presents one message card while retaining streaming events in 
 
   render(<MessageList sessionId={sessionId} sessionKind="chat" />);
 
-  expect(screen.getByText('2 messages')).toBeInTheDocument();
   expect(screen.getByText('Hi! How can I help you?')).toBeInTheDocument();
   expect(screen.queryByText('Streaming update')).not.toBeInTheDocument();
   expect(screen.queryByText('Usage updated')).not.toBeInTheDocument();
   expect(state.events.map((entry) => entry.type)).toEqual([
     'message.created', 'message.created', 'message.delta', 'message.completed', 'usage.updated',
   ]);
+});
+
+test('direct chat stays busy before the first assistant token and becomes idle after a response or error', () => {
+  const waiting = projection([
+    snapshot(),
+    event(1, 'message.created', { messageId: 'msg_human', authorId: 'human', authorKind: 'human', content: 'Wait for me.' }, 'human'),
+  ]);
+  expect(hasPendingAssistantResponse(waiting)).toBe(true);
+
+  const answered = projection([
+    snapshot(),
+    event(1, 'message.created', { messageId: 'msg_human', authorId: 'human', authorKind: 'human', content: 'Wait for me.' }, 'human'),
+    event(2, 'message.created', { messageId: 'msg_reply', authorId: 'coordinator', authorKind: 'coordinator', content: 'I am here.' }, 'coordinator'),
+  ]);
+  expect(hasPendingAssistantResponse(answered)).toBe(false);
+
+  const failed = projection([
+    snapshot(),
+    event(1, 'message.created', { messageId: 'msg_human', authorId: 'human', authorKind: 'human', content: 'Wait for me.' }, 'human'),
+    event(2, 'error.created', { errorId: 'error_1', code: 'provider_error', summary: 'Try again.', recoverable: true }),
+  ]);
+  expect(hasPendingAssistantResponse(failed)).toBe(false);
+});
+
+test('direct chat blocks overlapping sends and exposes an interrupt while waiting', () => {
+  const waiting = projection([
+    snapshot(),
+    event(1, 'message.created', { messageId: 'msg_human', authorId: 'human', authorKind: 'human', content: 'Wait for me.' }, 'human'),
+  ]);
+  useSessionRoomStore.setState({ projections: { [sessionId]: { ...waiting, connection: 'connected' } } });
+  render(<MessageInput sessionId={sessionId} sessionKind="chat" />);
+
+  const input = screen.getByLabelText('Message for direct chat');
+  fireEvent.change(input, { target: { value: 'Do not overlap this turn.' } });
+  expect(screen.getByRole('button', { name: 'Stop' })).toBeEnabled();
+  expect(screen.getByText(/Thinking… Press Stop/)).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Stop' }));
+
+  expect(sendMessage).not.toHaveBeenCalled();
+  expect(sendInterrupt).toHaveBeenCalledTimes(1);
 });
 
 describe('projection render batching', () => {

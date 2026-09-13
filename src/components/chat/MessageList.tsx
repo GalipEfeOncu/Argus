@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSessionRoomStore } from '@/stores/sessionRoomStore';
+import { hasPendingAssistantResponse } from '@/services/sessionProjection';
 import { createTimelineEntries, isTimelineEntrySpecialist } from '@/services/timelineModel';
 import { TimelineRow } from './TimelineRow';
 import { LiveTimelineAnnouncer } from './LiveTimelineAnnouncer';
@@ -72,6 +73,7 @@ export const MessageList: React.FC<MessageListProps> = ({ sessionId, sessionKind
     end = Math.min(entries.length, focusedIndex + OVERSCAN_ROWS + 1);
   }
   const visibleEntries = entries.slice(start, end);
+  const waitingForAssistant = sessionKind === 'chat' && projection !== undefined && hasPendingAssistantResponse(projection);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -133,15 +135,13 @@ export const MessageList: React.FC<MessageListProps> = ({ sessionId, sessionKind
   }
 
   return (
-    <section className="timeline-shell" aria-label={sessionKind === 'chat' ? 'Conversation timeline' : 'Shared room timeline'}>
-      <div className="timeline-toolbar">
-        <span>{sessionKind === 'chat' ? `${entries.filter((entry) => entry.event.type === 'message.created').length.toLocaleString()} messages` : `${entries.length.toLocaleString()} ordered events`}</span>
-        {sessionKind !== 'chat' && (
-          <button type="button" aria-pressed={collapseSpecialists} onClick={() => setCollapseSpecialists((value) => !value)}>
-            {collapseSpecialists ? 'Show specialist detail' : 'Collapse specialist detail'}
-          </button>
-        )}
-      </div>
+    <section className={`timeline-shell${sessionKind === 'chat' ? ' timeline-shell--chat' : ''}`} aria-label={sessionKind === 'chat' ? 'Conversation timeline' : 'Shared room timeline'}>
+      {sessionKind !== 'chat' && <div className="timeline-toolbar">
+        <span>{entries.length.toLocaleString()} ordered events</span>
+        <button type="button" aria-pressed={collapseSpecialists} onClick={() => setCollapseSpecialists((value) => !value)}>
+          {collapseSpecialists ? 'Show specialist detail' : 'Collapse specialist detail'}
+        </button>
+      </div>}
       <div
         className="timeline-viewport"
         ref={containerRef}
@@ -169,8 +169,14 @@ export const MessageList: React.FC<MessageListProps> = ({ sessionId, sessionKind
             collapsed={collapseSpecialists && isTimelineEntrySpecialist(entry)}
             onJumpToEvent={jumpToEvent}
             onMeasuredHeight={measureRow}
+            presentation={sessionKind === 'chat' ? 'chat' : 'room'}
+            messageStreaming={entry.event.type === 'message.created' && projection?.messages[entry.event.payload.messageId]?.streaming === true}
           />
         ))}
+        {waitingForAssistant && end === entries.length && <div className="chat-typing-indicator" role="status" aria-label="Argus is thinking">
+          <span className="chat-typing-indicator__dot" />
+          <span>Argus is thinking</span>
+        </div>}
         <div style={{ height: Math.max(0, layout.totalHeight - (layout.offsets[end] ?? layout.totalHeight)) }} aria-hidden="true" />
       </div>
       {unreadCount > 0 && (

@@ -3,9 +3,8 @@
    ============================================================ */
 
 .chat-panel {
-  background:
-    radial-gradient(circle at 50% 0%, var(--accent-transparent), transparent 30%),
-    linear-gradient(135deg, var(--bg-main), var(--bg-desktop));
+  background: var(--bg-main);
+  padding: 0 clamp(14px, 2.8vw, 40px) 22px;
 }
 
 .session-emergency-controls { display: inline-flex; align-items: center; gap: 5px; }
@@ -21,10 +20,13 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 20px;
+  width: min(100%, 1120px);
+  margin: 14px auto 0;
+  padding: 0 16px;
   height: 56px;
-  border-bottom: 1px solid color-mix(in srgb, var(--border-subtle) 72%, transparent);
-  background-color: color-mix(in srgb, var(--bg-main) 76%, transparent);
+  border: 1px solid var(--border-subtle);
+  border-radius: 14px;
+  background-color: color-mix(in srgb, var(--bg-main) 92%, var(--bg-card));
   backdrop-filter: blur(8px);
   flex-shrink: 0;
   z-index: 10;
@@ -156,10 +158,25 @@
   color: var(--text-primary);
 }
 
+.chat-model-pill {
+  max-width: min(34vw, 320px);
+  overflow: hidden;
+  border: 1px solid var(--border-subtle);
+  border-radius: 999px;
+  padding: 5px 10px;
+  color: var(--text-secondary);
+  font-size: 10px;
+  line-height: 1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* ── Messages area ───────────────────────────────────────────── */
 
 .chat-messages-area {
   position: relative;
+  width: min(100%, 920px);
+  margin: 0 auto;
 }
 
 .message-list-container::-webkit-scrollbar {
@@ -226,6 +243,14 @@
 .chat-bottom-area {
   display: flex;
   flex-direction: column;
-  border-top: 1px solid color-mix(in srgb, var(--border-subtle) 72%, transparent);
-  background-color: color-mix(in srgb, var(--bg-main) 86%, transparent);
+  width: min(100%, 920px);
+  margin: 10px auto 0;
+  border-top: 0;
+  background-color: transparent;
+}
+
+@media (max-width: 760px) {
+  .chat-panel { padding: 0 10px 12px; }
+  .chat-header { width: 100%; margin-top: 8px; }
+  .chat-model-pill { max-width: 42vw; }
 }

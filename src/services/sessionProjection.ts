@@ -145,6 +145,17 @@ export function setConnectionState(state: SessionProjection, connection: Connect
   return { ...state, connection };
 }
 
+/** A direct-chat turn stays busy between the accepted human message and the
+ * first assistant message, even before the provider emits its first token. */
+export function hasPendingAssistantResponse(state: SessionProjection): boolean {
+  for (const event of [...state.events].reverse()) {
+    if (event.type === 'error.created') return false;
+    if (event.type !== 'message.created') continue;
+    return event.payload.authorKind === 'human';
+  }
+  return false;
+}
+
 export function queueCommand(state: SessionProjection, command: ArgusSessionCommand): SessionProjection {
   const existing = state.pendingCommands[command.commandId];
   return {

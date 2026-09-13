@@ -45,6 +45,9 @@ All notable user-visible changes to Argus are recorded here. The project follows
 - Direct chats now render one conversational card per message while retaining
   ordered streaming, completion, and usage events in the underlying session
   projection.
+- Direct chats now use a centered, margin-preserving conversation layout, keep
+  provider/model context compact, and show an interruptible thinking state while
+  waiting for the first provider token instead of accepting overlapping turns.
 - Streamed message deltas now preserve meaningful leading spaces across the
   canonical event boundary, so words no longer run together in chat.
 - Provider Settings now explains when API-key providers are being configured

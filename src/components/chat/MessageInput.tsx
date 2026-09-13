@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useWebSocket } from '@/hooks/useWebSocket';
+import { hasPendingAssistantResponse } from '@/services/sessionProjection';
 import { useSessionRoomStore } from '@/stores/sessionRoomStore';
 import type { SessionKind } from '@/types/session';
 import './MessageInput.css';
@@ -24,6 +25,9 @@ export const MessageInput: React.FC<MessageInputProps> = ({ sessionId, sessionKi
   const mentions = extractMentions(content);
   const targetLabel = mentions.length === 0 ? 'Coordinator' : mentions.join(', ');
   const isDirectChat = sessionKind === 'chat';
+  const waitingForAssistant = isDirectChat && projection !== undefined && hasPendingAssistantResponse(projection);
+  const isChatBusy = isDirectChat && (isStreaming || waitingForAssistant);
+  const canInterrupt = isStreaming || isChatBusy;
 
   const updateContent = (nextContent: string) => {
     setContent(nextContent);
@@ -44,7 +48,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({ sessionId, sessionKi
   }, [projection, submission]);
 
   const handleSend = () => {
-    if (!content.trim() || !dispatchAvailable || submission !== null || (isDirectChat && isStreaming)) return;
+    if (!content.trim() || !dispatchAvailable || submission !== null || isChatBusy) return;
     const draft = content;
     const result = sendMessage(content.trim(), mentions);
     if (result.status === 'unavailable') {
@@ -60,21 +64,21 @@ export const MessageInput: React.FC<MessageInputProps> = ({ sessionId, sessionKi
       e.preventDefault();
       handleSend();
     }
-    if (e.key === 'Escape' && isStreaming) {
+    if (e.key === 'Escape' && canInterrupt) {
       e.preventDefault();
       sendInterrupt();
     }
   };
 
   return (
-    <div className="input-section">
+    <div className={`input-section${isDirectChat ? ' input-section--chat' : ''}`}>
 
       {/* ── Input Box ───────────────────────────────────── */}
       <div className="input-box-container">
 
         <textarea
           className="input-textarea"
-          rows={3}
+          rows={isDirectChat ? 1 : 3}
           aria-label={isDirectChat ? 'Message for direct chat' : 'Message for shared room'}
           placeholder={isDirectChat ? 'Write a message…' : 'Describe your task; @name explicitly targets a participant'}
           value={content}
@@ -88,20 +92,25 @@ export const MessageInput: React.FC<MessageInputProps> = ({ sessionId, sessionKi
           {/* Execute button */}
           <button
             className="btn-execute"
-            onClick={handleSend}
-            disabled={!content.trim() || !dispatchAvailable || submission !== null || (isDirectChat && isStreaming)}
+            onClick={isChatBusy ? () => sendInterrupt() : handleSend}
+            disabled={isChatBusy ? !dispatchAvailable : !content.trim() || !dispatchAvailable || submission !== null}
             type="button"
           >
-            <span>{isDirectChat ? 'Send message' : 'Execute Task'}</span>
-            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-              <line x1="22" y1="2" x2="11" y2="13" />
-              <polyline points="22 2 15 22 11 13 2 9 22 2" />
-            </svg>
+            <span>{isDirectChat ? (isChatBusy ? 'Stop' : 'Send message') : 'Execute Task'}</span>
+            {isDirectChat && isChatBusy ? (
+              <span className="btn-stop-icon" aria-hidden="true" />
+            ) : (
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                <line x1="22" y1="2" x2="11" y2="13" />
+                <polyline points="22 2 15 22 11 13 2 9 22 2" />
+              </svg>
+            )}
           </button>
         </div>
       </div>
 
-      <p className="composer-target">Targets: {targetLabel}{isStreaming ? ' · Escape interrupts active streaming' : ''}</p>
+      {!isDirectChat && <p className="composer-target">Targets: {targetLabel}{isStreaming ? ' · Escape interrupts active streaming' : ''}</p>}
+      {isDirectChat && isChatBusy && <p className="composer-state" role="status">Thinking… Press Stop or Escape to interrupt.</p>}
       {waitingForApproval && <p className="composer-state">Approval is still pending. You can message Coordinator; sending a message does not approve or reject the request.</p>}
       {connection === 'reconnecting' && <p className="composer-state" role="status">Reconnecting… Keep editing; sending resumes after the connection recovers.</p>}
       {connection === 'resyncing' && <p className="composer-state" role="status">Restoring ordered session state… Keep editing; sending resumes when it is ready.</p>}

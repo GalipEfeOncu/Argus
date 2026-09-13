@@ -37,6 +37,7 @@ export const SessionView: React.FC = () => {
   }
 
   const isDirectChat = sessionKind === 'chat';
+  const modelLabel = isDirectChat ? localSession?.roleConfigs[0]?.modelRef.displayName : undefined;
 
   return (
     <div className="session-view w-full h-full flex overflow-hidden bg-[var(--bg-main)]">
@@ -53,11 +54,12 @@ export const SessionView: React.FC = () => {
           sessionKind={sessionKind}
           initialDraft={isDirectChat ? newChatDraft : undefined}
           onDraftChange={isDirectChat ? setNewChatDraft : undefined}
+          modelLabel={modelLabel}
         />
       </div>
 
       {/* Right Sidebar (Agent Status & Workflow) */}
-      {agentPanelVisible && <AgentPanel sessionId={session.id} />}
+      {agentPanelVisible && !isDirectChat && <AgentPanel sessionId={session.id} />}
       
     </div>
   );

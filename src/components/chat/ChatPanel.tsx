@@ -14,6 +14,7 @@ interface ChatPanelProps {
   sessionKind?: SessionKind;
   initialDraft?: string;
   onDraftChange?: (draft: string) => void;
+  modelLabel?: string;
 }
 
 export const ChatPanel: React.FC<ChatPanelProps> = ({
@@ -23,6 +24,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   sessionKind = 'project',
   initialDraft,
   onDraftChange,
+  modelLabel,
 }) => {
   const { setActivePage, agentPanelVisible, toggleAgentPanel } = useUIStore();
   const isDirectChat = sessionKind === 'chat';
@@ -58,8 +60,9 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
 
         {/* Right: toggle agents + menu */}
         <div className="chat-header-right">
-          <SessionControls sessionId={sessionId} />
-          <button
+          {!isDirectChat && <SessionControls sessionId={sessionId} />}
+          {modelLabel && <span className="chat-model-pill" title={modelLabel}>{modelLabel}</span>}
+          {!isDirectChat && <button
             id="agent-panel-toggle"
             type="button"
             onClick={toggleAgentPanel}
@@ -75,7 +78,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
               <path d="M16 3.13a4 4 0 0 1 0 7.75" />
             </svg>
             <span>Agents</span>
-          </button>
+          </button>}
 
         </div>
       </div>
