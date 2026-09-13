@@ -233,6 +233,11 @@ runtime emits `running` and invokes the immutable Coordinator binding with the
 stored goal, bounded recent human messages, available participant metadata, and
 the strict Coordinator action schema. It never falls back to a scripted or
 built-in provider.
+The runtime composes a role-specific Argus prompt profile around the immutable
+session instructions: direct chat, Coordinator routing, and specialist work
+have separate behavior and output guidance. Dynamic context is labelled and
+bounded; prompts do not grant permissions or replace deterministic runtime
+validation.
 
 A valid `final` action emits a visible Coordinator message and reaches
 `completed` only after deterministic gate validation. `ask_user` and `wait`

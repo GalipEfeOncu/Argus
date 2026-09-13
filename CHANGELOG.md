@@ -31,6 +31,7 @@ All notable user-visible changes to Argus are recorded here. The project follows
 
 ### Fixed
 
+- Chat, Coordinator, and specialist turns now use separate layered prompt profiles with labelled session context, concise output guidance, and explicit evidence/runtime boundaries instead of sharing one generic system prompt.
 - Provider credentials now use the operating-system keyring on Linux and wake
   an idle native sidecar before handing a key to the local runtime.
 - Provider catalogues now exclude extraction, embedding, transcription, and

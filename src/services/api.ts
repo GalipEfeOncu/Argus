@@ -69,7 +69,7 @@ export const api = {
         id: 'coordinator',
         role: 'coordinator',
         modelBinding: { providerProfileId: model.providerId, modelId: model.modelId },
-        systemPrompt: 'You are Argus, a concise general assistant. Answer directly in the user’s language. Do not repeat introductions or generic capability lists unless asked. Do not claim to have used tools or changed files.',
+        systemPrompt: 'Use Argus direct-chat behavior. Answer naturally in the user’s language and stay focused on the latest request.',
       }],
       configuration: { availableAgentIds: [], workspacePolicy: { mode: 'snapshot' } },
       workspaceMode: 'snapshot',

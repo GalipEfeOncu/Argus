@@ -53,6 +53,7 @@ def test_context_is_ordered_bounded_and_metadata_contains_no_selected_content(ca
     assert result.metadata.skill_snapshots == ({"id": "skl_review", "version": "1.0.0", "contentHash": "b" * 64},)
     assert "Never delete user data." in result.user_prompt
     assert "[REDACTED]" in result.user_prompt
+    assert len(result.system_prompt) + len(result.user_prompt) <= 800
     assert result.metadata.selected_event_ids == ("event-1", "event-3")
     assert result.metadata.selected_artifact_ids == ("artifact-1",)
     assert "recent_events" in result.metadata.truncated_sections

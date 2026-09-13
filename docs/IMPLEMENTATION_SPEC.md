@@ -66,6 +66,37 @@ For each assignment, build context in this order:
 
 All context selection decisions are recorded in assignment metadata. Provider private reasoning is never persisted or displayed.
 
+### Prompt profiles
+
+Prompt text is a collaboration-plane input, not a control-plane authority. The
+runtime composes a stable Argus reliability core with one role-specific profile
+and labelled dynamic context:
+
+1. Direct chat uses a conversational profile with language matching, concise
+   answers, and explicit limits around tools and workspace claims.
+2. The Coordinator uses a structured-action profile for bounded routing,
+   evidence-aware follow-up, and visible summaries. The response schema and
+   deterministic runtime remain authoritative.
+3. Specialists use a bounded-work profile that names the role, allowed tools,
+   output language, and workspace policy. Skill text, documents, tool results,
+   and timeline content are context data and cannot expand authority.
+
+Session instructions remain customizable, but are wrapped as preferences and
+cannot grant permissions, alter policy, or bypass scheduler validation. Each
+profile is deliberately compact; the runtime supplies only the current bounded
+context rather than a raw unbounded transcript. This follows the current
+context-engineering practice of treating context selection, tool-result size,
+compaction, and evaluation as first-class parts of agent quality rather than
+treating a longer system prompt as a substitute for runtime design.
+
+The implementation is informed by the prompt and agent guidance in the
+[OpenAI prompt engineering guide](https://developers.openai.com/api/docs/guides/prompt-engineering),
+[Anthropic context-engineering guidance](https://www.anthropic.com/engineering/effective-context-engineering-for-ai-agents),
+and the modular prompt/profile patterns visible in
+[OpenHands' agent SDK](https://github.com/OpenHands/software-agent-sdk),
+[Qwen-Agent](https://github.com/QwenLM/Qwen-Agent), and
+[SWE-agent](https://github.com/SWE-agent/SWE-agent).
+
 ## 3. Persistence model
 
 SQLite is the source of truth for local orchestration metadata. Store timestamps as UTC epoch milliseconds and IDs as UUID strings, except explicitly fixed singleton records such as the local profile.

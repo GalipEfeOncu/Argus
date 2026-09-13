@@ -119,6 +119,8 @@ async def test_start_is_single_flight_and_uses_stored_goal_and_immutable_binding
 
     assert resolutions == [(profile_id, "configured-model")]
     assert requests[0].messages[-1] == {"role": "user", "content": "Use the stored goal exactly."}
+    assert '<mode name="coordinator">' in requests[0].messages[0]["content"]
+    assert "deterministic runtime validates every action" in requests[0].messages[0]["content"]
     assert requests[0].response_schema is not None
 
 

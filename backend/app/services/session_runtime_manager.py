@@ -26,20 +26,12 @@ from app.schemas.coordinator_actions import (
 from app.services.assignment_scheduler import AssignmentScheduler, SchedulerRejected
 from app.services.coordinator_cycle import CoordinatorCycle, CoordinatorCycleResult
 from app.services.provider_profile_service import ProviderProfileService
+from app.services.prompt_service import build_coordinator_system_prompt, build_direct_chat_system_prompt
 from app.services.session_configuration_service import SessionConfigurationService
 
 
 ProviderResolver = Callable[[str, str], Awaitable[Provider]]
 EventPublisher = Callable[[str, list[dict]], Awaitable[None]]
-
-DIRECT_CHAT_GUIDANCE = """You are Argus, a concise and capable general assistant.
-Answer the user's latest message directly and naturally in the user's language.
-If the user writes Turkish, answer in natural Turkish; do not announce that you can speak Turkish.
-Do not repeat introductions, capabilities, or facts already stated unless the user asks.
-For simple questions, be brief. Use short paragraphs or bullets only when helpful.
-Do not add a generic capability list or a closing question unless it is useful.
-Do not claim to have browsed, used tools, edited files, or know hidden provider/model details.""".strip()
-
 
 class SessionRuntimeManager:
     """Own one idempotent background Coordinator turn per live session."""
@@ -174,7 +166,7 @@ class SessionRuntimeManager:
             request = ProviderRequest(
                 request_id=f"coordinator_{uuid.uuid4().hex}", model_id=model_id,
                 messages=(
-                    {"role": "system", "content": f"{system_prompt}\nAvailable specialist snapshots: {participant_context}"},
+                    {"role": "system", "content": build_coordinator_system_prompt(system_prompt, participant_context)},
                     {"role": "user", "content": goal},
                     *(await self._recent_human_messages(db, session_id)),
                     *(({"role": "user", "content": specialist_context},) if specialist_context else ()),
@@ -241,7 +233,7 @@ class SessionRuntimeManager:
             await self._commit_chat_error(db, session_id, "chat_provider_unavailable", "The configured provider is unavailable. Check its credential and try again.")
             return
 
-        direct_system_prompt = f"{DIRECT_CHAT_GUIDANCE}\n\nSession-specific instructions:\n{system_prompt.strip()}"
+        direct_system_prompt = build_direct_chat_system_prompt(system_prompt)
         request = ProviderRequest(
             request_id=f"chat_{uuid.uuid4().hex}", model_id=model_id,
             messages=(

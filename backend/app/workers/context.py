@@ -9,6 +9,8 @@ import logging
 import re
 from typing import Literal
 
+from app.services.prompt_service import build_specialist_system_prompt
+
 
 _SENSITIVE_VALUE = re.compile(
     r"(?:sk-[A-Za-z0-9_-]{12,}|Bearer\s+\S+|AIza[\w-]{20,}|"
@@ -121,7 +123,14 @@ class AssignmentContextBuilder:
         project_identity: str | None = None,
         workspace_policy: str | None = None,
     ) -> BuiltContext:
-        safe_system_prompt = _redact(agent.system_prompt)
+        safe_system_prompt = _redact(build_specialist_system_prompt(
+            agent.system_prompt,
+            role=agent.role,
+            tools=agent.tool_allowlist,
+            output_language=agent.output_language,
+            workspace_policy=workspace_policy,
+            compact=self._limits.max_characters < 4_000,
+        ))
         system_prompt = safe_system_prompt[:self._limits.max_characters]
         sections: list[tuple[str, str]] = []
         truncated: list[str] = []
@@ -139,6 +148,7 @@ class AssignmentContextBuilder:
             f"permission profile {agent.permission_profile or 'session policy'}"
         )
         sections.append(("agent_snapshot", self._safe("Agent snapshot", agent_description)))
+        skill_references: list[tuple[str, str]] = []
         for skill in agent.skill_snapshots:
             skill_id = str(skill.get("id", "unknown"))
             version = str(skill.get("version", "unknown"))
@@ -152,21 +162,14 @@ class AssignmentContextBuilder:
             if isinstance(references, (list, tuple)):
                 for reference in references:
                     if isinstance(reference, dict):
-                        sections.append(("skill_reference", self._safe(
+                        skill_references.append(("skill_reference", self._safe(
                             f"Untrusted skill reference ({reference.get('path', 'reference')})",
                             str(reference.get("content", "")),
                         )))
         sections.append(("goal", self._safe("Goal", goal)))
-        if project_identity:
-            sections.append(("project", self._safe("Project", project_identity)))
-        if workspace_policy:
-            sections.append(("workspace_policy", self._safe("Workspace policy", workspace_policy)))
-        sections.append(("assignment", self._safe("Assignment acceptance criteria", assignment.acceptance_criteria)))
-        if assignment.parent_message:
-            sections.append(("parent_message", self._safe("Parent message", assignment.parent_message)))
-        if assignment.handoff:
-            sections.append(("handoff", self._safe("Handoff", assignment.handoff)))
 
+        # Preserve unresolved human constraints and recent evidence ahead of
+        # optional metadata when the context ceiling is small.
         unresolved = [item for item in recent_events if item.kind == "human_instruction" and item.unresolved]
         for item in unresolved[-self._limits.max_unresolved_instructions:]:
             sections.append(("unresolved_instruction", self._safe("Unresolved human instruction", item.summary)))
@@ -181,6 +184,21 @@ class AssignmentContextBuilder:
             event_ids.append(item.event_id)
         if len(recent_events) > self._limits.max_recent_events:
             truncated.append("recent_events")
+
+        if project_identity:
+            sections.append(("project", self._safe("Project", project_identity)))
+        if workspace_policy:
+            sections.append(("workspace_policy", self._safe("Workspace policy", workspace_policy)))
+        sections.append(("assignment", self._safe("Assignment acceptance criteria", assignment.acceptance_criteria)))
+        if assignment.parent_message:
+            sections.append(("parent_message", self._safe("Parent message", assignment.parent_message)))
+        if assignment.handoff:
+            sections.append(("handoff", self._safe("Handoff", assignment.handoff)))
+
+        # A bounded goal and acceptance criteria are more useful than a long
+        # reference when the total context budget is tight. References remain
+        # available after the high-signal assignment context.
+        sections.extend(skill_references)
 
         if summary:
             sections.append(("durable_summary", self._safe("Durable session summary", summary)))
@@ -225,19 +243,23 @@ class AssignmentContextBuilder:
     def _bounded_prompt(self, sections: list[tuple[str, str]], *, max_characters: int) -> tuple[str, list[str], bool]:
         output: list[str] = []
         included: list[str] = []
-        remaining = max_characters
         for name, section in sections:
-            rendered = f"{section}\n"
-            if len(rendered) <= remaining:
+            rendered = section.strip()
+            candidate = "\n\n".join((*output, rendered))
+            if len(candidate) <= max_characters:
                 output.append(rendered)
                 included.append(name)
-                remaining -= len(rendered)
                 continue
-            if remaining > 0:
-                output.append(f"{rendered[: max(0, remaining - 1)]}…")
+
+            prefix = "\n\n".join(output)
+            separator = "\n\n" if output else ""
+            available = max_characters - len(prefix) - len(separator)
+            if available > 0:
+                clipped = rendered[: max(0, available - 1)] + "…"
                 included.append(name)
-            return "\n".join(output).strip(), included, True
-        return "\n".join(output).strip(), included, False
+                return f"{prefix}{separator}{clipped}"[:max_characters].strip(), included, True
+            return prefix.strip(), included, True
+        return "\n\n".join(output).strip(), included, False
 
 
 def log_context_selection(metadata: ContextSelectionMetadata) -> None:
