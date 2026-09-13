@@ -98,6 +98,10 @@ class ParticipantStatusChangedEvent(EventEnvelope):
 
 
 class MessageCreatedPayload(CamelModel):
+    # Model and user message content is significant text; the shared model
+    # default must not trim meaningful leading/trailing whitespace.
+    model_config = ConfigDict(str_strip_whitespace=False)
+
     message_id: Identifier
     author_id: Identifier
     author_kind: Literal["human", "system", "coordinator", "agent"]
@@ -112,6 +116,10 @@ class MessageCreatedEvent(EventEnvelope):
 
 
 class MessageDeltaPayload(CamelModel):
+    # A streamed token often begins with a space. Preserve it or words will
+    # be joined when the canonical event crosses the wire.
+    model_config = ConfigDict(str_strip_whitespace=False)
+
     message_id: Identifier
     delta: Content
 

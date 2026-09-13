@@ -87,6 +87,24 @@ def test_schemas_are_discriminated_and_do_not_expose_sensitive_payload_fields() 
         assert "privatereasoning" not in serialized
 
 
+def test_message_streaming_preserves_meaningful_whitespace() -> None:
+    event = {
+        "version": 1,
+        "eventId": "evt_delta_whitespace",
+        "sessionId": "session_whitespace",
+        "sequence": 1,
+        "timestamp": "2026-07-19T12:00:00Z",
+        "actorId": "coordinator",
+        "type": "message.delta",
+        "payload": {"messageId": "message_whitespace", "delta": " How can I help?"},
+    }
+
+    parsed = parse_session_event(event)
+
+    assert parsed.payload.delta == " How can I help?"
+    assert parsed.model_dump(by_alias=True, mode="json", exclude_none=True) == event
+
+
 @pytest.mark.parametrize(
     ("parser", "value"),
     [

@@ -104,7 +104,7 @@ of snapshot compaction.
 | `session.snapshot` | Current session projection for initial load or resync |
 | `session.status_changed` | Lifecycle transition |
 | `participant.status_changed` | Idle, working, waiting, paused, errored, or stopped state |
-| `message.created` / `message.delta` / `message.completed` | Shared-room message streaming |
+| `message.created` / `message.delta` / `message.completed` | Shared-room message streaming; message content and deltas preserve meaningful whitespace |
 | `session.configuration_updated` | Audited future-facing team, gate, limit, or approval-policy update |
 | `assignment.proposed` | Coordinator or specialist proposal awaiting scheduler validation |
 | `assignment.created` / `assignment.started` | Accepted delegation and worker start |
