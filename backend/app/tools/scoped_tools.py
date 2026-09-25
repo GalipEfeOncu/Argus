@@ -26,6 +26,7 @@ from app.services.workspace_service import (
     ScopedToolService,
     WorkspaceError,
     WorkspaceRecord,
+    is_sensitive_workspace_path,
     resolve_workspace_path,
 )
 
@@ -123,10 +124,7 @@ def create_scoped_tools(workspace: WorkspaceRecord, *, tool_allowlist: Iterable[
     def list_dir(path: str = ".") -> str:
         """List one directory inside the active session workspace."""
         try:
-            directory = resolve_workspace_path(workspace.root_path, path, must_exist=True)
-            if not directory.is_dir():
-                return "Error: path is not a directory"
-            return "\n".join(sorted(item.name for item in directory.iterdir() if not item.is_symlink()))
+            return "\n".join(service.list_directory(path))
         except (OSError, WorkspaceError) as error:
             return _result_error(error)
 
@@ -137,7 +135,7 @@ def create_scoped_tools(workspace: WorkspaceRecord, *, tool_allowlist: Iterable[
             directory = resolve_workspace_path(workspace.root_path, path, must_exist=True)
             extensions = tuple(filter(None, (item.strip() for item in file_types.split(","))))
             relative_directory = directory.relative_to(workspace.root_path)
-            if any(part.startswith(".") for part in relative_directory.parts):
+            if is_sensitive_workspace_path(relative_directory):
                 return "No matches found"
             argv = ["rg", "--fixed-strings", "--line-number", "--color=never", "--max-count=5"]
             for extension in extensions:
@@ -146,7 +144,27 @@ def create_scoped_tools(workspace: WorkspaceRecord, *, tool_allowlist: Iterable[
             argv.extend(("--", pattern, "." if relative_argument == "." else relative_argument))
             try:
                 result = service.run(argv, timeout_seconds=15)
-                return (result.stdout or result.stderr or "No matches found")[:3000]
+                if directory.is_file():
+                    try:
+                        service.read_text(relative_directory.as_posix(), max_characters=1_000_000)
+                    except (OSError, UnicodeError, WorkspaceError):
+                        return "No matches found"
+                    return result.stdout[:3000] or "No matches found"
+                safe_matches: list[str] = []
+                for line in result.stdout.splitlines():
+                    match_path, separator, remainder = line.partition(":")
+                    line_number, separator, match_content = remainder.partition(":")
+                    if not separator or not line_number.isdecimal() or is_sensitive_workspace_path(match_path):
+                        continue
+                    try:
+                        source_lines = service.read_text(match_path, max_characters=1_000_000).splitlines()
+                    except (OSError, UnicodeError, WorkspaceError):
+                        continue
+                    index = int(line_number) - 1
+                    if index < 0 or index >= len(source_lines) or source_lines[index] != match_content:
+                        continue
+                    safe_matches.append(line)
+                return "\n".join(safe_matches)[:3000] or "No matches found"
             except FileNotFoundError:
                 matches: list[str] = []
                 scanned_files = 0
@@ -197,7 +215,7 @@ def create_scoped_tools(workspace: WorkspaceRecord, *, tool_allowlist: Iterable[
 
                 def search_candidate(candidate: Path) -> str | None:
                     nonlocal scanned_files
-                    if candidate.is_symlink() or any(part.startswith(".") for part in candidate.relative_to(workspace.root_path).parts):
+                    if candidate.is_symlink() or is_sensitive_workspace_path(candidate.relative_to(workspace.root_path)):
                         return None
                     scanned_files += 1
                     if scanned_files > 10_000:
@@ -236,7 +254,7 @@ def create_scoped_tools(workspace: WorkspaceRecord, *, tool_allowlist: Iterable[
                             if time.monotonic() >= deadline:
                                 return "\n".join(matches)[:3000] or "No matches found (15-second scan limit reached)"
                             candidate = Path(entry.path)
-                            if entry.name.startswith(".") or entry.is_symlink():
+                            if is_sensitive_workspace_path(entry.name) or entry.is_symlink():
                                 continue
                             try:
                                 if entry.is_dir(follow_symlinks=False):

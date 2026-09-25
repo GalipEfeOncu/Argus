@@ -20,6 +20,7 @@ class RecoveryReport:
     unknown_provider_operations: int
     unknown_acceptance_actions: int
     compacted_snapshots: int
+    interrupted_instructions: int = 0
 
 
 class RecoveryService:
@@ -32,7 +33,7 @@ class RecoveryService:
     async def recover_after_restart(self) -> RecoveryReport:
         async with self._db.execute("SELECT id FROM sessions WHERE status != 'setup' ORDER BY created_at_ms") as cursor:
             session_ids = [str(row["id"]) for row in await cursor.fetchall()]
-        orphaned_attempts = unknown_tools = unknown_provider_operations = unknown_acceptance_actions = compacted = 0
+        orphaned_attempts = unknown_tools = unknown_provider_operations = unknown_acceptance_actions = compacted = interrupted_instructions = 0
         for session_id in session_ids:
             # The session table is a cache; immutable events remain the source
             # of truth even if the previous process stopped between writes.
@@ -48,9 +49,41 @@ class RecoveryService:
                 session_id, blocked_assignment_ids=frozenset(unknown_tool_ids | unknown_provider_ids),
             )
             orphaned_attempts += len(recovered_attempts)
+            interrupted_instructions += await self._recover_incomplete_instructions(session_id)
             compacted += await self._events.compact_snapshots(session_id)
         await self._forfeit_stale_reservations()
-        return RecoveryReport(len(session_ids), orphaned_attempts, unknown_tools, unknown_provider_operations, unknown_acceptance_actions, compacted)
+        return RecoveryReport(len(session_ids), orphaned_attempts, unknown_tools, unknown_provider_operations, unknown_acceptance_actions, compacted, interrupted_instructions)
+
+    async def _recover_incomplete_instructions(self, session_id: str) -> int:
+        """Make a lost delivery attempt visible without replaying ambiguous work."""
+
+        async with transaction(self._db):
+            async with self._db.execute(
+                """SELECT instruction.id, session.status FROM participant_instructions instruction
+                   JOIN sessions session ON session.id = instruction.session_id
+                   WHERE instruction.session_id = ? AND instruction.state = 'delivered'
+                     AND instruction.delivery_started_at_ms IS NOT NULL
+                     AND instruction.delivery_finished_at_ms IS NULL""", (session_id,),
+            ) as cursor:
+                rows = await cursor.fetchall()
+            now = _now_ms()
+            for row in rows:
+                if row["status"] not in {"completed", "completed_partial", "cancelled", "failed"}:
+                    payload = {
+                        "errorId": f"instruction_recovery_{row['id']}", "code": "instruction_delivery_interrupted",
+                        "summary": "The sidecar stopped during instruction delivery. Its provider outcome is uncertain; the instruction was not reissued.",
+                        "recoverable": True,
+                    }
+                    await self._events._append_in_transaction(
+                        event_id=f"evt_{uuid.uuid4().hex}", session_id=session_id, event_type="error.created", actor_id="system",
+                        payload=payload, payload_json=_safe_json(payload), timestamp_ms=now, correlation_id=None, command_id=None,
+                    )
+                await self._db.execute(
+                    """UPDATE participant_instructions SET state = 'superseded', superseded_at_ms = ?,
+                       delivery_finished_at_ms = ? WHERE id = ?""",
+                    (now, now, row["id"]),
+                )
+            return len(rows)
 
     async def _recover_acceptance_actions(self, session_id: str) -> int:
         """Never repeat a source-project apply after a crash mid-operation."""

@@ -132,6 +132,13 @@ class CommandProcessor:
             if command.type in {"session.cancel", "participant.interrupt"}:
                 from app.services.limit_resolution_service import LimitResolutionService
                 await LimitResolutionService(self._db).cancel_pending_in_transaction(session_id)
+                if command.type == "session.cancel":
+                    await self._db.execute(
+                        "UPDATE participant_instructions SET state = 'superseded', superseded_at_ms = ? WHERE session_id = ? AND state = 'pending'",
+                        (_now_ms(), session_id),
+                    )
+                else:
+                    await ParticipantInstructionService(self._db).supersede_pending(session_id, command.payload.participant_id)
             if interrupted_assignments:
                 await self._db.executemany(
                     "UPDATE assignments SET state = 'interrupted', updated_at_ms = ? WHERE id = ? AND session_id = ?",
@@ -259,6 +266,8 @@ class CommandProcessor:
     ) -> list[tuple[str, str, dict[str, Any]]]:
         payload = command.payload
         if command.type == "message.send":
+            if status in {"completed", "completed_partial", "cancelled", "failed"}:
+                raise CommandRejected("session_terminal")
             return [("message.created", "human", {
                 "messageId": f"msg_{command.command_id}", "authorId": "human",
                 "authorKind": "human", "content": payload.content, "mentionIds": payload.mention_ids,

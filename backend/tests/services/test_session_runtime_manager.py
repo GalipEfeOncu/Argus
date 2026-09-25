@@ -713,7 +713,9 @@ async def test_read_only_specialist_tool_result_returns_to_coordinator_and_compl
     try:
         await _start(database)
         await manager.start("runtime-session")
-        await _wait_for_status(database, "completed")
+        await asyncio.wait_for(manager.wait("runtime-session"), timeout=5)
+        async with database.execute("SELECT status FROM sessions WHERE id = 'runtime-session'") as cursor:
+            assert (await cursor.fetchone())["status"] == "completed"
         events = await EventRepository(database).list_for_session("runtime-session")
         async with database.execute("SELECT exit_state, request_summary, result_summary FROM tool_executions") as cursor:
             tool = await cursor.fetchone()

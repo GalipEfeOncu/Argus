@@ -31,6 +31,17 @@ All notable user-visible changes to Argus are recorded here. The project follows
 
 ### Fixed
 
+- Model-facing workspace inspection now withholds sensitive project files and
+  detected secret content before provider delivery.
+- Locked frontend, Python, and Rust dependencies now include available fixes
+  for the high-severity advisories reported by the pre-release audit.
+- Human follow-up messages and explicit specialist mentions now resume their
+  intended runtime work in order; eligible interrupted specialist work resumes
+  after restart.
+- One-time human approvals now unlock exactly one matching operation under
+  `ask_each_time`; subsequent requests require a fresh decision.
+- The Dashboard now distinguishes a failed local catalogue load from an empty
+  session list, and its first-session action opens project-session setup.
 - Chat, Coordinator, and specialist turns now use separate layered prompt profiles with labelled session context, concise output guidance, and explicit evidence/runtime boundaries instead of sharing one generic system prompt.
 - Provider credentials now use the operating-system keyring on Linux and wake
   an idle native sidecar before handing a key to the local runtime.

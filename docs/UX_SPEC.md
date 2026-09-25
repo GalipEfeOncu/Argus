@@ -38,6 +38,10 @@ runtime. It shows compact loading, empty, and retryable error states without
 inventing sample projects, account identity, subscription status, or actions
 that the runtime does not support. Selecting a project filters the durable
 session list; selecting a session opens its real project/session breadcrumb.
+When the local catalogue fails and no sessions are cached, the dashboard shows
+the retryable error without claiming that no sessions exist. Its first-session
+action opens project-session setup, matching the Coordinator and specialist
+description shown beside it.
 
 ## Shared room
 

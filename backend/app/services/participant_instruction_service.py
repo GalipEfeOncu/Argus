@@ -17,6 +17,7 @@ class ParticipantInstruction:
     participant_id: str
     delivery_kind: str
     state: str
+    message_event_id: str = ""
 
 
 class ParticipantInstructionService:
@@ -57,12 +58,59 @@ class ParticipantInstructionService:
 
     async def pending_for(self, session_id: str, participant_id: str) -> tuple[ParticipantInstruction, ...]:
         async with self._db.execute(
-            """SELECT id, participant_id, delivery_kind, state FROM participant_instructions
-               WHERE session_id = ? AND participant_id = ? AND state = 'pending' ORDER BY created_at_ms, id""",
+            """SELECT instruction.id, instruction.participant_id, instruction.delivery_kind,
+                      instruction.state, instruction.message_event_id FROM participant_instructions instruction
+               JOIN events event ON event.id = instruction.message_event_id
+               WHERE instruction.session_id = ? AND instruction.participant_id = ? AND instruction.state = 'pending'
+               ORDER BY event.sequence, instruction.id""",
             (session_id, participant_id),
         ) as cursor:
             rows = await cursor.fetchall()
-        return tuple(ParticipantInstruction(row["id"], row["participant_id"], row["delivery_kind"], row["state"]) for row in rows)
+        return tuple(ParticipantInstruction(row["id"], row["participant_id"], row["delivery_kind"], row["state"], row["message_event_id"]) for row in rows)
+
+    async def next_pending(self, session_id: str) -> ParticipantInstruction | None:
+        """Select the oldest instruction; keep it pending until delivery finishes."""
+
+        async with self._db.execute(
+            """SELECT instruction.id, instruction.participant_id, instruction.delivery_kind,
+                      instruction.message_event_id FROM participant_instructions instruction
+               JOIN events event ON event.id = instruction.message_event_id
+               JOIN sessions session ON session.id = instruction.session_id
+               WHERE instruction.session_id = ? AND instruction.state = 'pending'
+                 AND session.status = 'running'
+               ORDER BY event.sequence, instruction.id LIMIT 1""",
+            (session_id,),
+        ) as cursor:
+            row = await cursor.fetchone()
+        if row is None:
+            return None
+        return ParticipantInstruction(row["id"], row["participant_id"], row["delivery_kind"], "pending", row["message_event_id"])
+
+    async def mark_started(self, instruction_id: str) -> bool:
+        from app.db.database import transaction
+        async with transaction(self._db):
+            cursor = await self._db.execute(
+                """UPDATE participant_instructions SET state = 'delivered', delivery_started_at_ms = ?
+                   WHERE id = ? AND state = 'pending'""",
+                (_now_ms(), instruction_id),
+            )
+            return cursor.rowcount == 1
+
+    async def mark_finished(self, instruction_id: str) -> None:
+        from app.db.database import transaction
+        async with transaction(self._db):
+            await self._db.execute(
+                """UPDATE participant_instructions SET delivery_finished_at_ms = ?
+                   WHERE id = ? AND state = 'delivered' AND delivery_finished_at_ms IS NULL""",
+                (_now_ms(), instruction_id),
+            )
+
+    async def has_pending(self, session_id: str, *, exclude_id: str | None = None) -> bool:
+        async with self._db.execute(
+            "SELECT 1 FROM participant_instructions WHERE session_id = ? AND state = 'pending' AND id != ? LIMIT 1",
+            (session_id, exclude_id or ""),
+        ) as cursor:
+            return await cursor.fetchone() is not None
 
     async def _resolve_targets(self, session_id: str, mention_ids: list[str]) -> tuple[tuple[str, str], ...]:
         try:

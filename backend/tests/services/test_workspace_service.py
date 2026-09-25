@@ -177,6 +177,53 @@ async def test_scoped_tools_apply_the_session_agent_allowlist(temporary_sqlite_d
 
 
 @pytest.mark.asyncio
+async def test_model_read_tools_withhold_nested_secret_paths_and_secret_bearing_content(
+    temporary_sqlite_db, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    project = tmp_path / "plain"
+    (project / "nested").mkdir(parents=True)
+    secret = "synthetic-secret-value-12345"
+    (project / ".env").write_text(f"API_TOKEN={secret}\n", encoding="utf-8")
+    (project / "nested" / ".env.production").write_text(f"API_TOKEN={secret}\n", encoding="utf-8")
+    (project / "nested" / "service.pem").write_text(f"-----BEGIN PRIVATE KEY-----\n{secret}\n", encoding="utf-8")
+    (project / "nested" / "config.txt").write_text(f"API_TOKEN={secret}\nordinary=visible\n", encoding="utf-8")
+    (project / "nested" / "settings.json").write_text(
+        f'{{\n  "api_key": "{secret}",\n  "ordinary": "visible"\n}}\n', encoding="utf-8",
+    )
+    (project / "nested" / "safe.txt").write_text("ordinary=visible\n", encoding="utf-8")
+    database = await get_db()
+    try:
+        await _session(database, "secret-tools")
+        service = ProjectWorkspaceService(database, managed_root=tmp_path / "managed")
+        registered = await service.register_project(str(project))
+        workspace = await service.prepare_workspace(
+            session_id="secret-tools", project_id=registered["id"], mode=WorkspaceMode.snapshot,
+        )
+        scoped = ScopedToolService(workspace)
+        for path in (".env", "nested/.env.production", "nested/service.pem", "nested/config.txt", "nested/settings.json"):
+            with pytest.raises(WorkspaceScopeError, match="sensitive workspace content"):
+                scoped.read_text(path)
+        assert scoped.read_text("nested/safe.txt") == "ordinary=visible\n"
+        assert ".env" not in scoped.list_directory()
+        assert ".env.production" not in scoped.list_directory("nested")
+        assert "service.pem" not in scoped.list_directory("nested")
+        assert scoped.search_text("ordinary") == ["nested/safe.txt:1:ordinary=visible"]
+        assert scoped.search_text(secret) == []
+        with pytest.raises(WorkspaceScopeError, match="sensitive workspace content"):
+            scoped.search_text(secret, "nested/.env.production")
+
+        by_name = {tool.name: tool for tool in create_scoped_tools(workspace)}
+        assert secret not in by_name["search_files"].invoke({"pattern": "ordinary", "path": "."})
+        assert "nested/safe.txt" in by_name["search_files"].invoke({"pattern": "ordinary", "path": "."})
+        assert secret not in by_name["search_files"].invoke({"pattern": secret, "path": "."})
+        monkeypatch.setenv("PATH", "")
+        assert secret not in by_name["search_files"].invoke({"pattern": "ordinary", "path": "."})
+        assert by_name["read_file"].invoke({"path": "nested/.env.production"}).startswith("Error:")
+    finally:
+        await database.close()
+
+
+@pytest.mark.asyncio
 async def test_workspace_tools_reject_escape_symlink_shell_injection_secrets_and_destructive_commands(temporary_sqlite_db, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     project = tmp_path / "plain"
     project.mkdir()
@@ -270,7 +317,7 @@ async def test_workspace_tools_reject_escape_symlink_shell_injection_secrets_and
     assert adversarial == "No matches found"
     assert regex_like_with_rg == regex_like == "No matches found"
     assert option_like_with_rg == option_like == "No matches found"
-    assert "safe-ignored" in direct_ignored_with_rg and "safe-ignored" in direct_ignored
+    assert direct_ignored_with_rg == direct_ignored == "No matches found"
     assert "types.d.ts:1:typed-needle" in direct_multi_extension
     assert timed_out == "No matches found (15-second scan limit reached)"
     assert fail_closed == "Error: workspace ignore rules could not be evaluated"

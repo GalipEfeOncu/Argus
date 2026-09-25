@@ -92,6 +92,11 @@ recorded as a failed visible operation with an **unknown outcome**; it is never
 replayed automatically. Recoverable work is left as a durable, queued recovery
 attempt with its last checkpoint; the owned worker dispatcher may resume it
 only through normal scheduler policy, never because a browser reconnected.
+At startup the dispatcher wakes running sessions with queued read-only
+assignments or pending human instructions. An instruction whose delivery began
+but did not finish before the process stopped gets a visible recoverable error;
+its uncertain provider turn is not silently repeated. Instructions that never
+began remain pending for the next eligible turn.
 
 Projection snapshots are checksummed, rebuildable caches. Argus retains a
 bounded number per session and never deletes append-only event records as part
@@ -233,6 +238,15 @@ runtime emits `running` and invokes the immutable Coordinator binding with the
 stored goal, bounded recent human messages, available participant metadata, and
 the strict Coordinator action schema. It never falls back to a scripted or
 built-in provider.
+While a session is running, each accepted human `message.send` records a
+durable participant instruction. Unmentioned messages wake the Coordinator;
+an explicit mention wakes the named participant through a bounded read-only
+assignment and normal scheduler permission checks. New messages arriving
+during a provider turn wait for a distinct next turn in event order. A direct
+chat reply is correlated with its requesting human message so overlapping
+human sends rebuild in conversational order. A paused session retains messages
+until `session.resume`; terminal sessions reject new messages. Explicit mentions
+cannot invoke the unavailable mutating specialist executor.
 The runtime composes a role-specific Argus prompt profile around the immutable
 session instructions: direct chat, Coordinator routing, and specialist work
 have separate behavior and output guidance. Dynamic context is labelled and
@@ -282,7 +296,9 @@ allowing clients to clear pending state.
 The backend evaluates every capability request in this order: non-bypassable
 denial, canonical workspace scope, permission profile, capability override,
 stored policy-bound grant, then approval behavior. The most restrictive result
-wins. `ask_each_time` never reuses a grant; `deny_interactive` never creates a
+wins. `ask_each_time` accepts only an exact-scope, one-time human grant and
+consumes it at the operation boundary; the next request asks again.
+`deny_interactive` never creates a
 prompt and returns a visible denial for ungranted work. `preauthorize_session`
 creates auditable, expiring session grants at start after the required
 acknowledgement. Coordinator output cannot resolve an approval or manufacture a

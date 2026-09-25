@@ -81,9 +81,16 @@ allowlist and requires `workspace.read`; the only executable names are
 `read_file`, `list_dir`, and `search_files`. Absolute paths, parent traversal,
 workspace escape, symbolic links, malformed or duplicate tool-call IDs, and
 unknown tools fail closed before filesystem access. Raw tool arguments and file
-contents may be returned to the configured provider for that bounded turn, but
-are not written to events, tool audit rows, logs, or support exports. Mutating
-proposals never enter this executor.
+contents may be returned to the configured provider for that bounded turn only
+after the workspace read service screens secret-bearing paths and recognizable
+credential content. The same screen applies to direct reads and search results;
+directory listings omit sensitive names. It denies rather than redacts a file
+when its content matches a known credential pattern, including quoted JSON,
+YAML, and environment assignments. This pattern screen cannot identify an
+arbitrary unlabelled secret in otherwise ordinary source text, so users should
+keep such material outside projects selected for model inspection. Raw
+arguments and file contents are not written to events, tool audit rows, logs,
+or support exports. Mutating proposals never enter this executor.
 
 ## Local skill packages
 

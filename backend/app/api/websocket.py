@@ -117,10 +117,7 @@ async def canonical_session_websocket(
                     # committed and offered to connected consumers.
                     await session_runtime_manager.start(session_id)
                 elif command.type == "message.send" and not outcome.duplicate:
-                    async with db.execute("SELECT session_type FROM sessions WHERE id = ?", (session_id,)) as cursor:
-                        session_kind = await cursor.fetchone()
-                    if session_kind is not None and session_kind["session_type"] == "chat":
-                        await session_runtime_manager.start(session_id)
+                    await session_runtime_manager.start(session_id)
                 elif command.type in {"participant.interrupt", "session.cancel"} and not outcome.duplicate:
                     await session_runtime_manager.interrupt(session_id)
             except WebSocketDisconnect:

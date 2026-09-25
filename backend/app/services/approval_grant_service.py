@@ -115,6 +115,12 @@ class ApprovalGrantService:
             reason = "No-interruption mode denies requests without an active pre-authorization." if behavior == "deny_interactive" else "The session pre-authorization does not cover this capability."
             return AuthorityDecision("deny", reason)
         if behavior == "ask_each_time":
+            grant = await self._matching_grant(
+                session_id, snapshot.policy_hash, capability, scope_path, consume_once,
+                once_only=True,
+            )
+            if grant is not None:
+                return AuthorityDecision("allow", "A one-time human approval allows this request.", str(grant["id"]))
             return AuthorityDecision("ask", "The selected behavior requires a human decision for every request.")
         if base == "allow":
             return AuthorityDecision("allow", "The selected permission profile allows this workspace-scoped request.")
@@ -170,6 +176,8 @@ class ApprovalGrantService:
             if fresh.outcome == "deny":
                 raise ApprovalRejected("approval_policy_denied", "Current policy no longer permits this grant.")
             grant_scope = payload.grant_scope or "once"
+            if snapshot.approval_policy["behavior"] == "ask_each_time" and grant_scope != "once":
+                raise ApprovalRejected("one_time_grant_required", "This behavior permits only one-time approvals.")
             duration = payload.grant_duration_seconds * 1000 if payload.grant_duration_seconds is not None else _DEFAULT_GRANT_MS[grant_scope]
             expiry = now + duration
             await self._db.execute(
@@ -228,7 +236,10 @@ class ApprovalGrantService:
             (_now_ms(), session_id, policy_hash),
         )
 
-    async def _matching_grant(self, session_id: str, policy_hash: str, capability: str, scope_path: str, consume_once: bool) -> aiosqlite.Row | None:
+    async def _matching_grant(
+        self, session_id: str, policy_hash: str, capability: str, scope_path: str,
+        consume_once: bool, *, once_only: bool = False,
+    ) -> aiosqlite.Row | None:
         now = _now_ms()
         async with self._db.execute(
             """SELECT * FROM approvals WHERE session_id = ? AND capability = ? AND decision = 'granted'
@@ -238,6 +249,8 @@ class ApprovalGrantService:
         ) as cursor:
             grants = await cursor.fetchall()
         for grant in grants:
+            if once_only and grant["grant_scope"] != "once":
+                continue
             granted_path = str(grant["scope_path"])
             in_scope = scope_path == granted_path or scope_path.startswith(f"{granted_path.rstrip('/')}/")
             if grant["grant_scope"] == "scope" and not in_scope:

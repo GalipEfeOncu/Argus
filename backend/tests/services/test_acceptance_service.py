@@ -17,7 +17,9 @@ from app.services.session_configuration_service import SessionConfigurationServi
 from app.services.workspace_service import ProjectWorkspaceService, ScopedToolService
 
 
-async def _prepared_snapshot(database, tmp_path: Path, session_id: str = "acceptance-session"):
+async def _prepared_snapshot(
+    database, tmp_path: Path, session_id: str = "acceptance-session", *, behavior: str = "ask_by_policy",
+):
     source = tmp_path / "project"
     source.mkdir()
     (source / "README.md").write_text("base\n", encoding="utf-8")
@@ -33,7 +35,7 @@ async def _prepared_snapshot(database, tmp_path: Path, session_id: str = "accept
         coordinator_id="coordinator",
         configuration=SessionConfigurationInput(
             availableAgentIds=["builder"],
-            approvalPolicy=ApprovalPolicy(permissionProfile="autonomous", behavior="ask_by_policy"),
+            approvalPolicy=ApprovalPolicy(permissionProfile="autonomous", behavior=behavior),
             acknowledgements=["autonomous_permissions"],
         ),
         workspace_mode="snapshot", acknowledged_direct_write=False,
@@ -44,10 +46,11 @@ async def _prepared_snapshot(database, tmp_path: Path, session_id: str = "accept
 
 
 @pytest.mark.asyncio
-async def test_review_apply_is_policy_checked_idempotent_and_retains_workspace(temporary_sqlite_db, tmp_path: Path) -> None:
+@pytest.mark.parametrize("behavior", ["ask_by_policy", "ask_each_time"])
+async def test_review_apply_is_policy_checked_idempotent_and_retains_workspace(temporary_sqlite_db, tmp_path: Path, behavior: str) -> None:
     database = await get_db()
     try:
-        source, workspace = await _prepared_snapshot(database, tmp_path)
+        source, workspace = await _prepared_snapshot(database, tmp_path, behavior=behavior)
         ScopedToolService(workspace).write_text("README.md", "changed\n")
         service = AcceptanceService(database, managed_root=tmp_path / "managed")
         review = await service.review("acceptance-session")

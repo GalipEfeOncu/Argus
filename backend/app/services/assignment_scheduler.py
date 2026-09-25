@@ -52,9 +52,9 @@ class AssignmentScheduler:
 
     async def accept_coordinator_proposal(
         self, session_id: str, proposal: CoordinatorAssignment, *, parent_id: str | None = None,
-        require_running: bool = False,
+        require_running: bool = False, actor_id: str = "coordinator",
     ) -> str:
-        """Validate and durably accept one Coordinator proposal exactly once."""
+        """Validate and durably accept one Coordinator or explicit-human proposal exactly once."""
 
         raw = proposal.model_dump(by_alias=True, mode="json")
         rejection: SchedulerRejected | None = None
@@ -72,7 +72,7 @@ class AssignmentScheduler:
                 return str(existing["assignment_id"])
             snapshot = await SessionConfigurationService(self._db).current(session_id)
             proposed = await self._event(
-                session_id, "assignment.proposed", "coordinator", {
+                session_id, "assignment.proposed", actor_id, {
                     "proposalId": proposal.proposal_id, "assigneeAgentId": proposal.assignee_agent_id,
                     **({"parentId": parent_id} if parent_id is not None else {}),
                     "objective": proposal.objective, "acceptanceCriteria": proposal.acceptance_criteria,
@@ -113,8 +113,8 @@ class AssignmentScheduler:
                 await self._db.execute(
                     """INSERT INTO assignment_proposals (id, session_id, parent_assignment_id, actor_id, proposal_json,
                        validation_state, validation_code, proposed_event_id, resolved_event_id, created_at_ms)
-                       VALUES (?, ?, ?, 'coordinator', ?, 'rejected', ?, ?, ?, ?)""",
-                    (proposal.proposal_id, session_id, parent_id, _safe_json(raw), rejection.code,
+                       VALUES (?, ?, ?, ?, ?, 'rejected', ?, ?, ?, ?)""",
+                    (proposal.proposal_id, session_id, parent_id, actor_id, _safe_json(raw), rejection.code,
                      proposed.event_id, resolved.event_id, now),
                 )
             else:
@@ -137,8 +137,8 @@ class AssignmentScheduler:
                 await self._db.execute(
                     """INSERT INTO assignment_proposals (id, session_id, parent_assignment_id, actor_id, proposal_json,
                        validation_state, assignment_id, proposed_event_id, resolved_event_id, created_at_ms)
-                       VALUES (?, ?, ?, 'coordinator', ?, 'accepted', ?, ?, ?, ?)""",
-                    (proposal.proposal_id, session_id, parent_id, _safe_json(raw), assignment_id,
+                       VALUES (?, ?, ?, ?, ?, 'accepted', ?, ?, ?, ?)""",
+                    (proposal.proposal_id, session_id, parent_id, actor_id, _safe_json(raw), assignment_id,
                      proposed.event_id, created.event_id, now),
                 )
                 if proposal.operation_class == "mutating" and proposal.finding_fingerprint is not None:

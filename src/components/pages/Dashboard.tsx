@@ -47,19 +47,20 @@ export const Dashboard: React.FC = () => {
           <div className="dashboard-empty" role="status"><p className="dashboard-empty-title">Loading local sessions…</p></div>
         ) : <>
           {error !== null && <div className="dashboard-catalog-alert" role="alert"><div><strong>Local catalogue unavailable</strong><span>{error}</span></div><button type="button" aria-label="Retry loading local projects and sessions" onClick={() => void refresh()}>Retry</button></div>}
-          {visibleSessions.length === 0 ? (
+          {error === null && visibleSessions.length === 0 ? (
           /* ── Empty State ─────────────────────────────────── */
           <div className="dashboard-empty">
             <p className="dashboard-empty-title">No sessions yet</p>
             <p className="dashboard-empty-sub">Start a read-only session with Coordinator and one specialist at a time.</p>
             <button
               className="dashboard-empty-cta"
-              onClick={() => setActivePage('new-chat')}
+              type="button"
+              onClick={() => setActivePage('session-setup')}
             >
               Start your first session
             </button>
           </div>
-          ) : (
+          ) : visibleSessions.length > 0 ? (
           /* ── Session Grid ─────────────────────────────────── */
           <div className="dashboard-grid">
             {visibleSessions.map((session) => (
@@ -91,7 +92,7 @@ export const Dashboard: React.FC = () => {
               </article>
             ))}
           </div>
-          )}
+          ) : null}
         </>}
       </div>
     </div>

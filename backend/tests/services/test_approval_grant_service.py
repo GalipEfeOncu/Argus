@@ -118,6 +118,47 @@ async def test_once_grant_is_consumed_atomically_at_the_tool_boundary(temporary_
 
 
 @pytest.mark.asyncio
+async def test_ask_each_time_uses_only_one_matching_grant_for_one_operation(temporary_sqlite_db) -> None:
+    database = await get_db()
+    try:
+        await configured(database, behavior="ask_each_time")
+        service = ApprovalGrantService(database)
+        before = await service.evaluate(
+            "approval_session", capability="workspace.write", scope_path="src", operation_class="mutating",
+        )
+        await grant_requested_write(database, "approval_session", scope="src", grant_scope="once")
+        async with transaction(database):
+            first = await service.evaluate(
+                "approval_session", capability="workspace.write", scope_path="src", operation_class="mutating",
+                consume_once=True,
+            )
+            second = await service.evaluate(
+                "approval_session", capability="workspace.write", scope_path="src", operation_class="mutating",
+                consume_once=True,
+            )
+        unrelated = await service.evaluate(
+            "approval_session", capability="workspace.write", scope_path="other", operation_class="mutating",
+        )
+    finally:
+        await database.close()
+    assert before.outcome == "ask"
+    assert first.outcome == "allow"
+    assert second.outcome == "ask"
+    assert unrelated.outcome == "ask"
+
+
+@pytest.mark.asyncio
+async def test_ask_each_time_rejects_reusable_grant(temporary_sqlite_db) -> None:
+    database = await get_db()
+    try:
+        await configured(database, behavior="ask_each_time")
+        with pytest.raises(ApprovalRejected, match="only one-time"):
+            await grant_requested_write(database, "approval_session", scope="src", grant_scope="session")
+    finally:
+        await database.close()
+
+
+@pytest.mark.asyncio
 async def test_human_cannot_grant_a_broader_capability_or_fake_an_approval(temporary_sqlite_db) -> None:
     database = await get_db()
     try:

@@ -31,7 +31,8 @@ async def lifespan(app: FastAPI):
         await ProjectWorkspaceService(db, managed_root=Path(settings.db_path).expanduser().resolve().parent / "workspaces").recover_after_restart()
         report = await RecoveryService(db).recover_after_restart()
         recovered_coordinators = await session_runtime_manager.recover_after_restart()
-        observability.record("INFO", "runtime.recovery_checked", {"sessions": report.sessions, "orphanedAttempts": report.orphaned_attempts, "interruptedCoordinators": recovered_coordinators})
+        resumed_sessions = await session_runtime_manager.resume_queued_after_restart()
+        observability.record("INFO", "runtime.recovery_checked", {"sessions": report.sessions, "orphanedAttempts": report.orphaned_attempts, "interruptedCoordinators": recovered_coordinators, "interruptedInstructions": report.interrupted_instructions, "resumedSessions": resumed_sessions})
         print(f"[Argus] Recovery checked {report.sessions} sessions; orphaned attempts={report.orphaned_attempts}")
     finally:
         await db.close()

@@ -24,6 +24,7 @@ from app.schemas.coordinator_actions import (
     coordinator_action_schema,
 )
 from app.services.assignment_scheduler import AssignmentScheduler, SchedulerRejected
+from app.services.participant_instruction_service import ParticipantInstruction, ParticipantInstructionService
 from app.services.coordinator_cycle import CoordinatorCycle, CoordinatorCycleResult
 from app.services.provider_profile_service import ProviderProfileService
 from app.services.prompt_service import build_coordinator_system_prompt, build_direct_chat_system_prompt
@@ -43,16 +44,21 @@ class SessionRuntimeManager:
         self._provider_resolver = provider_resolver
         self._publisher = publisher
         self._tasks: dict[str, asyncio.Task[None]] = {}
+        self._wakeup: set[str] = set()
+        self._active_instruction_ids: dict[str, str] = {}
         self._active_chat_streams: dict[str, tuple[Provider, str]] = {}
         self._lock = asyncio.Lock()
         self._shutting_down = False
 
-    async def start(self, session_id: str) -> bool:
+    async def start(self, session_id: str, *, recovery: bool = False) -> bool:
         async with self._lock:
             active = self._tasks.get(session_id)
-            if self._shutting_down or (active is not None and not active.done()):
+            if self._shutting_down:
                 return False
-            task = asyncio.create_task(self._run(session_id), name=f"argus-coordinator-{session_id}")
+            if active is not None and not active.done():
+                self._wakeup.add(session_id)
+                return False
+            task = asyncio.create_task(self._drive(session_id, recovery=recovery), name=f"argus-coordinator-{session_id}")
             self._tasks[session_id] = task
             task.add_done_callback(lambda completed, value=session_id: self._discard(value, completed))
             return True
@@ -89,6 +95,8 @@ class SessionRuntimeManager:
                 task.exception() if not task.cancelled() else None
         async with self._lock:
             self._tasks.clear()
+            self._wakeup.clear()
+            self._active_instruction_ids.clear()
             self._shutting_down = False
 
     async def recover_after_restart(self) -> int:
@@ -114,13 +122,196 @@ class SessionRuntimeManager:
         finally:
             await db.close()
 
+    async def resume_queued_after_restart(self) -> int:
+        """Wake safe queued work and sessions still preparing at restart."""
+
+        db = await get_db()
+        try:
+            async with db.execute(
+                """SELECT session.id FROM sessions session WHERE session.status = 'preparing'
+                   OR (session.status = 'running'
+                   AND (EXISTS (SELECT 1 FROM assignments assignment WHERE assignment.session_id = session.id
+                                AND assignment.state = 'created' AND assignment.operation_class = 'read_only')
+                        OR EXISTS (SELECT 1 FROM participant_instructions instruction
+                                   WHERE instruction.session_id = session.id AND instruction.state = 'pending')))"""
+            ) as cursor:
+                session_ids = [str(row["id"]) for row in await cursor.fetchall()]
+        finally:
+            await db.close()
+        for session_id in session_ids:
+            await self.start(session_id, recovery=True)
+        return len(session_ids)
+
     def _discard(self, session_id: str, task: asyncio.Task[None]) -> None:
         if self._tasks.get(session_id) is task:
             self._tasks.pop(session_id, None)
+            if session_id in self._wakeup and not self._shutting_down:
+                self._wakeup.discard(session_id)
+                asyncio.create_task(self.start(session_id, recovery=True))
         if not task.cancelled():
             task.exception()
 
-    async def _run(self, session_id: str, specialist_context: str | None = None, cycle_depth: int = 0) -> None:
+    async def _drive(self, session_id: str, *, recovery: bool) -> None:
+        db = await get_db()
+        try:
+            if recovery:
+                await self._resume_created_assignments(db, session_id)
+            first = not recovery or await self._is_status(db, session_id, "preparing")
+            while True:
+                instruction = await ParticipantInstructionService(db).next_pending(session_id)
+                if instruction is None:
+                    if first:
+                        await self._run(session_id)
+                        first = False
+                        continue
+                    return
+                first = False
+                if not await ParticipantInstructionService(db).mark_started(instruction.id):
+                    continue
+                self._active_instruction_ids[session_id] = instruction.id
+                try:
+                    if instruction.delivery_kind == "explicit_mention" and not await self._is_coordinator_participant(db, instruction.participant_id):
+                        await self._run_explicit_instruction(db, session_id, instruction)
+                    else:
+                        await self._run(session_id, through_event_id=instruction.message_event_id)
+                    await ParticipantInstructionService(db).mark_finished(instruction.id)
+                finally:
+                    self._active_instruction_ids.pop(session_id, None)
+        finally:
+            await db.close()
+
+    async def _is_coordinator_participant(self, db: aiosqlite.Connection, participant_id: str) -> bool:
+        async with db.execute("SELECT role FROM session_agents WHERE id = ?", (participant_id,)) as cursor:
+            row = await cursor.fetchone()
+        return row is not None and row["role"] == "coordinator"
+
+    async def _event_sequence(self, db: aiosqlite.Connection, event_id: str | None) -> int:
+        if event_id is None:
+            return 2**63 - 1
+        async with db.execute("SELECT sequence FROM events WHERE id = ?", (event_id,)) as cursor:
+            row = await cursor.fetchone()
+        return int(row["sequence"]) if row is not None else 0
+
+    async def _last_started_instruction_event(self, db: aiosqlite.Connection, session_id: str) -> str:
+        async with db.execute(
+            """SELECT instruction.message_event_id FROM participant_instructions instruction
+               JOIN events event ON event.id = instruction.message_event_id
+               WHERE instruction.session_id = ? AND instruction.state = 'delivered'
+               ORDER BY event.sequence DESC LIMIT 1""", (session_id,),
+        ) as cursor:
+            row = await cursor.fetchone()
+        return str(row["message_event_id"]) if row is not None else ""
+
+    async def _run_explicit_instruction(
+        self, db: aiosqlite.Connection, session_id: str, instruction: ParticipantInstruction,
+    ) -> None:
+        """Turn one explicit human mention into a bounded read-only assignment."""
+
+        from app.schemas.coordinator_actions import CoordinatorAssignment
+        from app.services.assignment_worker import READ_TOOLS
+        async with db.execute("SELECT payload_json FROM events WHERE id = ? AND session_id = ?", (instruction.message_event_id, session_id)) as cursor:
+            row = await cursor.fetchone()
+        if row is None:
+            return
+        content = json.loads(row["payload_json"]).get("content")
+        if not isinstance(content, str) or not content.strip():
+            return
+        snapshot = await SessionConfigurationService(db).current(session_id)
+        agent = next((item for item in snapshot.agent_snapshots if item["id"] == instruction.participant_id), None)
+        if agent is None or instruction.participant_id not in snapshot.available_agent_ids:
+            await self._recoverable_error(db, session_id, "mentioned_agent_unavailable", "The mentioned participant is no longer available in this session.")
+            return
+        if "workspace.read" not in agent["capabilities"]:
+            await self._recoverable_error(db, session_id, "mentioned_agent_unavailable", "The mentioned participant cannot run a read-only assignment.")
+            return
+        proposal = CoordinatorAssignment.model_validate({
+            "proposalId": f"mention_{instruction.id}", "assigneeAgentId": instruction.participant_id,
+            "objective": content[:4_000], "acceptanceCriteria": ["Respond to the explicit human instruction with bounded, read-only evidence."],
+            "operationClass": "read_only", "requestedBudget": {}, "requestedCapabilities": ["workspace.read"],
+            "requestedTools": sorted(set(agent["toolAllowlist"]) & READ_TOOLS),
+            "reasonSummary": "The human explicitly addressed this session participant.",
+        })
+        before = await EventRepository(db).last_sequence(session_id)
+        try:
+            assignment_id = await AssignmentScheduler(db).accept_coordinator_proposal(
+                session_id, proposal, require_running=True, actor_id="human",
+            )
+        except SchedulerRejected as error:
+            page = await EventRepository(db).page_after(session_id, after_sequence=before)
+            await self._publish(session_id, list(page.events))
+            await self._recoverable_error(db, session_id, error.code, error.summary)
+            return
+        page = await EventRepository(db).page_after(session_id, after_sequence=before)
+        await self._publish(session_id, list(page.events))
+        await self._execute_ready_assignments(db, session_id, (assignment_id,))
+
+    async def _resume_created_assignments(self, db: aiosqlite.Connection, session_id: str) -> None:
+        async with db.execute(
+            """SELECT id FROM assignments WHERE session_id = ? AND state = 'created'
+               AND operation_class = 'read_only' ORDER BY created_at_ms, rowid""", (session_id,),
+        ) as cursor:
+            assignment_ids = tuple(str(row["id"]) for row in await cursor.fetchall())
+        if assignment_ids:
+            await self._execute_ready_assignments(db, session_id, assignment_ids)
+
+    async def _execute_ready_assignments(
+        self, db: aiosqlite.Connection, session_id: str, assignment_ids: tuple[str, ...],
+    ) -> None:
+        from app.services.assignment_worker import AssignmentWorker
+        scheduler = AssignmentScheduler(db)
+        before = await EventRepository(db).last_sequence(session_id)
+        scheduled = await scheduler.dispatch_ready(session_id, assignment_ids=assignment_ids)
+        page = await EventRepository(db).page_after(session_id, after_sequence=before)
+        await self._publish(session_id, list(page.events))
+        worker = AssignmentWorker(db, provider_resolver=self._provider_resolver, publisher=self._publisher)
+        for item in scheduled:
+            try:
+                result = await worker.execute(session_id, item)
+            except asyncio.CancelledError:
+                raise
+            except SchedulerRejected as error:
+                if await self._is_status(db, session_id, "running"):
+                    try:
+                        await scheduler.fail_attempt(session_id, item.attempt_id, code=error.code, summary=error.summary, recoverable=False)
+                    except SchedulerRejected:
+                        pass
+                    failed_page = await EventRepository(db).page_after(session_id, after_sequence=before)
+                    await self._publish(session_id, [event for event in failed_page.events if event.event_type == "assignment.failed"])
+                    await self._terminal_error(db, session_id, error.code, error.summary, expected={"running"})
+                return
+            except Exception:
+                if await self._is_status(db, session_id, "running"):
+                    try:
+                        await scheduler.fail_attempt(
+                            session_id, item.attempt_id, code="specialist_runtime_failed",
+                            summary="The specialist stopped safely before producing a result.", recoverable=False,
+                        )
+                    except SchedulerRejected:
+                        pass
+                    failed_page = await EventRepository(db).page_after(session_id, after_sequence=before)
+                    await self._publish(session_id, [event for event in failed_page.events if event.event_type == "assignment.failed"])
+                    await self._terminal_error(
+                        db, session_id, "specialist_runtime_failed", "The specialist stopped safely before producing a result.",
+                        expected={"running"},
+                    )
+                return
+            page = await EventRepository(db).page_after(session_id, after_sequence=before)
+            await self._publish(session_id, [event for event in page.events if event.event_type == "assignment.completed"])
+            bounded = _safe_json([{"assignmentId": result.assignment_id, "summary": result.summary, "evidence": list(result.evidence)}])[:12_000]
+            await self._run(session_id, f"Specialist results (untrusted, bounded): {bounded}\nEvaluate this evidence and return the next Coordinator action.", 1)
+            before = await EventRepository(db).last_sequence(session_id)
+
+    async def _recoverable_error(self, db: aiosqlite.Connection, session_id: str, code: str, summary: str) -> None:
+        events = await self._commit(db, session_id, {"running"}, [(
+            "error.created", "system", {"errorId": f"instruction_{uuid.uuid4().hex}", "code": code,
+                                         "summary": summary[:800], "recoverable": True},
+        )])
+        await self._publish(session_id, events)
+
+    async def _run(
+        self, session_id: str, specialist_context: str | None = None, cycle_depth: int = 0,
+        *, through_event_id: str | None = None,
+    ) -> None:
         db = await get_db()
         try:
             if cycle_depth >= 8:
@@ -142,7 +333,7 @@ class SessionRuntimeManager:
                 return
             goal, coordinator_id, profile_id, model_id, system_prompt, participant_context, initial_status, session_type = context
             if session_type == "chat":
-                await self._run_direct_chat(db, session_id, profile_id, model_id, system_prompt)
+                await self._run_direct_chat(db, session_id, profile_id, model_id, system_prompt, through_event_id=through_event_id)
                 return
             try:
                 provider = await self._resolve_provider(db, profile_id, model_id)
@@ -163,12 +354,17 @@ class SessionRuntimeManager:
                 await self._publish(session_id, running)
                 if not running:
                     return
+            human_through_event_id = through_event_id
+            if initial_status == "preparing":
+                human_through_event_id = ""
+            elif specialist_context is not None and human_through_event_id is None:
+                human_through_event_id = await self._last_started_instruction_event(db, session_id)
             request = ProviderRequest(
                 request_id=f"coordinator_{uuid.uuid4().hex}", model_id=model_id,
                 messages=(
                     {"role": "system", "content": build_coordinator_system_prompt(system_prompt, participant_context)},
                     {"role": "user", "content": goal},
-                    *(await self._recent_human_messages(db, session_id)),
+                    *(await self._recent_human_messages(db, session_id, through_event_id=human_through_event_id)),
                     *(({"role": "user", "content": specialist_context},) if specialist_context else ()),
                 ),
                 response_schema=coordinator_action_schema(),
@@ -223,6 +419,7 @@ class SessionRuntimeManager:
 
     async def _run_direct_chat(
         self, db: aiosqlite.Connection, session_id: str, profile_id: str, model_id: str, system_prompt: str,
+        *, through_event_id: str | None = None,
     ) -> None:
         """Stream one ordinary provider response without workspace orchestration."""
 
@@ -238,7 +435,7 @@ class SessionRuntimeManager:
             request_id=f"chat_{uuid.uuid4().hex}", model_id=model_id,
             messages=(
                 {"role": "system", "content": direct_system_prompt},
-                *(await self._recent_chat_messages(db, session_id)),
+                *(await self._recent_chat_messages(db, session_id, through_event_id=through_event_id)),
             ),
             max_output_tokens=1024,
             reasoning_effort="low" if profile.provider_preset == "openrouter" else None,
@@ -278,13 +475,13 @@ class SessionRuntimeManager:
                                 "messageId": message_id, "authorId": "coordinator", "authorKind": "coordinator",
                                 "content": event.text[:64_000], "mentionIds": [], "streaming": True,
                             },
-                        )])
+                        )], correlation_id=through_event_id)
                         await self._publish(session_id, committed)
                         created = bool(committed)
                     else:
                         committed = await self._commit(db, session_id, {"running"}, [(
                             "message.delta", "coordinator", {"messageId": message_id, "delta": event.text[:64_000]},
-                        )])
+                        )], correlation_id=through_event_id)
                         await self._publish(session_id, committed)
                 elif isinstance(event, Usage):
                     try:
@@ -315,12 +512,12 @@ class SessionRuntimeManager:
             if created and finished:
                 completed = await self._commit(db, session_id, {"running"}, [(
                     "message.completed", "coordinator", {"messageId": message_id},
-                )])
+                )], correlation_id=through_event_id)
                 await self._publish(session_id, completed)
             elif created and cancelled:
                 completed = await self._commit(db, session_id, {"running"}, [(
                     "message.completed", "coordinator", {"messageId": message_id},
-                )])
+                )], correlation_id=through_event_id)
                 await self._publish(session_id, completed)
             elif created:
                 await self._commit_chat_error(db, session_id, "chat_incomplete_response", "The provider ended the response unexpectedly. Try again.", message_id)
@@ -362,12 +559,21 @@ class SessionRuntimeManager:
         return await ProviderProfileService(db).runtime_provider(profile_id, model_id)
 
     async def _recent_human_messages(
-        self, db: aiosqlite.Connection, session_id: str,
+        self, db: aiosqlite.Connection, session_id: str, *, through_event_id: str | None = None,
     ) -> tuple[dict[str, str], ...]:
+        ceiling = await self._event_sequence(db, through_event_id)
         async with db.execute(
-            """SELECT payload_json FROM events WHERE session_id = ? AND event_type = 'message.created'
-               AND actor_id = 'human' ORDER BY sequence DESC LIMIT 20""",
-            (session_id,),
+            """SELECT event.payload_json FROM events event
+               WHERE event.session_id = ? AND event.event_type = 'message.created'
+                 AND event.actor_id = 'human' AND event.sequence <= ?
+                 AND (NOT EXISTS (SELECT 1 FROM participant_instructions instruction WHERE instruction.message_event_id = event.id)
+                      OR EXISTS (SELECT 1 FROM participant_instructions instruction
+                                 WHERE instruction.message_event_id = event.id AND instruction.state = 'delivered'
+                                   AND (instruction.delivery_kind = 'coordinator'
+                                        OR instruction.participant_id IN (
+                                            SELECT id FROM session_agents WHERE session_id = event.session_id AND role = 'coordinator'))))
+               ORDER BY event.sequence DESC LIMIT 20""",
+            (session_id, ceiling),
         ) as cursor:
             rows = list(reversed(await cursor.fetchall()))
         messages: list[dict[str, str]] = []
@@ -378,35 +584,48 @@ class SessionRuntimeManager:
         return tuple(messages)
 
     async def _recent_chat_messages(
-        self, db: aiosqlite.Connection, session_id: str,
+        self, db: aiosqlite.Connection, session_id: str, *, through_event_id: str | None = None,
     ) -> tuple[ProviderMessage, ...]:
         """Rebuild the recent alternating direct-chat transcript from ordered events."""
 
+        ceiling = await self._event_sequence(db, through_event_id)
         async with db.execute(
-            """SELECT sequence, payload_json FROM events
+            """SELECT id, sequence, payload_json, correlation_id FROM events
                WHERE session_id = ? AND event_type = 'message.created'
                ORDER BY sequence DESC LIMIT 100""",
             (session_id,),
         ) as cursor:
             created_rows = list(reversed(await cursor.fetchall()))
 
-        selected: list[tuple[int, str, str]] = []
+        human_sequences = {
+            str(row["id"]): int(row["sequence"]) for row in created_rows
+            if int(row["sequence"]) <= ceiling and json.loads(row["payload_json"]).get("authorKind") == "human"
+        }
+        selected: list[tuple[int, int, str, str]] = []
         for row in created_rows:
             payload = json.loads(row["payload_json"])
             message_id = payload.get("messageId")
             author_kind = payload.get("authorKind")
             if not isinstance(message_id, str) or author_kind not in {"human", "coordinator"}:
                 continue
-            selected.append((int(row["sequence"]), message_id, "assistant" if author_kind == "coordinator" else "user"))
+            sequence = int(row["sequence"])
+            if author_kind == "human":
+                if sequence <= ceiling:
+                    selected.append((sequence, 0, message_id, "user"))
+            elif row["correlation_id"] in human_sequences:
+                selected.append((human_sequences[str(row["correlation_id"])], 1, message_id, "assistant"))
+            elif sequence <= ceiling and row["correlation_id"] is None:
+                selected.append((sequence, 0, message_id, "assistant"))
+        selected.sort()
         selected = selected[-20:]
         if not selected:
             return ()
 
-        selected_ids = {message_id for _, message_id, _ in selected}
-        roles = {message_id: role for _, message_id, role in selected}
+        selected_ids = {message_id for _, _, message_id, _ in selected}
+        roles = {message_id: role for _, _, message_id, role in selected}
         contents = {message_id: "" for message_id in selected_ids}
-        order: list[str] = []
-        first_sequence = selected[0][0]
+        order = [message_id for _, _, message_id, _ in selected]
+        first_sequence = min(int(row["sequence"]) for row in created_rows if json.loads(row["payload_json"]).get("messageId") in selected_ids)
         async with db.execute(
             """SELECT event_type, payload_json FROM events
                WHERE session_id = ? AND sequence >= ?
@@ -425,8 +644,6 @@ class SessionRuntimeManager:
                 content = payload.get("content")
                 if isinstance(content, str):
                     contents[message_id] = content
-                if message_id not in order:
-                    order.append(message_id)
             else:
                 delta = payload.get("delta")
                 if isinstance(delta, str):
@@ -446,6 +663,12 @@ class SessionRuntimeManager:
         *, cycle_depth: int = 0,
     ) -> None:
         action = result.action
+        if await ParticipantInstructionService(db).has_pending(
+            session_id, exclude_id=self._active_instruction_ids.get(session_id),
+        ):
+            # A newer human instruction supersedes this decision even when it
+            # arrives after provider output but before action persistence.
+            return
         if action is None:
             if result.error_code == "user_superseded":
                 return
@@ -600,7 +823,7 @@ class SessionRuntimeManager:
         events = await self._commit(db, session_id, {"running"}, [
             ("message.created", "coordinator", {"messageId": f"msg_{uuid.uuid4().hex}", "authorId": coordinator_id, "authorKind": "coordinator", "content": content, "mentionIds": [], "streaming": False}),
             ("session.status_changed", "system", {"status": status, "reasonSummary": reason}),
-        ])
+        ], defer_status_if_pending=True)
         await self._publish(session_id, events)
 
     async def _message(
@@ -623,6 +846,7 @@ class SessionRuntimeManager:
     async def _commit(
         self, db: aiosqlite.Connection, session_id: str, expected: set[str],
         specs: list[tuple[str, str, dict]],
+        *, defer_status_if_pending: bool = False, correlation_id: str | None = None,
     ) -> list[StoredEvent]:
         committed: list[StoredEvent] = []
         async with transaction(db):
@@ -630,11 +854,15 @@ class SessionRuntimeManager:
                 session = await cursor.fetchone()
             if session is None or session["status"] not in expected:
                 return []
+            if defer_status_if_pending and await ParticipantInstructionService(db).has_pending(
+                session_id, exclude_id=self._active_instruction_ids.get(session_id),
+            ):
+                return []
             repository = EventRepository(db)
             for event_type, actor_id, payload in specs:
                 committed.append(await repository._append_in_transaction(
                     event_id=f"evt_{uuid.uuid4().hex}", session_id=session_id, event_type=event_type, actor_id=actor_id,
-                    payload=payload, payload_json=_safe_json(payload), timestamp_ms=_now_ms(), correlation_id=None, command_id=None,
+                    payload=payload, payload_json=_safe_json(payload), timestamp_ms=_now_ms(), correlation_id=correlation_id, command_id=None,
                 ))
         return committed
 

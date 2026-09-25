@@ -14,6 +14,7 @@ from hashlib import sha256
 import json
 import os
 from pathlib import Path
+import re
 import shutil
 import stat
 import subprocess
@@ -42,6 +43,43 @@ class WriterLeaseUnavailable(WorkspaceError):
 
 class UnsupportedProject(WorkspaceError):
     pass
+
+
+_SECRET_FILE_NAMES = frozenset({
+    ".env", ".npmrc", ".pypirc", ".netrc", "id_rsa", "id_ed25519", "id_ecdsa", "id_dsa",
+    "credentials", "credentials.json", "secrets.json", "service-account.json",
+})
+_SECRET_SUFFIXES = (".pem", ".key", ".p12", ".pfx", ".jks", ".keystore")
+_SECRET_ASSIGNMENT = re.compile(
+    r"(?im)(?:^|[,{])\s*(?:export\s+)?['\"]?[\w.-]*"
+    r"(?:api[_-]?key|access[_-]?key|secret|token|password|passwd|credential|"
+    r"private[_-]?key|authorization|database[_-]?url|connection[_-]?string|dsn)"
+    r"[\w.-]*['\"]?\s*(?::|=(?!=))\s*['\"]?([^\s'\"#,}\]]+)"
+)
+_SECRET_MARKER = re.compile(
+    r"-----BEGIN [A-Z ]*PRIVATE KEY-----|\b(?:AKIA[0-9A-Z]{16}|gh[pousr]_[A-Za-z0-9_]{20,}|github_pat_[A-Za-z0-9_]{20,}|sk-[A-Za-z0-9_-]{20,})\b"
+)
+
+
+def is_sensitive_workspace_path(path: str | Path) -> bool:
+    """Conservatively withhold secret-bearing paths from model-facing tools."""
+
+    parts = Path(path).parts
+    for part in parts:
+        name = part.casefold()
+        if (name in _SECRET_FILE_NAMES or name.startswith(".env.") or name.endswith(_SECRET_SUFFIXES)
+                or name.startswith(("secret.", "secrets.", "credentials.", "service-account."))
+                or name.endswith((".secret", ".secrets"))):
+            return True
+        if name.startswith(".") and name not in {".", ".gitignore", ".ignore", ".rgignore"}:
+            return True
+        if name in {"secrets", "credentials", "private_keys"}:
+            return True
+    return False
+
+
+def _contains_sensitive_content(content: str) -> bool:
+    return bool(_SECRET_MARKER.search(content) or _SECRET_ASSIGNMENT.search(content))
 
 
 def _now_ms() -> int:
@@ -523,6 +561,8 @@ class ScopedToolService:
         self._workspace = workspace
 
     def read_text(self, path: str, *, max_characters: int | None = None) -> str:
+        if is_sensitive_workspace_path(path):
+            raise WorkspaceScopeError("sensitive workspace content is not available to model tools")
         try:
             file_fd = _open_workspace_file(self._workspace.root_path, path, write=False)
         except OSError as error:
@@ -533,9 +573,13 @@ class ScopedToolService:
             content = handle.read() if max_characters is None else handle.read(max_characters + 1)
         if max_characters is not None and len(content) > max_characters:
             raise WorkspaceError("workspace file exceeds the bounded read limit")
+        if _contains_sensitive_content(content):
+            raise WorkspaceScopeError("sensitive workspace content is not available to model tools")
         return content
 
     def list_directory(self, path: str = ".", *, max_entries: int = 200) -> list[str]:
+        if is_sensitive_workspace_path(path):
+            raise WorkspaceScopeError("sensitive workspace content is not available to model tools")
         target = resolve_workspace_path(self._workspace.root_path, path, must_exist=True)
         if target.is_symlink() or not target.is_dir():
             raise WorkspaceScopeError("workspace directory target is invalid")
@@ -543,6 +587,8 @@ class ScopedToolService:
         for child in sorted(target.iterdir(), key=lambda item: item.name):
             if child.is_symlink():
                 raise WorkspaceScopeError("symbolic links are not allowed in workspace paths")
+            if is_sensitive_workspace_path(child.name):
+                continue
             entries.append(child.name + ("/" if child.is_dir() else ""))
             if len(entries) >= max_entries:
                 break
@@ -554,6 +600,8 @@ class ScopedToolService:
     ) -> list[str]:
         if not query or len(query) > 500:
             raise WorkspaceError("search query must be between 1 and 500 characters")
+        if is_sensitive_workspace_path(path):
+            raise WorkspaceScopeError("sensitive workspace content is not available to model tools")
         target = resolve_workspace_path(self._workspace.root_path, path, must_exist=True)
         if target.is_symlink():
             raise WorkspaceScopeError("symbolic links are not allowed in workspace paths")
@@ -567,13 +615,17 @@ class ScopedToolService:
                     for name in directories:
                         if (current_path / name).is_symlink():
                             raise WorkspaceScopeError("symbolic links are not allowed in workspace paths")
-                    directories[:] = sorted(directories)
+                    directories[:] = sorted(name for name in directories if not is_sensitive_workspace_path(name))
                     for name in sorted(files):
+                        if is_sensitive_workspace_path(name):
+                            continue
                         yield current_path / name
             candidates = bounded_files()
         results: list[str] = []
         scanned_files = scanned_bytes = 0
         for candidate in candidates:
+            if is_sensitive_workspace_path(candidate.relative_to(self._workspace.root_path)):
+                continue
             if candidate.is_symlink():
                 raise WorkspaceScopeError("symbolic links are not allowed in workspace paths")
             if not candidate.is_file():

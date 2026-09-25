@@ -124,20 +124,25 @@ test('sidebar exposes loading, empty, and retryable error states', () => {
   expect(screen.getByText('No local projects registered.')).toBeInTheDocument();
 });
 
-test('dashboard exposes loading, empty, and retryable error states', () => {
+test('dashboard error does not claim the local catalogue is empty', () => {
   useWorkspaceStore.setState({ loading: true });
-  const view = render(<Dashboard />);
+  render(<Dashboard />);
   expect(screen.getByRole('status')).toHaveTextContent('Loading local sessions');
 
   act(() => useWorkspaceStore.setState({ loading: false, error: 'Local projects and sessions could not be loaded.' }));
   expect(screen.getByRole('alert')).toHaveTextContent('Local projects and sessions could not be loaded');
   expect(screen.getByRole('button', { name: 'Retry loading local projects and sessions' })).toBeInTheDocument();
+  expect(screen.queryByText('No sessions yet')).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Start your first session' })).not.toBeInTheDocument();
+});
 
-  act(() => useWorkspaceStore.setState({ error: null, sessions: [] }));
+test('dashboard empty state starts the described project-session setup', () => {
+  render(<Dashboard />);
   expect(screen.getByText('No sessions yet')).toBeInTheDocument();
   expect(screen.getByText('Start a read-only session with Coordinator and one specialist at a time.')).toBeInTheDocument();
   expect(screen.getByRole('button', { name: 'Start your first session' })).toBeInTheDocument();
-  view.unmount();
+  fireEvent.click(screen.getByRole('button', { name: 'Start your first session' }));
+  expect(useUIStore.getState().activePage).toBe('session-setup');
 });
 
 test('dashboard navigates semantically without exposing the unsupported retention action', () => {

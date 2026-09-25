@@ -212,8 +212,14 @@ connection for it, resolves only the immutable configured provider/model, and
 publishes every derived event after commit. The turn continues without a live
 WebSocket. Pause or cancel fences late provider output, shutdown drains then
 cancels within a bound, and restart recovery records an interrupted Coordinator
-operation as unknown instead of replaying remote work. Accepted read-only
-assignments now dispatch a bounded provider-backed specialist worker. Its tools
+operation as unknown instead of replaying remote work. Accepted human
+instructions are drained in event order by that same process-owned
+runtime, including direct-chat sends arriving during a stream and explicit
+specialist mentions. Delivery start and finish are durable so startup can make
+an interrupted instruction visible. Recoverable orphaned read-only assignments
+are dispatched through the scheduler after restart; uncertain mutating work is
+never replayed. Accepted read-only assignments now dispatch a bounded
+provider-backed specialist worker. Its tools
 are the intersection of the proposal, immutable session-agent allowlist, and
 `workspace.read` authority, and all filesystem reads pass through the scoped
 workspace service. Tool arguments/results remain provider-turn context only;
